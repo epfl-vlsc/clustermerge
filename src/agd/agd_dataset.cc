@@ -13,7 +13,6 @@
 
 namespace agd {
 
-using std::cout;
 using std::ifstream;
 using std::string;
 using std::unique_ptr;
@@ -22,6 +21,8 @@ using std::vector;
 Status AGDDataset::Create(const string& agd_json_path,
                           unique_ptr<AGDDataset>& dataset,
                           vector<string> columns) {
+
+  std::cout << "Loading AGD dataset '" << agd_json_path << "' ...\n";
   dataset.reset(new AGDDataset());
   Status s = dataset->Initialize(agd_json_path, columns);
   if (!s.ok()) {
@@ -37,14 +38,20 @@ Status AGDDataset::Initialize(const string& agd_json_path,
   json agd_metadata;
   i >> agd_metadata;
   name_ = agd_metadata["name"];
-  cout << "AGDDataset name is " << name_ << "\n";
   agd_metadata_ = agd_metadata;
 
   vector<string> to_load;
   const auto& cols = agd_metadata["columns"];
   if (!columns.empty()) {
     for (const auto& c : columns) {
-      if (cols.find(c) == cols.end()) {
+      bool found = false;
+      for (const auto& json_col : cols) {
+        if (json_col == c) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
         return NotFound("column ", c, " was not found in dataset.");
       }
     }
@@ -57,17 +64,14 @@ Status AGDDataset::Initialize(const string& agd_json_path,
 
   string file_path_base =
       agd_json_path.substr(0, agd_json_path.find_last_of('/') + 1);
-  cout << "AGDDataset base path is " << file_path_base << "\n";
 
   RecordParser parser;
 
   for (const auto& c : to_load) {
-    cout << "AGDDataset loading column " << c << "\n";
 
     for (const auto& chunk : agd_metadata["records"]) {
       string chunk_name = chunk["path"];
       string path = absl::StrCat(file_path_base, chunk_name, ".", c);
-      cout << "AGDDataset loading chunk " << path << "\n";
 
       const int fd = open(path.c_str(), O_RDONLY);
       struct stat st;

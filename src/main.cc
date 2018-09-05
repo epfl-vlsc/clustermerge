@@ -1,37 +1,83 @@
 
 #include <iostream>
 #include "agd/agd_dataset.h"
+#include "args.h"
+#include "debug.h"
+#include "bottom_up_merge.h"
 
 using std::cout;
 using std::string;
 using std::unique_ptr;
 
-string PrintNormalizedProtein(const char* seq, size_t len) {
-  std::vector<char> scratch;
-  scratch.resize(len);
-  memcpy(&scratch[0], seq, len);
-  for (size_t i = 0; i < len; i++) {
-    scratch[i] = scratch[i] + 'A';
-  }
-  return string(&scratch[0], len);
+agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
+                         std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
+    
+    agd::Status s = agd::Status::OK();
+    for (const auto dataset_opt : args::get(datasets_opts)) {
+      unique_ptr<agd::AGDDataset> dataset;
+      try {
+        s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
+      } catch (...) {
+        cout << "Error parsing AGD metadata for dataet '" << dataset_opt << "', are you sure it's valid JSON?";
+        throw;
+      }
+      datasets->push_back(std::move(dataset));
+    }
+    return s;
 }
 
 int main(int argc, char** argv) {
-  string json_path(argv[1]);
-  unique_ptr<agd::AGDDataset> dataset;
+  args::ArgumentParser parser("ClusterMerge",
+                              "Bottom up protein cluster merge.");
+  args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+  args::PositionalList<std::string> datasets_opts(parser, "datasets",
+                                         "AGD Protein datasets to cluster.");
 
-  cout << "JSON path is " << json_path << "\n";
-  agd::Status s = agd::AGDDataset::Create(json_path, dataset);
+  try {
+    parser.ParseCLI(argc, argv);
+  } catch (args::Help) {
+    std::cout << parser;
+    return 0;
+  } catch (args::ParseError e) {
+    std::cerr << e.what() << std::endl;
+    std::cerr << parser;
+    return 1;
+  } catch (args::ValidationError e) {
+    std::cerr << e.what() << std::endl;
+    std::cerr << parser;
+    return 1;
+  }
+
+  std::vector<unique_ptr<agd::AGDDataset>> datasets;
+  
+  agd::Status s;
+
+  if (datasets_opts) {
+    // load and parse protein datasets
+     s = LoadDatasets(datasets_opts, &datasets);
+  } else {
+    cout << "No AGD datasets provided. See usage: \n";
+    std::cerr << parser;
+  }
 
   if (!s.ok()) {
     cout << s.ToString() << "\n";
     return 0;
   }
 
-  agd::AGDDataset::ColumnIterator iter;
-  s = dataset->Column("prot", &iter);
-  
-  if (!s.ok()) {
+  // build initial clustersets
+  // one sequence, in one cluster, in one set
+  // then, we bottom-up merge them
+
+  cout << "Data loaded, building merger ...\n";
+  BottomUpMerge merger(datasets);
+  merger.DebugDump();
+
+
+  /*agd::AGDDataset::ColumnIterator iter;
+  s = dataset->Column("prot", &iter);*/
+
+  /*if (!s.ok()) {
     cout << s.ToString() << "\n";
     return 0;
   }
@@ -42,7 +88,7 @@ int main(int argc, char** argv) {
   while (s.ok()) {
     cout << PrintNormalizedProtein(data, size) << "\n\n";
     s = iter.GetNextRecord(&data, &size);
-  }
+  }*/
 
   return (0);
 }

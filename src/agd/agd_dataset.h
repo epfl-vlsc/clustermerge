@@ -40,6 +40,10 @@ class AGDDataset {
     }
   }
 
+  uint32_t Size() const { return total_records_; }
+
+  const std::string& Name() const { return name_; }
+
  private:
   AGDDataset() = default;
   Status Initialize(const std::string& agd_json_path,

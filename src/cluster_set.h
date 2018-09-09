@@ -16,8 +16,10 @@ class ClusterSet {
   }
 
   // merge two cluster sets by building a new one
-  ClusterSet MergeClusters(ClusterSet& other);
+  ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
 
+  //void ScheduleAlignments(AlignmentExecutor* executor);
+  
   void DebugDump() const;
 
  private:

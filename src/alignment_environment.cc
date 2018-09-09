@@ -97,7 +97,7 @@ void ReadJsonEnv(const json& json_env, AlignmentEnvironment* env) {
   env->gap_open = json_env["gap_open"];
   env->gap_extend = json_env["gap_ext"];
   env->pam_distance = json_env["pam_distance"];
-  env->threshold = json_env["threshold"];
+  env->threshold = 85.0f;
 
   env->matrix = new double[MDIM];
   std::fill(env->matrix, env->matrix + MDIM, 0.0f);
@@ -111,7 +111,8 @@ void ReadJsonEnv(const json& json_env, AlignmentEnvironment* env) {
       exit(0);
     }
     for (size_t j = 0; j < column_order.size(); j++) {
-      env->matrix[(column_order[i].get<char>() - 'A') * DIMSIZE + column_order[j].get<char>() - 'A'] =
+      //cout << "column order first char is " << column_order[i].get<string>().front() << "\n";
+      env->matrix[(column_order[i].get<string>().front() - 'A') * DIMSIZE + column_order[j].get<string>().front() - 'A'] =
           compact_matrix[i][j];
     }
   }
@@ -131,6 +132,7 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
   size_t i = 0;
   for (const auto& env : matrices_json["matrices"]) {
     ReadJsonEnv(env, &envs_[i]);
+    i++;
   }
 
   ReadJsonEnv(logpam_json, &logpam_env_);
@@ -151,8 +153,22 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
       just_score_env_.gap_open, just_score_env_.gap_extend,
       just_score_env_.gap_open_int16, just_score_env_.gap_ext_int16);
 
+  /*cout << "just score int 16\n";
+  for (size_t i = 0; i < DIMSIZE; i++) {
+    for (size_t j = 0; j < DIMSIZE; j++) {
+      printf("%d ", just_score_env_.matrix_int16[i*DIMSIZE + j]);
+    }
+    printf("\n");
+  }*/
+
+  for (size_t i = 0; i < envs_.size(); i++) {
+    if (envs_[i].matrix == nullptr) {
+      cout << "NULL MAT POINTER!!";
+    }
+  }
   vector<double> gaps, gap_extends, pam_dists;
   vector<double*> double_matrices;
+  double_matrices.push_back(nullptr);
   gaps.push_back(0.0f);
   gap_extends.push_back(0.0f);
   pam_dists.push_back(0.0f);

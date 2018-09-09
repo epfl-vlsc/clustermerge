@@ -32,6 +32,9 @@ class AlignmentEnvironments {
  // pointers here own no data
  public:
   AlignmentEnvironments() {}
+  // no allow copy, iz bad
+  AlignmentEnvironments(const AlignmentEnvironments& envs) = delete;
+
   void EstimPam(char* seq1, char* seq2, int len, double result[3]) const;
   const AlignmentEnvironment& FindNearest(double pam) const;
   const AlignmentEnvironment& LogPamEnv() const;

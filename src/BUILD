@@ -35,10 +35,20 @@ cc_library(
     copts = ["-msse3"]
 )
 
+# actually generate debug symbols ffs
+# only applies to MacOS
+genrule(
+    name = "main_dsym",
+    srcs = [":clustermerge"],
+    outs = ["clustermerge.dSYM"],
+    output_to_bindir = True,
+    cmd = "dsymutil $(location :clustermerge) -o $@"
+)
+
 cc_binary(
     name = "clustermerge",
-    srcs = glob(["*.cc", "*.h"]),
-    #copts = ["-std=c++17"],
+    srcs = glob(["*.cc", "*.h"]) + ["threadpool/ThreadPool.h"],
+    copts = ["-std=c++17"],
     deps = ["@com_google_absl//absl/strings",
             ":swps3_lib",
             "//src/agd:agd"]

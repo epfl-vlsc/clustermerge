@@ -58,6 +58,10 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
     auto& s1 = sets_[0];
     auto& s2 = sets_[1];
 
+    cout << "Merging cluster sets: \n";
+    s1.DebugDump();
+    cout << "\nand\n";
+    s2.DebugDump();
     auto merged_set = s1.MergeClusters(s2, aligner_);
 
     sets_.pop_front();
@@ -67,7 +71,9 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
 
   auto& final_set = sets_[0];
 
+  cout << "Got the final set.\n";
   // for all clusters in final set, schedule all-all alignments with executor
+  final_set.ScheduleAlignments(executor);
 
   return agd::Status::OK();
 }

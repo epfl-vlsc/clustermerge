@@ -122,15 +122,18 @@ int main(int argc, char** argv) {
   cout << "Data loaded, building merger ...\n";
   BottomUpMerge merger(datasets, &aligner);
 
-  AllAllExecutor executor(std::thread::hardware_concurrency(), 100, &envs,
+  AllAllExecutor executor(/*std::thread::hardware_concurrency()*/1, 100, &envs,
                           &params);
+  executor.Initialize();
+
   // pass to Run
   merger.Run(&executor);
 
+  merger.DebugDump();
   // wait and finish call on executor
   // which dumps final results to disk
+  executor.FinishAndOutput("outputfoldertest");
 
-  merger.DebugDump();
 
 
   return (0);

@@ -6,6 +6,8 @@
 
 ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
                                      ProteinAligner* aligner) {
+  // this is the money method
+  
   // merge clusters, clusters can "disappear" from either
   // set, so we just create a new one and resize its internal
   // cluster vector for a single alloc
@@ -109,6 +111,19 @@ void ClusterSet::DebugDump() const {
       std::cout << "\t\tGenome: " << seq.Genome() << ", sequence: "
                 << PrintNormalizedProtein(seq.Seq().data(), seq.Seq().length())
                 << "\n\n";
+    }
+  }
+}
+
+void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
+  for (const auto& cluster : clusters_) {
+    for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end(); it++) {
+
+      for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
+        std::cout << "Scheduling alignment...\n";
+        AllAllExecutor::WorkItem item = std::make_tuple(&(*it), &(*itt));
+        executor->EnqueueAlignment(item);
+      }
     }
   }
 }

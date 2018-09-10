@@ -1,8 +1,9 @@
 
 #pragma once
 
+#include <vector>
+#include "all_all_executor.h"
 #include "cluster.h"
-#include <vector> 
 
 class ClusterSet {
  public:
@@ -11,15 +12,14 @@ class ClusterSet {
     clusters_.push_back(std::move(c));
   }
 
-  ClusterSet(size_t num) {
-    clusters_.resize(num);
-  }
+  ClusterSet(size_t num) { clusters_.resize(num); }
 
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
 
-  //void ScheduleAlignments(AlignmentExecutor* executor);
-  
+  // schedule all-all alignments onto the executor threadpool
+  void ScheduleAlignments(AllAllExecutor* executor);
+
   void DebugDump() const;
 
  private:

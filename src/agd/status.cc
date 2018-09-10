@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "status.h"
 #include <stdio.h>
+#include <assert.h>
 
 namespace agd {
 

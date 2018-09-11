@@ -32,6 +32,21 @@ void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
 
   std::unordered_map<GenomePair, std::ofstream, PairHash> file_map;
   string output_dir("output_matches");
+  struct stat info;
+  if (stat(output_dir.c_str(), &info) != 0) {
+    // doesnt exist, create
+    cout << "creating dir " << output_dir << "\n";
+    int e = mkdir(output_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if (e != 0) {
+      cout << "could not create output dir " << output_dir << ", exiting ...\n";
+      exit(0);
+    }
+  } else if (!(info.st_mode & S_IFDIR)) {
+    // exists but not dir
+    cout << "output dir exists but is not dir, exiting ...\n";
+    exit(0);
+  }  // else, dir exists,
+
   size_t total_candidates = 0;
 
   for (const auto& matches_map : matches_per_thread_) {

@@ -39,6 +39,7 @@ class ProteinAligner {
     if (buf1_) {
       delete[] buf1_;
     }
+    delete bt_data_;
   }
 
   agd::Status AlignLocal(const char* seq1, const char* seq2, int seq1_len,

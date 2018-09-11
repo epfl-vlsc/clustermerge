@@ -124,6 +124,7 @@ void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
     of.seekp(pos - 2);
     of << " ):";
   }
+  cout << "Total matches: " << total_candidates << "\n";
 }
 
 AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,

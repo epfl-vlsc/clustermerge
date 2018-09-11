@@ -1,10 +1,11 @@
 
 #include "aligner.h"
-#include "debug.h"
 #include <cfloat>
 #include <fstream>
+#include <iostream>
 #include <vector>
 #include "agd/agd_dataset.h"
+#include "debug.h"
 extern "C" {
 #include "swps3/DynProgr_sse_double.h"
 #include "swps3/DynProgr_sse_short.h"
@@ -109,7 +110,7 @@ void ProteinAligner::FindStartingPoint(const char* seq1, const char* seq2,
 
     int max_len = AlignStrings(new_env.matrix, s1, s1_len, s2, s2_len,
                                alignment.score, buf1_, buf2_, 0.5e-4,
-                               new_env.gap_open, new_env.gap_extend, &bt_data_);
+                               new_env.gap_open, new_env.gap_extend, bt_data_);
     envs_->EstimPam(buf1_, buf2_, max_len, estim_result);
     // LOG(INFO) << "FSP: estim pam values: " << estim_result[0] << ", " <<
     // estim_result[1]
@@ -182,7 +183,7 @@ agd::Status ProteinAligner::AlignLocal(const char* seq1, const char* seq2,
 
     int max_len = AlignStrings(new_env.matrix, s1, s1_len, s2, s2_len,
                                alignment.score, buf1_, buf2_, 0.5e-4,
-                               new_env.gap_open, new_env.gap_extend, &bt_data_);
+                               new_env.gap_open, new_env.gap_extend, bt_data_);
     envs_->EstimPam(buf1_, buf2_, max_len, estim_result);
     // LOG(INFO) << "AlignLocal: estim pam values: " << estim_result[0] << ", "
     // << estim_result[1]
@@ -232,7 +233,7 @@ agd::Status ProteinAligner::AlignDouble(const char* seq1, const char* seq2,
 
   double score =
       align_double_local(profile, seq2, seq2_len, env.gap_open, env.gap_extend,
-                         thresh, &max1, &max2, &bt_data_);
+                         thresh, &max1, &max2, bt_data_);
   max1--;
   max2--;
 
@@ -254,7 +255,7 @@ agd::Status ProteinAligner::AlignDouble(const char* seq1, const char* seq2,
 
   double score_rev = align_double_local(
       profile_rev, seq2_rev.c_str(), seq2_rev.length(), env.gap_open,
-      env.gap_extend, thresh, &max1_rev, &max2_rev, &bt_data_);
+      env.gap_extend, thresh, &max1_rev, &max2_rev, bt_data_);
   max1_rev--;
   max2_rev--;
 
@@ -271,7 +272,7 @@ agd::Status ProteinAligner::AlignDouble(const char* seq1, const char* seq2,
   // << result.seq1_min
   //<< ", seq2min: " << result.seq2_min;
 
-  //CHECK_LE(fabs(score - score_rev), fabs(score) * 1e-10);
+  // CHECK_LE(fabs(score - score_rev), fabs(score) * 1e-10);
   if (!(fabs(score - score_rev) <= fabs(score) * 1e-10)) {
     return agd::errors::Internal("score not less than or equal");
   }
@@ -305,7 +306,7 @@ bool ProteinAligner::PassesThreshold(const char* seq1, const char* seq2,
     value = score / (65535.0f / options.threshold);
 
   swps3_freeProfileShortSSE(profile);
-  // LOG(INFO) << "value is " << value << " score is " << score;
+  std::cout << "ALIGNER: value is " << value << " score is " << score;
   return value >= 0.75f * params_->min_score;
 }
 

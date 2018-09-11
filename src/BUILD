@@ -48,7 +48,6 @@ genrule(
 cc_binary(
     name = "clustermerge",
     srcs = glob(["*.cc", "*.h"]) + ["threadpool/ThreadPool.h"],
-    copts = ["-std=c++17"],
     linkopts = ["-lpthread"],
     deps = ["@com_google_absl//absl/strings",
             ":swps3_lib",

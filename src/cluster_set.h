@@ -12,7 +12,7 @@ class ClusterSet {
     clusters_.push_back(std::move(c));
   }
 
-  ClusterSet(size_t num) { clusters_.resize(num); }
+  ClusterSet(size_t num) { clusters_.reserve(num); }
 
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);

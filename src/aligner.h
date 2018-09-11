@@ -31,7 +31,9 @@ class ProteinAligner {
   };
 
   ProteinAligner(const AlignmentEnvironments* envs, const Parameters* params)
-      : envs_(envs), params_(params) {}
+      : envs_(envs), params_(params) {
+        bt_data_ = new BTData();
+  }
 
   ~ProteinAligner() {
     if (buf1_) {
@@ -87,5 +89,5 @@ class ProteinAligner {
   char* savebuf1_ = nullptr;  // MAXSEQLEN
   char* savebuf2_ = nullptr;  // MAXSEQLEN
 
-  BTData bt_data_;
+  BTData* bt_data_;
 };

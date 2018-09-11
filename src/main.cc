@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
   } else {
     cout << "No AGD datasets provided. See usage: \n";
     std::cerr << parser;
+    exit(0);
   }
 
   if (!s.ok()) {

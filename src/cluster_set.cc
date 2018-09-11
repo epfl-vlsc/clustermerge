@@ -23,6 +23,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
       // construct new_cluster_set
 
       if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
+        std::cout << "passed threshold, aligning ...\n";
         s = c.AlignReps(c_other, &alignment, aligner);
         // does c contain c_other fully
         if (alignment.seq1_max - alignment.seq1_min == c.Rep().Seq().size()) {
@@ -86,10 +87,10 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
             c.Merge(c_other, aligner);
           }
         }
-
-        // c is compared to all others and still exists, push into new
-        new_cluster_set.clusters_.push_back(std::move(c));
-      }
+      } // if passes threshold
+    }
+    if (!c.IsFullyMerged()) {
+      new_cluster_set.clusters_.push_back(std::move(c));
     }
   }
 
@@ -99,6 +100,8 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
       new_cluster_set.clusters_.push_back(std::move(c_other));
     }
   }
+  std::cout << "new cluster set is \n";
+  new_cluster_set.DebugDump();
 
   return new_cluster_set;
 }

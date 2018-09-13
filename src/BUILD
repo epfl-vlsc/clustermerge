@@ -49,7 +49,7 @@ cc_binary(
     name = "clustermerge",
     srcs = glob(["*.cc", "*.h"]),
     linkopts = ["-lpthread"],
-    copts = ["-std=c++17"],
+    copts = ["-std=c++14"],
     deps = ["@com_google_absl//absl/strings",
             ":swps3_lib",
             "//src/agd:agd"]

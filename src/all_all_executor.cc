@@ -2,9 +2,10 @@
 #include "all_all_executor.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <chrono>
 #include <fstream>
 #include <iostream>
-#include <chrono>
+#include "absl/strings/str_cat.h"
 #include "aligner.h"
 
 using std::cout;
@@ -22,10 +23,8 @@ void AllAllExecutor::EnqueueAlignment(const WorkItem& item) {
 void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
   cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
-    
     std::this_thread::sleep_for(1s);
     cout << "work queue has " << work_queue_->size() << " entries left\n";
-   
   }
   cout << "Queue emptied, unblocking...\n";
   run_ = false;
@@ -81,9 +80,9 @@ void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
         cout << "opening file " << path << "\n";
         file_map[genome_pair] = std::ofstream(path);
 
-        file_map[genome_pair]
-            << absl::StrCat("# AllAll of ", genome_pair.first, " vs ",
-                            genome_pair.second, ";\nRefinedMatches(\n[");
+        string line = absl::StrCat("# AllAll of ", genome_pair.first, " vs ",
+                                   genome_pair.second, ";\nRefinedMatches(\n[");
+        file_map[genome_pair] << line;
       }
 
       auto& out_file = file_map[genome_pair];

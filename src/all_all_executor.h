@@ -1,19 +1,20 @@
 
 #pragma once
 
+#include <algorithm>
 #include <atomic>
+#include <iostream>
 #include <string>
 #include <unordered_map>
-#include <iostream>
-#include <algorithm>
+#include <thread>
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "aligner.h"
 #include "alignment_environment.h"
 #include "candidate_map.h"
 #include "concurrent_queue.h"
 #include "params.h"
 #include "sequence.h"
-#include "threadpool/ThreadPool.h"
-#include "aligner.h"
 
 class AllAllExecutor {
  public:
@@ -40,7 +41,7 @@ class AllAllExecutor {
   AlignmentEnvironments* envs_;
   Parameters* params_;
   size_t num_threads_;
-  
+
   struct Match {
     int seq1_min;
     int seq1_max;
@@ -74,10 +75,11 @@ class AllAllExecutor {
   std::vector<ResultMap> matches_per_thread_;
 
   bool PassesLengthConstraint(const ProteinAligner::Alignment& alignment,
-    int seq1_len, int seq2_len) {
-
-    float min_alignment_len = std::min(float(alignment.seq1_length), float(alignment.seq2_length));
-    float max_min_seq_len = std::max(30.0f, 0.3f*float(std::min(seq1_len, seq2_len)));
+                              int seq1_len, int seq2_len) {
+    float min_alignment_len =
+        std::min(float(alignment.seq1_length), float(alignment.seq2_length));
+    float max_min_seq_len =
+        std::max(30.0f, 0.3f * float(std::min(seq1_len, seq2_len)));
     return min_alignment_len >= max_min_seq_len;
   }
 
@@ -106,7 +108,7 @@ class AllAllExecutor {
         continue;
       }
 
-      //std::cout << "aligner thread got work\n";
+      // std::cout << "aligner thread got work\n";
 
       auto seq1 = std::get<0>(item);
       auto seq2 = std::get<1>(item);
@@ -143,9 +145,10 @@ class AllAllExecutor {
           agd::Status s = aligner.AlignLocal(
               seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
               seq2->Seq().size(), alignment);
-        
-          if (PassesLengthConstraint(alignment, seq1->Seq().size(), seq2->Seq().size()) &&
-            PassesScoreConstraint(params_, alignment.score)) {
+
+          if (PassesLengthConstraint(alignment, seq1->Seq().size(),
+                                     seq2->Seq().size()) &&
+              PassesScoreConstraint(params_, alignment.score)) {
             Match new_match;
             new_match.seq1_min = alignment.seq1_min;
             new_match.seq1_max = alignment.seq1_max;
@@ -156,9 +159,7 @@ class AllAllExecutor {
             new_match.distance = alignment.pam_distance;
             matches[genome_pair][seq_pair] = new_match;
           }
-
         }
-
       }
       // else, we already aligned these two seqs, done
     }
@@ -167,5 +168,4 @@ class AllAllExecutor {
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }
-
 };

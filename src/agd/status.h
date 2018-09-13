@@ -22,6 +22,7 @@ limitations under the License.
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <ostream>
 #include "error_code.h"
 
 namespace agd {

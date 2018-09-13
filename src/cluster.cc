@@ -38,7 +38,6 @@ void Cluster::Merge(const Cluster& other, ProteinAligner* aligner) {
 
   const auto& other_seqs = other.Sequences();
   seqs_.push_back(other_seqs[0]); // the rep matches, or we wouldnt be here
-  const auto& rep = seqs_[0];
 
   bool first = true; // to skip first
   for (const auto& seq : other_seqs) {
@@ -46,6 +45,7 @@ void Cluster::Merge(const Cluster& other, ProteinAligner* aligner) {
       first = false;
       continue;
     }
+    const auto& rep = seqs_[0];
     if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(), rep.Seq().size(), seq.Seq().size())) {
       seqs_.push_back(seq);
     }

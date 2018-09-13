@@ -4,12 +4,14 @@
 #include <sys/types.h>
 #include <fstream>
 #include <iostream>
+#include <chrono>
 #include "aligner.h"
 
 using std::cout;
 using std::get;
 using std::make_pair;
 using std::string;
+using namespace std::literals::chrono_literals;
 
 void AllAllExecutor::EnqueueAlignment(const WorkItem& item) {
   if (!work_queue_->push(item)) {
@@ -18,9 +20,12 @@ void AllAllExecutor::EnqueueAlignment(const WorkItem& item) {
 }
 
 void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
+  cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
-    ;
-    ;
+    
+    std::this_thread::sleep_for(1s);
+    cout << "work queue has " << work_queue_->size() << " entries left\n";
+   
   }
   cout << "Queue emptied, unblocking...\n";
   run_ = false;

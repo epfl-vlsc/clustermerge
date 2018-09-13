@@ -83,7 +83,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
             // add c_other_rep into c
             // for each sequence in c_other, add if it matches c rep
             // keep both clusters
-
+            std::cout << "merging and keeping both clusters\n";
             c.Merge(c_other, aligner);
           }
         }
@@ -100,8 +100,8 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
       new_cluster_set.clusters_.push_back(std::move(c_other));
     }
   }
-  std::cout << "new cluster set is \n";
-  new_cluster_set.DebugDump();
+  //std::cout << "new cluster set is \n";
+  //new_cluster_set.DebugDump();
 
   return new_cluster_set;
 }
@@ -123,7 +123,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end(); it++) {
 
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-        std::cout << "Scheduling alignment...\n";
+        //std::cout << "Scheduling alignment...\n";
         AllAllExecutor::WorkItem item = std::make_tuple(&(*it), &(*itt));
         executor->EnqueueAlignment(item);
       }

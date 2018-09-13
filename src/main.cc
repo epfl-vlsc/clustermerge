@@ -127,14 +127,22 @@ int main(int argc, char** argv) {
                           &params);
   executor.Initialize();
 
+  auto t0 = std::chrono::high_resolution_clock::now();
   // pass to Run
   merger.Run(&executor);
 
-  merger.DebugDump();
+  //merger.DebugDump();
   // wait and finish call on executor
   // which dumps final results to disk
   executor.FinishAndOutput("outputfoldertest");
+  
+  auto t1 = std::chrono::high_resolution_clock::now();
 
+  auto duration = t1 - t0;
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+
+  cout << "Execution time: " << sec.count() << " seconds.\n";
 
 
   return (0);

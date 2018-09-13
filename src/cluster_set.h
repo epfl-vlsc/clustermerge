@@ -22,6 +22,8 @@ class ClusterSet {
 
   void DebugDump() const;
 
+  size_t Size() { return clusters_.size(); }
+
  private:
   ClusterSet() = default;
   std::vector<Cluster> clusters_;

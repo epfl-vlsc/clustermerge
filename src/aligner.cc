@@ -306,7 +306,7 @@ bool ProteinAligner::PassesThreshold(const char* seq1, const char* seq2,
     value = score / (65535.0f / options.threshold);
 
   swps3_freeProfileShortSSE(profile);
-  std::cout << "ALIGNER: value is " << value << " score is " << score;
+  //std::cout << "ALIGNER: value is " << value << " score is " << score;
   return value >= 0.75f * params_->min_score;
 }
 

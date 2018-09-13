@@ -27,15 +27,15 @@ BottomUpMerge::BottomUpMerge(
     s = iter.GetNextRecord(&data, &size);
     uint32_t genome_index = 0;
     while (s.ok()) {
-      coverages_.push_back(string());
-      coverages_.back().resize(size);
+      //coverages_.push_back(string());
+      //coverages_.back().resize(size);
 
       cout << "Adding sequence id " << id << "\n";
       if (size > 60000) {
         cout << "over size " << size << "\n";
         exit(0);
       }
-      Sequence seq(absl::string_view(data, size), coverages_.back(),
+      Sequence seq(absl::string_view(data, size), //coverages_.back(),
                    dataset->Name(), dataset->Size(), genome_index++, id++);
 
       ClusterSet cs(seq);

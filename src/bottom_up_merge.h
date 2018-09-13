@@ -19,7 +19,7 @@ class BottomUpMerge {
  private:
   std::deque<ClusterSet> sets_;
 
-  std::list<std::string> coverages_;
+  //std::list<std::string> coverages_;
     
   // aligner object
   ProteinAligner* aligner_;

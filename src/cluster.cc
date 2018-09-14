@@ -46,8 +46,18 @@ void Cluster::Merge(const Cluster& other, ProteinAligner* aligner) {
       continue;
     }
     const auto& rep = seqs_[0];
-    if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(), rep.Seq().size(), seq.Seq().size())) {
-      seqs_.push_back(seq);
+    bool found = false;
+    for (const auto& s : seqs_) {
+      if (s.ID() == seq.ID()) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
+                                   rep.Seq().size(), seq.Seq().size())) {
+        seqs_.push_back(seq);
+      }
     }
   }
 }

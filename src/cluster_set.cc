@@ -1,8 +1,13 @@
 
 #include "cluster_set.h"
 #include <iostream>
+#include <fstream>
+#include <iomanip>
 #include "aligner.h"
 #include "debug.h"
+#include "agd/json.hpp"
+
+using std::vector;
 
 ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
                                      ProteinAligner* aligner) {
@@ -129,4 +134,26 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
       }
     }
   }
+}
+
+void ClusterSet::DumpJson() const {
+
+
+  vector<vector<size_t>> cluster_seqs;
+  for (const auto& c : clusters_) {
+    vector<size_t> seq_ids;
+    for (const auto& s : c.Sequences()) {
+      seq_ids.push_back(s.ID());
+    }
+
+    cluster_seqs.push_back(seq_ids);
+  }
+  
+  nlohmann::json j(cluster_seqs);
+
+  std::cout << "dumping clusters ...\n";
+  std::ofstream o("clusters.json");
+
+  o << std::setw(2) << j << std::endl;
+
 }

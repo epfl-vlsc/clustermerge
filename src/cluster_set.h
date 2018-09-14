@@ -21,6 +21,7 @@ class ClusterSet {
   void ScheduleAlignments(AllAllExecutor* executor);
 
   void DebugDump() const;
+  void DumpJson() const;
 
   size_t Size() { return clusters_.size(); }
 

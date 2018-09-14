@@ -84,6 +84,8 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
 
   auto& final_set = sets_[0];
 
+  final_set.DumpJson();
+
   // for all clusters in final set, schedule all-all alignments with executor
   final_set.ScheduleAlignments(executor);
   

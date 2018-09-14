@@ -33,6 +33,11 @@ int main(int argc, char** argv) {
   args::ArgumentParser parser("ClusterMerge",
                               "Bottom up protein cluster merge.");
   args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+  args::ValueFlag<unsigned int> threads_arg(
+      parser, "threads",
+      absl::StrCat("Number of threads to use [",
+                   std::thread::hardware_concurrency(), "]"),
+      {'t'});
   args::ValueFlag<std::string> json_data_dir(
       parser, "data_dir",
       "Directory containing alignment environment matrices in JSON "
@@ -56,7 +61,17 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // load alignment envs and initialize
+  unsigned int threads = std::thread::hardware_concurrency();
+  if (threads_arg) {
+    threads = args::get(threads_arg);
+    // do not allow more than hardware threads
+    if (threads > std::thread::hardware_concurrency()) {
+      threads = std::thread::hardware_concurrency();
+    }
+  }
+  cout << "Using " << threads << " hardware threads for execution.\n";
+
+  // load alignment envs and initialize (this is for SWPS3)
   string json_dir_path = "data/matrices/json/";
   if (json_data_dir) {
     json_dir_path = args::get(json_data_dir);
@@ -94,7 +109,9 @@ int main(int argc, char** argv) {
   envs.InitFromJSON(logpam_json, all_matrices_json);
   cout << "Done.\n";
 
-  Parameters params;
+  // done init envs
+
+  Parameters params; // using default params for now
 
   // init aligner object
   ProteinAligner aligner(&envs, &params);
@@ -104,6 +121,8 @@ int main(int argc, char** argv) {
 
   if (datasets_opts) {
     // load and parse protein datasets
+    // cluster merge sequences are simply string_views over this data
+    // so these structures must live until computations complete
      s = LoadDatasets(datasets_opts, &datasets);
   } else {
     cout << "No AGD datasets provided. See usage: \n";

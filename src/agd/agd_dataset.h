@@ -6,6 +6,10 @@
 namespace agd {
 using json = nlohmann::json;
 
+// AGD Dataset loads an entire dataset into memory. 
+// This may not be suitable for very large datasets.
+// Consider adding AGDBufferedDataset, which will buffer one or two chunks
+// from each requested column for sequential access. 
 class AGDDataset {
  public:
   // create dataset

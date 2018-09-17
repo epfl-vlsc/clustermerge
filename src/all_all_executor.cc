@@ -5,6 +5,8 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include "absl/strings/str_cat.h"
 #include "aligner.h"
 
@@ -49,7 +51,17 @@ void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
     // exists but not dir
     cout << "output dir exists but is not dir, exiting ...\n";
     exit(0);
-  }  // else, dir exists,
+  } else {
+    // dir exists, nuke
+    // im too lazy to do this the proper way
+    string cmd = absl::StrCat("rm -rf ", output_dir, "/*");
+    cout << "dir " << output_dir << " exists, nuking ...\n";
+    int nuke_result = system(cmd.c_str());
+    if (nuke_result != 0) {
+      cout << "Could not nuke dir " << output_dir << "\n";
+      exit(0);
+    }
+  }
 
   size_t total_candidates = 0;
 

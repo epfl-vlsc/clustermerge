@@ -94,6 +94,7 @@ Status AGDDataset::Initialize(const string& agd_json_path,
       column_map_[c].push_back(AGDRecordReader(chunk_buf.data(), num_records));
       chunks_.push_back(std::move(chunk_buf));
       chunk_sizes_.push_back(num_records);
+      total_records_ += num_records;
 
       munmap(mapped, size);
       close(fd);

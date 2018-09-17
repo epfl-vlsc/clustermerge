@@ -56,7 +56,7 @@ class AGDDataset {
   // map column name to its set of readers
   std::unordered_map<std::string, std::vector<AGDRecordReader>> column_map_;
   std::vector<size_t> chunk_sizes_;
-  size_t total_records_;
+  uint32_t total_records_;
 };
 
 }  // namespace agd

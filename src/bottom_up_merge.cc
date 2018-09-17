@@ -30,7 +30,7 @@ BottomUpMerge::BottomUpMerge(
       //coverages_.push_back(string());
       //coverages_.back().resize(size);
 
-      cout << "Adding sequence id " << id << "\n";
+      //cout << "Adding sequence id " << id << "\n";
       if (size > 60000) {
         cout << "over size " << size << "\n";
         exit(0);
@@ -63,9 +63,9 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
     auto& s1 = sets_[0];
     auto& s2 = sets_[1];
 
-    cout << "Merging cluster sets of size " << s1.Size() 
+    /*cout << "Merging cluster sets of size " << s1.Size() 
       << " and " << s2.Size() << "\n";
-    cout << "Cluster sets remaining: " << sets_.size() - 2 << "\n";
+    cout << "Cluster sets remaining: " << sets_.size() - 2 << "\n";*/
     //s1.DebugDump();
     //cout << "\nand\n";
     //s2.DebugDump();

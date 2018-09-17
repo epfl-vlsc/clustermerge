@@ -24,6 +24,7 @@ agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
         cout << "Error parsing AGD metadata for dataet '" << dataset_opt << "', are you sure it's valid JSON?";
         throw;
       }
+      cout << "data is " << dataset->Name() << " with size " << dataset->Size() << "\n";
       datasets->push_back(std::move(dataset));
     }
     return s;

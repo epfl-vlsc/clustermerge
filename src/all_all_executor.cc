@@ -149,7 +149,7 @@ AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
   work_queue_.reset(new ConcurrentQueue<WorkItem>(capacity));
   matches_per_thread_.resize(num_threads);
 
-  cout << "Start executor, id is " << id_.load() << "\n";
+  //cout << "Start executor, id is " << id_.load() << "\n";
 
   num_active_threads_ = num_threads;
 }

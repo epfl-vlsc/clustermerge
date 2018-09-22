@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
   cout << "Data loaded, building merger ...\n";
   BottomUpMerge merger(datasets, &aligner);
 
-  AllAllExecutor executor(/*std::thread::hardware_concurrency()*/1, 100, &envs,
+  AllAllExecutor executor(threads, 100, &envs,
                           &params);
   executor.Initialize();
 

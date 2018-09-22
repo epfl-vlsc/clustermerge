@@ -6,10 +6,10 @@
 namespace agd {
 using json = nlohmann::json;
 
-// AGD Dataset loads an entire dataset into memory. 
+// AGD Dataset loads an entire dataset into memory.
 // This may not be suitable for very large datasets.
 // Consider adding AGDBufferedDataset, which will buffer one or two chunks
-// from each requested column for sequential access. 
+// from each requested column for sequential access.
 class AGDDataset {
  public:
   // create dataset
@@ -19,6 +19,7 @@ class AGDDataset {
                        std::vector<std::string> columns = {});
 
   // allows iteration over a complete agd column
+  // associated AGDDataset must outlive the ColumnIterator
   class ColumnIterator {
     friend class AGDDataset;
 

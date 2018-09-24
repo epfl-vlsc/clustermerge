@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
   //merger.DebugDump();
   // wait and finish call on executor
   // which dumps final results to disk
-  executor.FinishAndOutput("output_matches");
+  executor.FinishAndOutput("outputfoldertest");
   
   auto t1 = std::chrono::high_resolution_clock::now();
 

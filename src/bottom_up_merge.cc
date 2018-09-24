@@ -69,7 +69,7 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
     //s1.DebugDump();
     //cout << "\nand\n";
     //s2.DebugDump();
-    auto merged_set = s1.MergeClusters(s2, aligner_, &id_map_);
+    auto merged_set = s1.MergeClusters(s2, aligner_);
 
     sets_.pop_front();
     sets_.pop_front();

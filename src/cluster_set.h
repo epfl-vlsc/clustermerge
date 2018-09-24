@@ -15,8 +15,7 @@ class ClusterSet {
   ClusterSet(size_t num) { clusters_.reserve(num); }
 
   // merge two cluster sets by building a new one
-  ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner,
-                           SequenceIDMap* id_map);
+  ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
 
   // schedule all-all alignments onto the executor threadpool
   void ScheduleAlignments(AllAllExecutor* executor);

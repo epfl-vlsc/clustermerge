@@ -10,7 +10,7 @@
 using std::vector;
 
 ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
-                                     ProteinAligner* aligner, SequenceIDMap* id_map) {
+                                     ProteinAligner* aligner) {
   // this is the money method
 
   // merge clusters, clusters can "disappear" from either
@@ -24,8 +24,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
   for (auto& c : clusters_) {
     for (auto& c_other : other.clusters_) {
 
-
-      if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner, id_map)) {
+      if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
         // std::cout << "passed threshold, aligning ...\n";
         s = c.AlignReps(c_other, &alignment, aligner);
         // does c contain c_other fully
@@ -89,7 +88,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
             // for each sequence in c_other, add if it matches c rep
             // keep both clusters
             // std::cout << "merging and keeping both clusters\n";
-            c.Merge(c_other, aligner, id_map);
+            c.Merge(c_other, aligner);
           }
         }
       }  // if passes threshold

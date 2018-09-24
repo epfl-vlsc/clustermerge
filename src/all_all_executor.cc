@@ -22,7 +22,7 @@ void AllAllExecutor::EnqueueAlignment(const WorkItem& item) {
   }
 }
 
-void AllAllExecutor::FinishAndOutput(const string& output_folder) {
+void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
   cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
     std::this_thread::sleep_for(1s);
@@ -37,13 +37,14 @@ void AllAllExecutor::FinishAndOutput(const string& output_folder) {
   cout << "All threads finished.\n";
 
   std::unordered_map<GenomePair, std::ofstream, PairHash> file_map;
+  string output_dir("output_matches");
   struct stat info;
-  if (stat(output_folder.c_str(), &info) != 0) {
+  if (stat(output_dir.c_str(), &info) != 0) {
     // doesnt exist, create
-    cout << "creating dir " << output_folder << "\n";
-    int e = mkdir(output_folder.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    cout << "creating dir " << output_dir << "\n";
+    int e = mkdir(output_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (e != 0) {
-      cout << "could not create output dir " << output_folder << ", exiting ...\n";
+      cout << "could not create output dir " << output_dir << ", exiting ...\n";
       exit(0);
     }
   } else if (!(info.st_mode & S_IFDIR)) {
@@ -53,11 +54,11 @@ void AllAllExecutor::FinishAndOutput(const string& output_folder) {
   } else {
     // dir exists, nuke
     // im too lazy to do this the proper way
-    string cmd = absl::StrCat("rm -rf ", output_folder, "/*");
-    cout << "dir " << output_folder << " exists, nuking ...\n";
+    string cmd = absl::StrCat("rm -rf ", output_dir, "/*");
+    cout << "dir " << output_dir << " exists, nuking ...\n";
     int nuke_result = system(cmd.c_str());
     if (nuke_result != 0) {
-      cout << "Could not nuke dir " << output_folder << "\n";
+      cout << "Could not nuke dir " << output_dir << "\n";
       exit(0);
     }
   }
@@ -71,7 +72,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_folder) {
 
       if (file_map.find(genome_pair) == file_map.end()) {
         // create the file
-        string path = output_folder + "/" + genome_pair.first;
+        string path = output_dir + "/" + genome_pair.first;
         struct stat info;
         if (stat(path.c_str(), &info) != 0) {
           // doesnt exist, create

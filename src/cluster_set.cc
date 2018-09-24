@@ -69,7 +69,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
           if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
               alignment.score > aligner->Params()->min_full_merge_score) {
             // they are _almost_ overlapped, merge completely
-            std::cout << "Nearly complete overlap, merging c into c_other, score is " << alignment.score << "\n";
+            //std::cout << "Nearly complete overlap, merging c into c_other, score is " << alignment.score << "\n";
             for (const auto& seq : c.Sequences()) {
               c_other.AddSequence(seq);
             }
@@ -78,7 +78,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
 
           } else if (c_other_num_uncovered < aligner->Params()->max_n_aa_not_covered && 
               alignment.score > aligner->Params()->min_full_merge_score) {
-            std::cout << "Nearly complete overlap, merging c_other into c, score is " << alignment.score << "\n";
+            //std::cout << "Nearly complete overlap, merging c_other into c, score is " << alignment.score << "\n";
             for (const auto& seq : c_other.Sequences()) {
               c.AddSequence(seq);
             }

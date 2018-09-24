@@ -3,6 +3,7 @@
 #include <vector>
 #include "agd/errors.h"
 #include "aligner.h"
+#include "candidate_map.h"
 #include "sequence.h"
 
 class Cluster {
@@ -15,13 +16,14 @@ class Cluster {
     fully_merged_ = other.fully_merged_;
   }
 
-  void Merge(const Cluster& other, ProteinAligner* aligner);
+  void Merge(const Cluster& other, ProteinAligner* aligner, SequenceIDMap* id_map);
 
   agd::Status AlignReps(const Cluster& other,
                         ProteinAligner::Alignment* alignment,
                         ProteinAligner* aligner);
 
-  bool PassesThreshold(const Cluster& other, ProteinAligner* aligner);
+  bool PassesThreshold(const Cluster& other, ProteinAligner* aligner,
+                       SequenceIDMap* id_map);
 
   bool IsFullyMerged() const { return fully_merged_; }
 

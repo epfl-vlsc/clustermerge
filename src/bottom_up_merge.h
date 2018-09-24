@@ -6,6 +6,7 @@
 #include "cluster_set.h"
 #include "aligner.h"
 #include "all_all_executor.h"
+#include "candidate_map.h"
 
 class BottomUpMerge {
  public:
@@ -23,4 +24,6 @@ class BottomUpMerge {
     
   // aligner object
   ProteinAligner* aligner_;
+
+  SequenceIDMap id_map_;
 };

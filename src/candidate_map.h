@@ -8,12 +8,11 @@
 
 namespace {
 template <class T>
-inline void hash_combine(std::size_t& seed, const T& v)
-{
-    std::hash<T> hasher;
-    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+inline void hash_combine(std::size_t& seed, const T& v) {
+  std::hash<T> hasher;
+  seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
-}
+}  // namespace
 
 struct PairHash {
   template <class T1, class T2>
@@ -54,4 +53,35 @@ class CandidateMap {
  private:
   GenomeSequenceMap map_;
   absl::Mutex mu_;
+};
+
+// class for associating sequence ID pairs
+// as passed threshold or not
+class SequenceIDMap {
+ public:
+  // determine if a sequencepair has been aligned, and
+  // if it passed the threshold
+  bool Exists(const SequencePair& s, bool* passed_threshold)
+      LOCKS_EXCLUDED(mu_) {
+    absl::MutexLock l(&mu_);
+
+    auto it = map_.find(s);
+    if (it != map_.end()) {
+      *passed_threshold = it->second;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  void Insert(const SequencePair& s, const bool& passed_threshold)
+      LOCKS_EXCLUDED(mu_) {
+    absl::MutexLock l(&mu_);
+
+    map_[s] = passed_threshold;
+  }
+
+ private:
+  absl::Mutex mu_;
+  std::unordered_map<SequencePair, bool, PairHash> map_ GUARDED_BY(mu_);
 };

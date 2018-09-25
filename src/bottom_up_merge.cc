@@ -80,7 +80,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
-        queue_pop_cv_.Signal();
+        queue_pop_cv_.SignalAll();
         queue_mu_.Unlock();
 
       } else if (sets_.size() <= 1) {  // wait until enough
@@ -107,7 +107,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
-        queue_pop_cv_.Signal();
+        queue_pop_cv_.SignalAll();
         queue_mu_.Unlock();
 
       } else {  // only one cluster set left, done.

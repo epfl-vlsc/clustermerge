@@ -36,16 +36,21 @@ int main(int argc, char** argv) {
   args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
   args::ValueFlag<unsigned int> threads_arg(
       parser, "threads",
-      absl::StrCat("Number of threads to use [",
+      absl::StrCat("Number of threads to use for all-all [",
                    std::thread::hardware_concurrency(), "]"),
       {'t', "threads"});
+  args::ValueFlag<unsigned int> cluster_threads_arg(
+      parser, "cluster_threads",
+      absl::StrCat("Number of threads to use for clustering [",
+                   std::thread::hardware_concurrency(), "]"),
+      {'c', "cluster-threads"});
   args::ValueFlag<std::string> json_data_dir(
       parser, "data_dir",
       "Directory containing alignment environment matrices in JSON "
       "(logPAM1.json, all_matrices.json) [data/matrices/json]",
       {'d', "data_dir"});
   args::ValueFlag<std::string> output_dir(
-      parser, "data_dir",
+      parser, "output_dir",
       "Output directory. Will be overwritten if exists."
       "[./output_matches]",
       {'o', "output_dir"});
@@ -75,7 +80,17 @@ int main(int argc, char** argv) {
       threads = std::thread::hardware_concurrency();
     }
   }
-  cout << "Using " << threads << " hardware threads for execution.\n";
+  cout << "Using " << threads << " hardware threads for alignment.\n";
+
+  unsigned int cluster_threads = std::thread::hardware_concurrency();
+  if (cluster_threads_arg) {
+    cluster_threads = args::get(cluster_threads_arg);
+    // do not allow more than hardware threads
+    if (cluster_threads > std::thread::hardware_concurrency()) {
+      cluster_threads = std::thread::hardware_concurrency();
+    }
+  }
+  cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
 
   // get output dir to use
   string dir("output_matches");
@@ -161,7 +176,11 @@ int main(int argc, char** argv) {
 
   auto t0 = std::chrono::high_resolution_clock::now();
   // pass to Run
-  merger.Run(&executor);
+  if (cluster_threads == 1) {
+    merger.Run(&executor);
+  } else {
+    merger.RunMulti(cluster_threads, &executor);
+  }
 
   //merger.DebugDump();
   // wait and finish call on executor

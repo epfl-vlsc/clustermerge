@@ -7,6 +7,10 @@
 
 class ClusterSet {
  public:
+  ClusterSet() = default;
+  ClusterSet(ClusterSet&& other) {
+    clusters_ = std::move(other.clusters_);
+  }
   ClusterSet(Sequence& seed) {
     Cluster c(seed);
     clusters_.push_back(std::move(c));
@@ -26,6 +30,5 @@ class ClusterSet {
   size_t Size() { return clusters_.size(); }
 
  private:
-  ClusterSet() = default;
   std::vector<Cluster> clusters_;
 };

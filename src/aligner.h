@@ -59,6 +59,7 @@ class ProteinAligner {
                           int seq2_len, Alignment& result);
 
   const Parameters* Params() { return params_; }
+  const AlignmentEnvironments* Envs() { return envs_; }
 
  private:
   const AlignmentEnvironments* envs_;

@@ -27,15 +27,15 @@ BottomUpMerge::BottomUpMerge(
     s = iter.GetNextRecord(&data, &size);
     uint32_t genome_index = 0;
     while (s.ok()) {
-      //coverages_.push_back(string());
-      //coverages_.back().resize(size);
+      // coverages_.push_back(string());
+      // coverages_.back().resize(size);
 
-      //cout << "Adding sequence id " << id << "\n";
+      // cout << "Adding sequence id " << id << "\n";
       if (size > 60000) {
         cout << "over size " << size << "\n";
         exit(0);
       }
-      Sequence seq(absl::string_view(data, size), //coverages_.back(),
+      Sequence seq(absl::string_view(data, size),  // coverages_.back(),
                    dataset->Name(), dataset->Size(), genome_index++, id++);
 
       ClusterSet cs(seq);
@@ -53,6 +53,96 @@ void BottomUpMerge::DebugDump() {
   }
 }
 
+agd::Status BottomUpMerge::RunMulti(size_t num_threads,
+                                    AllAllExecutor* executor) {
+  cluster_sets_left_ = sets_.size();
+
+  // launch threads, join threads
+  auto cluster_worker = [this]() {
+    cout << "cluster worker starting\n";
+    // need own aligner per thread
+    ProteinAligner aligner(aligner_->Envs(), aligner_->Params());
+
+    // is atomic actually needed here?
+    while (cluster_sets_left_.load() > 1) {
+      queue_mu_.Lock();
+      if (sets_.size() > 1 && cluster_sets_left_.load() > 1) {  // enough to pop
+        auto s1 = std::move(sets_.front());
+        sets_.pop_front();
+        auto s2 = std::move(sets_.front());
+        sets_.pop_front();
+        cluster_sets_left_.fetch_sub(1);
+        cout << "cluster sets left: " << cluster_sets_left_.load();
+        queue_mu_.Unlock();
+
+        // this part takes a while for larger sets
+        auto merged_set = s1.MergeClusters(s2, &aligner);
+
+        queue_mu_.Lock();
+        sets_.push_back(std::move(merged_set));
+        queue_pop_cv_.Signal();
+        queue_mu_.Unlock();
+
+      } else if (sets_.size() <= 1) {  // wait until enough
+        while (sets_.size() <= 1 && cluster_sets_left_.load() > 1) {
+          cout << "waiting, set size: " << sets_.size()
+               << " sets left: " << cluster_sets_left_.load() << "\n";
+          queue_pop_cv_.Wait(&queue_mu_);
+        }
+        if (cluster_sets_left_.load() <= 1) {
+          queue_mu_.Unlock();
+          break;
+        }
+
+        auto s1 = std::move(sets_.front());
+        sets_.pop_front();
+        auto s2 = std::move(sets_.front());
+        sets_.pop_front();
+        cluster_sets_left_.fetch_sub(1);
+        cout << "cluster sets left: " << cluster_sets_left_.load();
+        queue_mu_.Unlock();
+
+        // this part takes a while for larger sets
+        auto merged_set = s1.MergeClusters(s2, &aligner);
+
+        queue_mu_.Lock();
+        sets_.push_back(std::move(merged_set));
+        queue_pop_cv_.Signal();
+        queue_mu_.Unlock();
+
+      } else {  // only one cluster set left, done.
+        queue_mu_.Unlock();
+        break;
+      }
+    }
+
+    cout << "Cluster eval thread finishing...\n";
+  };
+
+  cout << "scheduling cluster threads, sets remaining: " << cluster_sets_left_.load();
+  threads_.reserve(num_threads);
+  for (size_t i = 0; i < num_threads; i++) {
+    threads_.push_back(std::thread(cluster_worker));
+  }
+
+  for (auto& t : threads_) {
+    t.join();
+  }
+
+  assert(sets_.size() == 1);
+  // now we are all finished clustering
+  auto& final_set = sets_[0];
+
+  final_set.DumpJson();
+
+  // for all clusters in final set, schedule all-all alignments with executor
+  final_set.ScheduleAlignments(executor);
+
+  cout << "Total clusters: " << final_set.Size() << "\n";
+
+  return agd::Status::OK();
+}
+
 agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
@@ -63,19 +153,19 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
     auto& s1 = sets_[0];
     auto& s2 = sets_[1];
 
-    /*cout << "Merging cluster sets of size " << s1.Size() 
+    /*cout << "Merging cluster sets of size " << s1.Size()
       << " and " << s2.Size() << "\n";
     cout << "Cluster sets remaining: " << sets_.size() - 2 << "\n";*/
-    //s1.DebugDump();
-    //cout << "\nand\n";
-    //s2.DebugDump();
+    // s1.DebugDump();
+    // cout << "\nand\n";
+    // s2.DebugDump();
     auto merged_set = s1.MergeClusters(s2, aligner_);
 
     sets_.pop_front();
     sets_.pop_front();
     sets_.push_back(std::move(merged_set));
   };
-  
+
   auto t1 = std::chrono::high_resolution_clock::now();
 
   auto duration = t1 - t0;
@@ -88,7 +178,6 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
 
   // for all clusters in final set, schedule all-all alignments with executor
   final_set.ScheduleAlignments(executor);
-  
 
   cout << "Total clusters: " << final_set.Size() << "\n";
 

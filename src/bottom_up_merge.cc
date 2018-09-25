@@ -72,7 +72,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        cout << "cluster sets left: " << cluster_sets_left_.load();
+        cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets
@@ -99,7 +99,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        cout << "cluster sets left: " << cluster_sets_left_.load();
+        cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets

@@ -120,6 +120,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   };
 
   cout << "scheduling cluster threads, sets remaining: " << cluster_sets_left_.load();
+  auto t0 = std::chrono::high_resolution_clock::now();
   threads_.reserve(num_threads);
   for (size_t i = 0; i < num_threads; i++) {
     threads_.push_back(std::thread(cluster_worker));
@@ -128,6 +129,12 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   for (auto& t : threads_) {
     t.join();
   }
+  
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  auto duration = t1 - t0;
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  cout << "Clustering execution time: " << sec.count() << " seconds.\n";
 
   assert(sets_.size() == 1);
   // now we are all finished clustering

@@ -38,12 +38,17 @@ int main(int argc, char** argv) {
       parser, "threads",
       absl::StrCat("Number of threads to use [",
                    std::thread::hardware_concurrency(), "]"),
-      {'t'});
+      {'t', "threads"});
   args::ValueFlag<std::string> json_data_dir(
       parser, "data_dir",
       "Directory containing alignment environment matrices in JSON "
       "(logPAM1.json, all_matrices.json) [data/matrices/json]",
-      {"data_dir"});
+      {'d', "data_dir"});
+  args::ValueFlag<std::string> output_dir(
+      parser, "data_dir",
+      "Output directory. Will be overwritten if exists."
+      "[./output_matches]",
+      {'o', "output_dir"});
   args::PositionalList<std::string> datasets_opts(
       parser, "datasets", "AGD Protein datasets to cluster.");
 
@@ -71,6 +76,13 @@ int main(int argc, char** argv) {
     }
   }
   cout << "Using " << threads << " hardware threads for execution.\n";
+
+  // get output dir to use
+  string dir("output_matches");
+  if (output_dir) {
+    dir = args::get(output_dir);
+  }
+  cout << "Using " << dir << " for output.\n";
 
   // load alignment envs and initialize (this is for SWPS3)
   string json_dir_path = "data/matrices/json/";
@@ -154,7 +166,7 @@ int main(int argc, char** argv) {
   //merger.DebugDump();
   // wait and finish call on executor
   // which dumps final results to disk
-  executor.FinishAndOutput("outputfoldertest");
+  executor.FinishAndOutput(dir);
   
   auto t1 = std::chrono::high_resolution_clock::now();
 

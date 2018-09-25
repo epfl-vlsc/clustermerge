@@ -26,7 +26,7 @@ class AllAllExecutor {
 
   void EnqueueAlignment(const WorkItem& item);
 
-  void FinishAndOutput(absl::string_view output_folder);
+  void FinishAndOutput(const std::string& output_dir);
 
   void Initialize();
 

@@ -22,7 +22,7 @@ void AllAllExecutor::EnqueueAlignment(const WorkItem& item) {
   }
 }
 
-void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
+void AllAllExecutor::FinishAndOutput(const string& output_dir) {
   cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
     std::this_thread::sleep_for(1s);
@@ -37,7 +37,6 @@ void AllAllExecutor::FinishAndOutput(absl::string_view output_folder) {
   cout << "All threads finished.\n";
 
   std::unordered_map<GenomePair, std::ofstream, PairHash> file_map;
-  string output_dir("output_matches");
   struct stat info;
   if (stat(output_dir.c_str(), &info) != 0) {
     // doesnt exist, create

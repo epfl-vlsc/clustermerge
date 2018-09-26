@@ -76,7 +76,13 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets
+        auto t0 = std::chrono::high_resolution_clock::now();
         auto merged_set = s1.MergeClusters(s2, &aligner);
+        auto t1 = std::chrono::high_resolution_clock::now();
+
+        auto duration = t1 - t0;
+        auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+        cout << "merge took: " << sec.count() << " seconds.\n";
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
@@ -103,7 +109,13 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets
+        auto t0 = std::chrono::high_resolution_clock::now();
         auto merged_set = s1.MergeClusters(s2, &aligner);
+        auto t1 = std::chrono::high_resolution_clock::now();
+
+        auto duration = t1 - t0;
+        auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+        cout << "merge took: " << sec.count() << " seconds.\n";
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));

@@ -44,6 +44,11 @@ int main(int argc, char** argv) {
       absl::StrCat("Number of threads to use for clustering [",
                    std::thread::hardware_concurrency(), "]"),
       {'c', "cluster-threads"});
+  args::ValueFlag<unsigned int> merge_threads_arg(
+      parser, "merge_threads",
+      absl::StrCat("Number of threads to use for merging [",
+                   std::thread::hardware_concurrency(), "]"),
+      {'m', "merge-threads"});
   args::ValueFlag<std::string> json_data_dir(
       parser, "data_dir",
       "Directory containing alignment environment matrices in JSON "
@@ -88,6 +93,16 @@ int main(int argc, char** argv) {
     // do not allow more than hardware threads
     if (cluster_threads > std::thread::hardware_concurrency()) {
       cluster_threads = std::thread::hardware_concurrency();
+    }
+  }
+  cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
+  
+  unsigned int merge_threads = std::thread::hardware_concurrency();
+  if (merge_threads_arg) {
+    merge_threads = args::get(merge_threads_arg);
+    // do not allow more than hardware threads
+    if (merge_threads > std::thread::hardware_concurrency()) {
+      merge_threads = std::thread::hardware_concurrency();
     }
   }
   cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
@@ -181,7 +196,7 @@ int main(int argc, char** argv) {
   if (cluster_threads == 1) {
     merger.Run(&executor);
   } else {
-    merger.RunMulti(cluster_threads, &executor, &merge_executor);
+    merger.RunMulti(merge_threads, &executor, &merge_executor);
   }
 
   //merger.DebugDump();

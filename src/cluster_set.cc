@@ -22,6 +22,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
   ClusterSet new_cluster_set(clusters_.size() + other.clusters_.size());
 
   vector<absl::Notification> notifies;
+  notifies.resize(clusters_.size());
   size_t i = 0;
   for (auto& c : clusters_) {
     // launch a thread and save a future for each c

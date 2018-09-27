@@ -21,19 +21,15 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
 
   ClusterSet new_cluster_set(clusters_.size() + other.clusters_.size());
 
-  vector<absl::Notification> notifies;
-  notifies.resize(clusters_.size());
-  size_t i = 0;
+  MultiNotification n;
   for (auto& c : clusters_) {
     // launch a thread and save a future for each c
-    MergeExecutor::WorkItem item = make_tuple(&c, &other, &notifies[i]);
-    i++;
+    MergeExecutor::WorkItem item = make_tuple(&c, &other, &n);
     executor->EnqueueMerge(item);
   }
+  n.SetMinNotifies(clusters_.size());
   std::cout << "submitted to merger, waaiting ...\n";
-  for (auto& n : notifies) {
-    n.WaitForNotification();
-  }
+  n.WaitForNotification();
   std::cout << "done\n";
   for (auto& c_other : other.clusters_) {
     if (!c_other.IsFullyMerged()) {

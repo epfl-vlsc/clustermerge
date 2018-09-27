@@ -29,11 +29,11 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
     i++;
     executor->EnqueueMerge(item);
   }
-  cout << "submitted to merger, waaiting ...\n";
+  std::cout << "submitted to merger, waaiting ...\n";
   for (auto& n : notifies) {
     n.WaitForNotification();
   }
-  cout << "done\n";
+  std::cout << "done\n";
   for (auto& c_other : other.clusters_) {
     if (!c_other.IsFullyMerged()) {
       // push any not fully merged cluster into the new set and we are done

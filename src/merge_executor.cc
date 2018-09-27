@@ -13,6 +13,7 @@ MergeExecutor::MergeExecutor(size_t num_threads, size_t capacity,
   for (size_t i = 0; i < num_threads_; i++) {
     threads_.push_back(std::thread(&MergeExecutor::Worker, this));
   }
+  cout << "merge executor started threads\n";
 }
 
 MergeExecutor::~MergeExecutor() {
@@ -39,7 +40,7 @@ void MergeExecutor::EnqueueMerge(const WorkItem& item) {
 void MergeExecutor::Worker() {
   int my_id = id_.fetch_add(1, std::memory_order_relaxed);
 
-  std::cout << absl::StrCat("Alignment thread spinning up with id ",
+  std::cout << absl::StrCat("merger thread spinning up with id ",
                    my_id, "\n");
 
   ProteinAligner aligner(envs_, params_);
@@ -55,6 +56,7 @@ void MergeExecutor::Worker() {
     auto* cluster_set = std::get<1>(item);
     auto* notification = std::get<2>(item);
 
+    cout << "merge thread merging ...\n";
 
     cluster_set->MergeClusterLocked(cluster, &aligner);
 

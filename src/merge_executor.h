@@ -6,12 +6,13 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "alignment_environment.h"
+#include "multi_notification.h"
 #include "cluster_set.h"
 #include "params.h"
 
 class MergeExecutor {
  public:
-  typedef std::tuple<Cluster*, ClusterSet*, absl::Notification*> WorkItem;
+  typedef std::tuple<Cluster*, ClusterSet*, MultiNotification*> WorkItem;
 
   MergeExecutor() = delete;
   ~MergeExecutor();

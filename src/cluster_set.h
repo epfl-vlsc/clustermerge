@@ -5,6 +5,8 @@
 #include "all_all_executor.h"
 #include "cluster.h"
 
+class MergeExecutor;
+
 class ClusterSet {
  public:
   ClusterSet() = default;
@@ -20,6 +22,12 @@ class ClusterSet {
 
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
+  
+  // merge two cluster sets by building a new one, in parallel (uses std::async)
+  ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);
+
+  // merge `this` with `cluster`, called from parallel merge executor
+  void MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner);
 
   // schedule all-all alignments onto the executor threadpool
   void ScheduleAlignments(AllAllExecutor* executor);

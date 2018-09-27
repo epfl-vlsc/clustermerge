@@ -173,13 +173,15 @@ int main(int argc, char** argv) {
   AllAllExecutor executor(threads, 100, &envs,
                           &params);
   executor.Initialize();
+  
+  MergeExecutor merge_executor(threads, 200, &envs, &params);
 
   auto t0 = std::chrono::high_resolution_clock::now();
   // pass to Run
   if (cluster_threads == 1) {
     merger.Run(&executor);
   } else {
-    merger.RunMulti(cluster_threads, &executor);
+    merger.RunMulti(cluster_threads, &executor, &merge_executor);
   }
 
   //merger.DebugDump();

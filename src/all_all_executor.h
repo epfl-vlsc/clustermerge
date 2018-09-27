@@ -88,16 +88,11 @@ class AllAllExecutor {
   }
 
   int Worker() {
-    // int test = id_.load();
-    // cout << string("cur val of test is ") + std::to_string(test);
-
     int my_id = id_.fetch_add(1, std::memory_order_relaxed);
     auto& matches = matches_per_thread_[my_id];
 
     /*std::cout << string("Alignment thread spinning up with id ") +
                      std::to_string(my_id) + "\n";*/
-
-    // int capacity = work_queue_->capacity();
 
     ProteinAligner aligner(envs_, params_);
 

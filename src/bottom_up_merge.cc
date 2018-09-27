@@ -54,11 +54,12 @@ void BottomUpMerge::DebugDump() {
 }
 
 agd::Status BottomUpMerge::RunMulti(size_t num_threads,
-                                    AllAllExecutor* executor) {
+                                    AllAllExecutor* executor,
+                                    MergeExecutor* merge_executor) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
-  auto cluster_worker = [this]() {
+  auto cluster_worker = [this, &merge_executor]() {
     cout << "cluster worker starting\n";
     // need own aligner per thread
     ProteinAligner aligner(aligner_->Envs(), aligner_->Params());
@@ -77,7 +78,10 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         // this part takes a while for larger sets
         auto t0 = std::chrono::high_resolution_clock::now();
-        auto merged_set = s1.MergeClusters(s2, &aligner);
+
+        // eventually we may want to call single thread mergeClusters for
+        // small cluster sets as it may be more efficient
+        auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
         auto t1 = std::chrono::high_resolution_clock::now();
 
         auto duration = t1 - t0;
@@ -110,7 +114,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         // this part takes a while for larger sets
         auto t0 = std::chrono::high_resolution_clock::now();
-        auto merged_set = s1.MergeClusters(s2, &aligner);
+        auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
         auto t1 = std::chrono::high_resolution_clock::now();
 
         auto duration = t1 - t0;
@@ -131,7 +135,8 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
     cout << "Cluster eval thread finishing...\n";
   };
 
-  cout << "scheduling cluster threads, sets remaining: " << cluster_sets_left_.load();
+  cout << "scheduling cluster threads, sets remaining: "
+       << cluster_sets_left_.load();
   auto t0 = std::chrono::high_resolution_clock::now();
   threads_.reserve(num_threads);
   for (size_t i = 0; i < num_threads; i++) {
@@ -141,7 +146,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   for (auto& t : threads_) {
     t.join();
   }
-  
+
   auto t1 = std::chrono::high_resolution_clock::now();
 
   auto duration = t1 - t0;

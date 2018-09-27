@@ -4,6 +4,7 @@
 #include "agd/errors.h"
 #include "aligner.h"
 #include "sequence.h"
+#include "absl/synchronization/mutex.h"
 
 class Cluster {
  public:
@@ -36,8 +37,14 @@ class Cluster {
 
   const std::vector<Sequence>& Sequences() const { return seqs_; }
 
+  void Lock() { mu_.Lock(); }
+  void Unlock() { mu_.Unlock(); }
+
  private:
   // representative is first seq
   std::vector<Sequence> seqs_;
   bool fully_merged_ = false;
+
+  absl::Mutex mu_; // protects seqs_ and fully_merged_
+
 };

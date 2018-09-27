@@ -28,9 +28,9 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
     executor->EnqueueMerge(item);
   }
   n.SetMinNotifies(clusters_.size());
-  std::cout << "submitted to merger, waaiting ...\n";
+  //std::cout << "submitted to merger, waaiting ...\n";
   n.WaitForNotification();
-  std::cout << "done\n";
+  //std::cout << "done\n";
   for (auto& c_other : other.clusters_) {
     if (!c_other.IsFullyMerged()) {
       // push any not fully merged cluster into the new set and we are done

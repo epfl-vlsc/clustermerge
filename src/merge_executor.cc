@@ -56,7 +56,7 @@ void MergeExecutor::Worker() {
     auto* cluster_set = std::get<1>(item);
     auto* notification = std::get<2>(item);
 
-    cout << "merge thread merging ...\n";
+    //cout << "merge thread merging ...\n";
 
     cluster_set->MergeClusterLocked(cluster, &aligner);
 

@@ -51,6 +51,7 @@ cc_binary(
     linkopts = ["-lpthread"],
     copts = ["-std=c++14"],
     deps = ["@com_google_absl//absl/strings",
+            "@com_google_absl//absl/container:flat_hash_map",
             ":swps3_lib",
             "//src/agd:agd"]
 )

@@ -23,14 +23,14 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
 
   MultiNotification n;
   for (auto& c : clusters_) {
-    // launch a thread and save a future for each c
+    // enqueue each comparison between c and all cluster in other
     MergeExecutor::WorkItem item = make_tuple(&c, &other, &n);
     executor->EnqueueMerge(item);
   }
+
   n.SetMinNotifies(clusters_.size());
-  //std::cout << "submitted to merger, waaiting ...\n";
   n.WaitForNotification();
-  //std::cout << "done\n";
+
   for (auto& c_other : other.clusters_) {
     if (!c_other.IsFullyMerged()) {
       // push any not fully merged cluster into the new set and we are done

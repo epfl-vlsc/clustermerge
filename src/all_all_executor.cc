@@ -36,7 +36,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
   }
   cout << "All threads finished.\n";
 
-  std::unordered_map<GenomePair, std::ofstream, PairHash> file_map;
+  absl::flat_hash_map<GenomePair, std::ofstream> file_map;
   struct stat info;
   if (stat(output_dir.c_str(), &info) != 0) {
     // doesnt exist, create
@@ -71,7 +71,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
 
       if (file_map.find(genome_pair) == file_map.end()) {
         // create the file
-        string path = output_dir + "/" + genome_pair.first;
+        string path = absl::StrCat(output_dir, "/", genome_pair.first);;
         struct stat info;
         if (stat(path.c_str(), &info) != 0) {
           // doesnt exist, create

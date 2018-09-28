@@ -5,8 +5,10 @@
 #include <unordered_map>
 #include <utility>
 #include "absl/synchronization/mutex.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 
-namespace {
+/*namespace {
 template <class T>
 inline void hash_combine(std::size_t& seed, const T& v)
 {
@@ -23,15 +25,15 @@ struct PairHash {
     hash_combine(h1, h2);
     return h1;
   }
-};
+};*/
 
-typedef std::pair<std::string, std::string>
+typedef std::pair<absl::string_view, absl::string_view>
     GenomePair;  // could be replaced by ints that map to genome strings
 typedef std::pair<int, int> SequencePair;
 
 class CandidateMap {
-  typedef std::unordered_map<
-      GenomePair, std::unordered_map<SequencePair, bool, PairHash>, PairHash>
+  typedef absl::flat_hash_map<
+      GenomePair, absl::flat_hash_map<SequencePair, bool>>
       GenomeSequenceMap;
 
  public:

@@ -34,9 +34,40 @@ void Cluster::AddSequence(const Sequence& seq) {
   }
 }
 
-void Cluster::Merge(const Cluster& other, ProteinAligner* aligner) {
+void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
 
-  const auto& other_seqs = other.Sequences();
+  const auto& other_seqs = other->Sequences();
+  seqs_.push_back(other_seqs[0]); // the rep matches, or we wouldnt be here
+
+  bool first = true; // to skip first
+  for (const auto& seq : other_seqs) {
+    if (first) {
+      first = false;
+      continue;
+    }
+    const auto& rep = seqs_[0];
+    bool found = false;
+    for (const auto& s : seqs_) {
+      if (s.ID() == seq.ID()) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
+                                   rep.Seq().size(), seq.Seq().size())) {
+        seqs_.push_back(seq);
+      }
+    }
+  }
+
+  other->MergeOther(this, aligner);
+}
+
+
+void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
+
+  const auto& other_seqs = other->Sequences();
   seqs_.push_back(other_seqs[0]); // the rep matches, or we wouldnt be here
 
   bool first = true; // to skip first

@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
       merge_threads = std::thread::hardware_concurrency();
     }
   }
-  cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
+  cout << "Using " << merge_threads << " hardware threads for merging.\n";
 
   // get output dir to use
   string dir("output_matches");
@@ -188,14 +188,12 @@ int main(int argc, char** argv) {
   AllAllExecutor executor(threads, 100, &envs,
                           &params);
   executor.Initialize();
-  
-  MergeExecutor merge_executor(threads, 200, &envs, &params);
 
   auto t0 = std::chrono::high_resolution_clock::now();
-  // pass to Run
   if (cluster_threads == 1) {
     merger.Run(&executor);
   } else {
+    MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
     merger.RunMulti(merge_threads, &executor, &merge_executor);
   }
 

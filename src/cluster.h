@@ -11,12 +11,13 @@ class Cluster {
   Cluster() = default;  // an empty cluster
   Cluster(Sequence& seed) { seqs_.push_back(seed); }
 
-  Cluster(Cluster&& other) {
+  Cluster(Cluster&& other) noexcept {
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
   }
 
-  void Merge(const Cluster& other, ProteinAligner* aligner);
+  void Merge(Cluster* other, ProteinAligner* aligner);
+  void MergeOther(Cluster* other, ProteinAligner* aligner);
 
   agd::Status AlignReps(const Cluster& other,
                         ProteinAligner::Alignment* alignment,

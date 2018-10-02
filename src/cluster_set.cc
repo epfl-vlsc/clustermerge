@@ -133,10 +133,13 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
           // for each sequence in c_other, add if it matches c rep
           // keep both clusters
           // std::cout << "merging and keeping both clusters\n";
+          c_other.Lock(); 
           if (c_other.IsFullyMerged()) {
+            c_other.Unlock();
             continue;
           }
-          cluster->Merge(c_other, aligner);
+          cluster->Merge(&c_other, aligner);
+          c_other.Unlock();
         }
       }
     }  // if passes threshold
@@ -222,7 +225,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
             // for each sequence in c_other, add if it matches c rep
             // keep both clusters
             // std::cout << "merging and keeping both clusters\n";
-            c.Merge(c_other, aligner);
+            c.Merge(&c_other, aligner);
           }
         }
       }  // if passes threshold

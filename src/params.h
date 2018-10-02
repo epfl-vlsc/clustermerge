@@ -7,5 +7,5 @@ struct Parameters {
   size_t max_representatives = 1;
   size_t max_n_aa_not_covered = 15;
   // min score for full merge
-  float min_full_merge_score = 200.0f;
+  float min_full_merge_score = 250.0f;
 };

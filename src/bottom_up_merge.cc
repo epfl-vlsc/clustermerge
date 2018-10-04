@@ -73,7 +73,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
+        //cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets
@@ -102,8 +102,8 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
       } else if (sets_.size() <= 1) {  // wait until enough
         while (sets_.size() <= 1 && cluster_sets_left_.load() > 1) {
-          cout << "waiting, set size: " << sets_.size()
-               << " sets left: " << cluster_sets_left_.load() << "\n";
+          /*cout << "waiting, set size: " << sets_.size()
+               << " sets left: " << cluster_sets_left_.load() << "\n";*/
           queue_pop_cv_.Wait(&queue_mu_);
         }
         if (cluster_sets_left_.load() <= 1) {
@@ -116,7 +116,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
+        //cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
         
         // swap so we have the larger set first, this results

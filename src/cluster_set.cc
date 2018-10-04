@@ -273,8 +273,8 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
             [](Cluster& a, Cluster& b) { return a.Residues() > b.Residues(); });
 
   for (const auto& cluster : clusters_) {
-    std::cout << "Scheduling cluster with residues " << cluster.Residues()
-              << "\n";
+    /*std::cout << "Scheduling cluster with residues " << cluster.Residues()
+              << "\n";*/
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {

@@ -20,6 +20,10 @@ class ClusterSet {
 
   ClusterSet(size_t num) { clusters_.reserve(num); }
 
+  void Swap(ClusterSet* other) {
+    clusters_.swap(other->clusters_);
+  }
+
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
   

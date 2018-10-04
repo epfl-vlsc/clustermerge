@@ -81,6 +81,13 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         // eventually we may want to call single thread mergeClusters for
         // small cluster sets as it may be more efficient
+        
+        // swap so we have the larger set first, this results
+        // in a larger number of smaller work items
+        if (s1.Size() < s2.Size()) {
+          s1.Swap(&s2);
+        }
+
         auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
         auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -111,6 +118,12 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         cluster_sets_left_.fetch_sub(1);
         cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
+        
+        // swap so we have the larger set first, this results
+        // in a larger number of smaller work items
+        if (s1.Size() < s2.Size()) {
+          s1.Swap(&s2);
+        }
 
         // this part takes a while for larger sets
         auto t0 = std::chrono::high_resolution_clock::now();

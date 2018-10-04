@@ -96,6 +96,7 @@ class AllAllExecutor {
                      std::to_string(my_id) + "\n";*/
 
     ProteinAligner aligner(envs_, params_);
+    std::vector<size_t> alignment_times;
 
     while (run_.load()) {
       // read from queue, and align work item
@@ -138,9 +139,15 @@ class AllAllExecutor {
       if (!candidate_map_.ExistsOrInsert(genome_pair, seq_pair)) {
         if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                     seq1->Seq().size(), seq2->Seq().size())) {
+
+          auto t0 = std::chrono::high_resolution_clock::now();
           agd::Status s = aligner.AlignLocal(
               seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
               seq2->Seq().size(), alignment);
+          auto t1 = std::chrono::high_resolution_clock::now();
+          auto duration = t1 - t0;
+          auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+          alignment_times.push_back(msec.count());
 
           if (PassesLengthConstraint(alignment, seq1->Seq().size(),
                                      seq2->Seq().size()) &&
@@ -159,8 +166,9 @@ class AllAllExecutor {
       }
       // else, we already aligned these two seqs, done
     }
-
-    std::cout << "aligner executor thread ending.\n";
+    
+    auto longest_time = max_element(alignment_times.begin(), alignment_times.end());
+    std::cout << "aligner executor thread ending, max time is " << *longest_time << " ms \n";
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

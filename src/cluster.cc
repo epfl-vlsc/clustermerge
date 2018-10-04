@@ -7,8 +7,8 @@ agd::Status Cluster::AlignReps(const Cluster& other,
   const auto& this_rep = seqs_[0];
   const auto& other_rep = other.seqs_[0];
   return aligner->AlignSingle(this_rep.Seq().data(), other_rep.Seq().data(),
-                             this_rep.Seq().size(), other_rep.Seq().size(),
-                             *alignment);
+                              this_rep.Seq().size(), other_rep.Seq().size(),
+                              *alignment);
 }
 
 bool Cluster::PassesThreshold(const Cluster& other, ProteinAligner* aligner) {
@@ -36,11 +36,10 @@ void Cluster::AddSequence(const Sequence& seq) {
 }
 
 void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
-
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs[0]); // the rep matches, or we wouldnt be here
+  seqs_.push_back(other_seqs[0]);  // the rep matches, or we wouldnt be here
 
-  bool first = true; // to skip first
+  bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
     if (first) {
       first = false;
@@ -66,13 +65,11 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
   other->MergeOther(this, aligner);
 }
 
-
 void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
-
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs[0]); // the rep matches, or we wouldnt be here
+  seqs_.push_back(other_seqs[0]);  // the rep matches, or we wouldnt be here
 
-  bool first = true; // to skip first
+  bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
     if (first) {
       first = false;

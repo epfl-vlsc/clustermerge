@@ -106,13 +106,16 @@ void ReadJsonEnv(const json& json_env, AlignmentEnvironment* env) {
 
   for (size_t i = 0; i < column_order.size(); i++) {
     if (compact_matrix[i].size() != column_order.size()) {
-      cout << "column order doesnt match!! " << compact_matrix[i].dump() << " \n"
+      cout << "column order doesnt match!! " << compact_matrix[i].dump()
+           << " \n"
            << column_order << "\n";
       exit(0);
     }
     for (size_t j = 0; j < column_order.size(); j++) {
-      //cout << "column order first char is " << column_order[i].get<string>().front() << "\n";
-      env->matrix[(column_order[i].get<string>().front() - 'A') * DIMSIZE + column_order[j].get<string>().front() - 'A'] =
+      // cout << "column order first char is " <<
+      // column_order[i].get<string>().front() << "\n";
+      env->matrix[(column_order[i].get<string>().front() - 'A') * DIMSIZE +
+                  column_order[j].get<string>().front() - 'A'] =
           compact_matrix[i][j];
     }
   }

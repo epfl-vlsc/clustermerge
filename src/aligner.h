@@ -32,7 +32,7 @@ class ProteinAligner {
 
   ProteinAligner(const AlignmentEnvironments* envs, const Parameters* params)
       : envs_(envs), params_(params) {
-        bt_data_ = new BTData();
+    bt_data_ = new BTData();
   }
 
   ~ProteinAligner() {

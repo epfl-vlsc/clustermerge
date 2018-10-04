@@ -69,7 +69,7 @@ class AllAllExecutor {
   };
 
   typedef absl::flat_hash_map<GenomePair,
-                             absl::flat_hash_map<SequencePair, Match>>
+                              absl::flat_hash_map<SequencePair, Match>>
       ResultMap;
   // candidate map prevents dups, we store the actual matches here
   // each thread gets its own map, to avoid any sync here
@@ -134,19 +134,20 @@ class AllAllExecutor {
         std::swap(seq1, seq2);
       }
 
-      auto genome_pair = std::make_pair(absl::string_view(seq1->Genome()), absl::string_view(seq2->Genome()));
+      auto genome_pair = std::make_pair(absl::string_view(seq1->Genome()),
+                                        absl::string_view(seq2->Genome()));
       auto seq_pair = std::make_pair(seq1->GenomeIndex(), seq2->GenomeIndex());
       if (!candidate_map_.ExistsOrInsert(genome_pair, seq_pair)) {
         if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                     seq1->Seq().size(), seq2->Seq().size())) {
-
           auto t0 = std::chrono::high_resolution_clock::now();
           agd::Status s = aligner.AlignLocal(
               seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
               seq2->Seq().size(), alignment);
           auto t1 = std::chrono::high_resolution_clock::now();
           auto duration = t1 - t0;
-          auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+          auto msec =
+              std::chrono::duration_cast<std::chrono::milliseconds>(duration);
           alignment_times.push_back(msec.count());
 
           if (PassesLengthConstraint(alignment, seq1->Seq().size(),
@@ -166,9 +167,11 @@ class AllAllExecutor {
       }
       // else, we already aligned these two seqs, done
     }
-    
-    auto longest_time = max_element(alignment_times.begin(), alignment_times.end());
-    std::cout << "aligner executor thread ending, max time is " << *longest_time << " ms \n";
+
+    auto longest_time =
+        max_element(alignment_times.begin(), alignment_times.end());
+    std::cout << "aligner executor thread ending, max time is " << *longest_time
+              << " ms \n";
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

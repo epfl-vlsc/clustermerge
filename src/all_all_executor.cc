@@ -1,12 +1,12 @@
 
 #include "all_all_executor.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
 #include "absl/strings/str_cat.h"
 #include "aligner.h"
 
@@ -71,7 +71,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
 
       if (file_map.find(genome_pair) == file_map.end()) {
         // create the file
-        string path = absl::StrCat(output_dir, "/", genome_pair.first);;
+        string path = absl::StrCat(output_dir, "/", genome_pair.first);
         struct stat info;
         if (stat(path.c_str(), &info) != 0) {
           // doesnt exist, create
@@ -148,7 +148,7 @@ AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
   work_queue_.reset(new ConcurrentQueue<WorkItem>(capacity));
   matches_per_thread_.resize(num_threads);
 
-  //cout << "Start executor, id is " << id_.load() << "\n";
+  // cout << "Start executor, id is " << id_.load() << "\n";
 
   num_active_threads_ = num_threads;
 }

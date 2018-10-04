@@ -1,9 +1,9 @@
 
 #include "cluster_set.h"
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <algorithm>
 #include "agd/json.hpp"
 #include "aligner.h"
 #include "debug.h"
@@ -14,7 +14,6 @@ using std::vector;
 
 ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
                                              MergeExecutor* executor) {
-
   ClusterSet new_cluster_set(clusters_.size() + other.clusters_.size());
 
   MultiNotification n;
@@ -40,7 +39,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
     }
   }
 
-  // sort so that larger rep clusters come first, leading to 
+  // sort so that larger rep clusters come first, leading to
   // better scheduling overlap of work
   std::sort(new_cluster_set.clusters_.begin(), new_cluster_set.clusters_.end(),
             [](Cluster& a, Cluster& b) {
@@ -271,12 +270,11 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   // sort by residue total first
   // to schedule the heaviest computations first
   std::sort(clusters_.begin(), clusters_.end(),
-            [](Cluster& a, Cluster& b) {
-              return a.Residues() > b.Residues();
-            });
+            [](Cluster& a, Cluster& b) { return a.Residues() > b.Residues(); });
 
   for (const auto& cluster : clusters_) {
-    std::cout << "Scheduling cluster with residues " << cluster.Residues() << "\n";
+    std::cout << "Scheduling cluster with residues " << cluster.Residues()
+              << "\n";
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {

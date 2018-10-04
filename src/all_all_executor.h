@@ -168,10 +168,10 @@ class AllAllExecutor {
       // else, we already aligned these two seqs, done
     }
 
-    auto longest_time =
+    /*auto longest_time =
         max_element(alignment_times.begin(), alignment_times.end());
     std::cout << absl::StrCat("aligner executor thread ending, max time is ", *longest_time,
-              " ms \n");
+              " ms \n");*/
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

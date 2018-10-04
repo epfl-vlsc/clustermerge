@@ -268,11 +268,18 @@ void ClusterSet::DebugDump() const {
 }
 
 void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
+  // sort by residue total first
+  // to schedule the heaviest computations first
+  std::sort(clusters_.begin(), clusters_.end(),
+            [](Cluster& a, Cluster& b) {
+              return a.Residues() > b.Residues();
+            });
+
   for (const auto& cluster : clusters_) {
+    std::cout << "Scheduling cluster with residues " << cluster.Residues() << "\n";
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-        // std::cout << "Scheduling alignment...\n";
         AllAllExecutor::WorkItem item = std::make_tuple(&(*it), &(*itt));
         executor->EnqueueAlignment(item);
       }

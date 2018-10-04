@@ -14,11 +14,13 @@ class Cluster {
   Cluster(Cluster&& other) noexcept {
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
+    residue_total = other.residue_total;
   }
 
   Cluster& operator=(Cluster&& other) {
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
+    residue_total = other.residue_total;
     return *this;
   }
 
@@ -44,6 +46,8 @@ class Cluster {
 
   const std::vector<Sequence>& Sequences() const { return seqs_; }
 
+  uint64_t Residues() const { return residue_total; }
+
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
 
@@ -51,6 +55,7 @@ class Cluster {
   // representative is first seq
   std::vector<Sequence> seqs_;
   bool fully_merged_ = false;
+  uint64_t residue_total = 0;
 
   absl::Mutex mu_; // protects seqs_ and fully_merged_
 

@@ -30,6 +30,7 @@ void Cluster::AddSequence(const Sequence& seq) {
     }
   }
   if (!found) {
+    residue_total += seq.Seq().size();
     seqs_.push_back(std::move(seq));
   }
 }
@@ -56,6 +57,7 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
     if (!found) {
       if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
                                    rep.Seq().size(), seq.Seq().size())) {
+        residue_total += seq.Seq().size();
         seqs_.push_back(seq);
       }
     }
@@ -87,6 +89,7 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
     if (!found) {
       if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
                                    rep.Seq().size(), seq.Seq().size())) {
+        residue_total += seq.Seq().size();
         seqs_.push_back(seq);
       }
     }

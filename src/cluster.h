@@ -16,6 +16,12 @@ class Cluster {
     fully_merged_ = other.fully_merged_;
   }
 
+  Cluster& operator=(Cluster&& other) {
+    seqs_ = std::move(other.seqs_);
+    fully_merged_ = other.fully_merged_;
+    return *this;
+  }
+
   void Merge(Cluster* other, ProteinAligner* aligner);
   void MergeOther(Cluster* other, ProteinAligner* aligner);
 

@@ -5,11 +5,9 @@
 
 class Sequence {
  public:
-  Sequence(absl::string_view seq, /*std::string& coverage,*/
-           const std::string& genome, uint32_t genome_size,
-           uint32_t genome_index, uint32_t id)
+  Sequence(absl::string_view seq, const std::string& genome,
+           uint32_t genome_size, uint32_t genome_index, uint32_t id)
       : sequence_(seq),
-        // coverage_(coverage),
         genome_(genome),
         genome_size_(genome_size),
         genome_index_(genome_index),
@@ -28,7 +26,6 @@ class Sequence {
 
  private:
   absl::string_view sequence_;
-  // std::string& coverage_;
   const std::string& genome_;
   uint32_t genome_size_;
   uint32_t genome_index_;

@@ -104,6 +104,8 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
           // they are _almost_ overlapped, merge completely
           // std::cout << "Nearly complete overlap, merging c into c_other,
           // score is " << alignment.score << "\n";
+
+          // TODO move this code into class Cluster
           c_other.Lock();
           if (c_other.IsFullyMerged()) {
             c_other.Unlock();
@@ -121,6 +123,7 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
                    alignment.score > aligner->Params()->min_full_merge_score) {
           // std::cout << "Nearly complete overlap, merging c_other into c,
           // score is " << alignment.score << "\n";
+          // TODO move this code into class Cluster
           c_other.Lock();
           if (c_other.IsFullyMerged()) {
             c_other.Unlock();

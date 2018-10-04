@@ -93,7 +93,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         auto duration = t1 - t0;
         auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-        cout << "merge took: " << sec.count() << " seconds.\n";
+        //cout << "merge took: " << sec.count() << " seconds.\n";
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
@@ -132,7 +132,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         auto duration = t1 - t0;
         auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-        cout << "merge took: " << sec.count() << " seconds.\n";
+        //cout << "merge took: " << sec.count() << " seconds.\n";
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));

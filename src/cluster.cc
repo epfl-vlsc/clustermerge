@@ -1,11 +1,13 @@
 
 #include "cluster.h"
+#include <iostream>
 
 agd::Status Cluster::AlignReps(const Cluster& other,
                                ProteinAligner::Alignment* alignment,
                                ProteinAligner* aligner) {
   const auto& this_rep = seqs_[0];
   const auto& other_rep = other.seqs_[0];
+
   return aligner->AlignSingle(this_rep.Seq().data(), other_rep.Seq().data(),
                               this_rep.Seq().size(), other_rep.Seq().size(),
                               *alignment);
@@ -31,7 +33,7 @@ void Cluster::AddSequence(const Sequence& seq) {
   }
   if (!found) {
     residue_total += seq.Seq().size();
-    seqs_.push_back(std::move(seq));
+    seqs_.push_back(seq);
   }
 }
 

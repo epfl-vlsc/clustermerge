@@ -86,6 +86,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         // in a larger number of smaller work items
         if (s1.Size() < s2.Size()) {
           s1.Swap(&s2);
+          //cout << "swapped89\n";
         }
 
         auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
@@ -123,6 +124,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         // in a larger number of smaller work items
         if (s1.Size() < s2.Size()) {
           s1.Swap(&s2);
+          //cout << "swapped127\n";
         }
 
         // this part takes a while for larger sets

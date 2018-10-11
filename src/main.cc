@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
     merger.Run(&executor);
   } else {
     MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
-    merger.RunMulti(merge_threads, &executor, &merge_executor);
+    merger.RunMulti(cluster_threads, &executor, &merge_executor);
   }
 
   //merger.DebugDump();

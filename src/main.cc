@@ -1,12 +1,12 @@
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include "agd/agd_dataset.h"
-#include "args.h"
-#include "debug.h"
-#include "bottom_up_merge.h"
 #include "aligner.h"
 #include "all_all_executor.h"
+#include "args.h"
+#include "bottom_up_merge.h"
+#include "debug.h"
 
 using std::cout;
 using std::string;
@@ -14,20 +14,51 @@ using std::unique_ptr;
 
 agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
                          std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
-    
-    agd::Status s = agd::Status::OK();
-    for (const auto dataset_opt : args::get(datasets_opts)) {
-      unique_ptr<agd::AGDDataset> dataset;
-      try {
-        s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
-      } catch (...) {
-        cout << "Error parsing AGD metadata for dataet '" << dataset_opt << "', are you sure it's valid JSON?";
-        throw;
-      }
-      cout << "data is " << dataset->Name() << " with size " << dataset->Size() << "\n";
-      datasets->push_back(std::move(dataset));
+  agd::Status s = agd::Status::OK();
+  for (const auto dataset_opt : args::get(datasets_opts)) {
+    unique_ptr<agd::AGDDataset> dataset;
+    try {
+      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
+    } catch (...) {
+      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
+           << "', are you sure it's valid JSON?";
+      throw;
     }
-    return s;
+    cout << "data is " << dataset->Name() << " with size " << dataset->Size()
+         << "\n";
+    datasets->push_back(std::move(dataset));
+  }
+  return s;
+}
+
+agd::Status LoadDatasetsJSON(
+    const string& dataset_file,
+    std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
+
+  std::ifstream dataset_stream(dataset_file);
+
+  if (!dataset_stream.good()) {
+    return agd::errors::NotFound("No such file: ", dataset_file);
+  }
+
+  json dataset_json_obj;
+  dataset_stream >> dataset_json_obj;
+
+  agd::Status s = agd::Status::OK();
+  for (const auto dataset_opt : dataset_json_obj) {
+    unique_ptr<agd::AGDDataset> dataset;
+    try {
+      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
+    } catch (...) {
+      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
+           << "', are you sure it's valid JSON?";
+      throw;
+    }
+    cout << "data is " << dataset->Name() << " with size " << dataset->Size()
+         << "\n";
+    datasets->push_back(std::move(dataset));
+  }
+  return s;
 }
 
 int main(int argc, char** argv) {
@@ -59,6 +90,9 @@ int main(int argc, char** argv) {
       "Output directory. Will be overwritten if exists."
       "[./output_matches]",
       {'o', "output_dir"});
+  args::ValueFlag<std::string> input_file_list(
+      parser, "file_list", "JSON containing list of input AGD datasets.",
+      {'i', "input_list"});
   args::PositionalList<std::string> datasets_opts(
       parser, "datasets", "AGD Protein datasets to cluster.");
 
@@ -96,7 +130,7 @@ int main(int argc, char** argv) {
     }
   }
   cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
-  
+
   unsigned int merge_threads = std::thread::hardware_concurrency();
   if (merge_threads_arg) {
     merge_threads = args::get(merge_threads_arg);
@@ -133,7 +167,7 @@ int main(int argc, char** argv) {
     std::cerr << "File " << logpam_json_file << " not found.\n";
     return 1;
   }
-  
+
   if (!allmat_stream.good()) {
     std::cerr << "File " << all_matrices_json_file << " not found.\n";
     return 1;
@@ -154,7 +188,7 @@ int main(int argc, char** argv) {
 
   // done init envs
 
-  Parameters params; // using default params for now
+  Parameters params;  // using default params for now
 
   // init aligner object
   ProteinAligner aligner(&envs, &params);
@@ -166,7 +200,12 @@ int main(int argc, char** argv) {
     // load and parse protein datasets
     // cluster merge sequences are simply string_views over this data
     // so these structures must live until computations complete
-     s = LoadDatasets(datasets_opts, &datasets);
+    if (input_file_list) {
+      cout << "WARNING: ignoring input file list and using positionals!\n";
+    }
+    s = LoadDatasets(datasets_opts, &datasets);
+  } else if (input_file_list) {
+    s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
   } else {
     cout << "No AGD datasets provided. See usage: \n";
     std::cerr << parser;
@@ -185,8 +224,7 @@ int main(int argc, char** argv) {
   cout << "Data loaded, building merger ...\n";
   BottomUpMerge merger(datasets, &aligner);
 
-  AllAllExecutor executor(threads, 100, &envs,
-                          &params);
+  AllAllExecutor executor(threads, 100, &envs, &params);
   executor.Initialize();
 
   auto t0 = std::chrono::high_resolution_clock::now();
@@ -197,19 +235,17 @@ int main(int argc, char** argv) {
     merger.RunMulti(cluster_threads, &executor, &merge_executor);
   }
 
-  //merger.DebugDump();
+  // merger.DebugDump();
   // wait and finish call on executor
   // which dumps final results to disk
   executor.FinishAndOutput(dir);
-  
+
   auto t1 = std::chrono::high_resolution_clock::now();
 
   auto duration = t1 - t0;
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
 
-
   cout << "Execution time: " << sec.count() << " seconds.\n";
-
 
   return (0);
 }

@@ -12,6 +12,12 @@ class Buffer : public Data {
   std::size_t size_ = 0, allocation_ = 0, extend_extra_ = 0;
 
  public:
+  ~Buffer() override = default;
+  Buffer(const Buffer& other) = delete;
+  void operator=(const Buffer& other) = delete;
+
+  Buffer(Buffer&&) = default;
+  Buffer& operator=(Buffer&&) = default;
   Buffer(decltype(size_) initial_size = 2 * 1024 * 1024,
          decltype(size_) extend_extra = 8 * 1024 * 1024);
 

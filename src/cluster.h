@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include <list>
 #include "agd/errors.h"
 #include "aligner.h"
 #include "sequence.h"
@@ -35,7 +35,7 @@ class Cluster {
 
   bool IsFullyMerged() const { return fully_merged_; }
 
-  const Sequence& Rep() { return seqs_[0]; }
+  const Sequence& Rep() { return seqs_.front(); }
 
   // add (move) seq into seqs_
   void AddSequence(const Sequence& seq);
@@ -44,7 +44,7 @@ class Cluster {
   // with another, and will go away. seqs_ may not be valid anymore
   void SetFullyMerged() { fully_merged_ = true; }
 
-  const std::vector<Sequence>& Sequences() const { return seqs_; }
+  const std::list<Sequence>& Sequences() const { return seqs_; }
 
   uint64_t Residues() const { return residue_total; }
 
@@ -53,7 +53,8 @@ class Cluster {
 
  private:
   // representative is first seq
-  std::vector<Sequence> seqs_;
+  // use a list so refs aren't invalidated
+  std::list<Sequence> seqs_;
   bool fully_merged_ = false;
   uint64_t residue_total = 0;
 

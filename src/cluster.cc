@@ -5,8 +5,8 @@
 agd::Status Cluster::AlignReps(const Cluster& other,
                                ProteinAligner::Alignment* alignment,
                                ProteinAligner* aligner) {
-  const auto& this_rep = seqs_[0];
-  const auto& other_rep = other.seqs_[0];
+  const auto& this_rep = seqs_.front();
+  const auto& other_rep = other.seqs_.front();
 
   return aligner->AlignSingle(this_rep.Seq().data(), other_rep.Seq().data(),
                               this_rep.Seq().size(), other_rep.Seq().size(),
@@ -14,8 +14,8 @@ agd::Status Cluster::AlignReps(const Cluster& other,
 }
 
 bool Cluster::PassesThreshold(const Cluster& other, ProteinAligner* aligner) {
-  const auto& this_rep = seqs_[0];
-  const auto& other_rep = other.seqs_[0];
+  const auto& this_rep = seqs_.front();
+  const auto& other_rep = other.seqs_.front();
 
   return aligner->PassesThreshold(this_rep.Seq().data(), other_rep.Seq().data(),
                                   this_rep.Seq().size(),
@@ -39,7 +39,7 @@ void Cluster::AddSequence(const Sequence& seq) {
 
 void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs[0]);  // the rep matches, or we wouldnt be here
+  seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
@@ -47,7 +47,7 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
       first = false;
       continue;
     }
-    const auto& rep = seqs_[0];
+    const auto& rep = seqs_.front();
     bool found = false;
     for (const auto& s : seqs_) {
       if (s.ID() == seq.ID()) {
@@ -69,7 +69,7 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
 
 void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs[0]);  // the rep matches, or we wouldnt be here
+  seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
@@ -77,7 +77,7 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
       first = false;
       continue;
     }
-    const auto& rep = seqs_[0];
+    const auto& rep = seqs_.front();
     bool found = false;
     for (const auto& s : seqs_) {
       if (s.ID() == seq.ID()) {

@@ -43,6 +43,10 @@ class AllAllExecutor {
   Parameters* params_;
   size_t num_threads_;
 
+  // statistics
+  std::atomic<uint64_t> num_full_alignments_{0};
+  std::atomic<uint64_t> num_pass_threshold{0};
+
   struct Match {
     int seq1_min;
     int seq1_max;
@@ -138,6 +142,7 @@ class AllAllExecutor {
                                         absl::string_view(seq2->Genome()));
       auto seq_pair = std::make_pair(seq1->GenomeIndex(), seq2->GenomeIndex());
       if (!candidate_map_.ExistsOrInsert(genome_pair, seq_pair)) {
+        num_pass_threshold++;
         if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                     seq1->Seq().size(), seq2->Seq().size())) {
           auto t0 = std::chrono::high_resolution_clock::now();
@@ -149,6 +154,7 @@ class AllAllExecutor {
           auto msec =
               std::chrono::duration_cast<std::chrono::milliseconds>(duration);
           alignment_times.push_back(msec.count());
+          num_full_alignments_++;
 
           if (PassesLengthConstraint(alignment, seq1->Seq().size(),
                                      seq2->Seq().size()) &&

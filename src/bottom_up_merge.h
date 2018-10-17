@@ -17,11 +17,11 @@ class BottomUpMerge {
 
   // single threaded mode
   // without mutltithread sync overhead
-  agd::Status Run(AllAllExecutor* executor);
+  agd::Status Run(AllAllExecutor* executor, bool do_allall);
 
   // use multiple threads to merge clusters in parallel
   agd::Status RunMulti(size_t num_threads, AllAllExecutor* executor,
-                       MergeExecutor* merge_executor);
+                       MergeExecutor* merge_executor, bool do_allall);
 
   void DebugDump();
 

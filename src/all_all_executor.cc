@@ -140,6 +140,9 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
     of << " ):";
   }
   cout << "Total matches: " << total_candidates << "\n";
+  cout << "Total All-All full alignments: " << num_full_alignments_.load()
+       << "\n";
+  cout << "Total threshold alignments: " << num_pass_threshold.load() << "\n";
 }
 
 AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,

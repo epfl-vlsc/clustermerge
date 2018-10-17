@@ -55,7 +55,7 @@ void BottomUpMerge::DebugDump() {
 
 agd::Status BottomUpMerge::RunMulti(size_t num_threads,
                                     AllAllExecutor* executor,
-                                    MergeExecutor* merge_executor) {
+                                    MergeExecutor* merge_executor, bool do_allall) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
@@ -175,14 +175,18 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   final_set.DumpJson();
 
   // for all clusters in final set, schedule all-all alignments with executor
-  final_set.ScheduleAlignments(executor);
+  if (do_allall) {
+    final_set.ScheduleAlignments(executor);
+  } else {
+    cout << "Skipping all all computation ...\n";
+  }
 
   cout << "Total clusters: " << final_set.Size() << "\n";
 
   return agd::Status::OK();
 }
 
-agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
+agd::Status BottomUpMerge::Run(AllAllExecutor* executor, bool do_allall) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets
@@ -216,7 +220,11 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor) {
   final_set.DumpJson();
 
   // for all clusters in final set, schedule all-all alignments with executor
-  final_set.ScheduleAlignments(executor);
+  if (do_allall) {
+    final_set.ScheduleAlignments(executor);
+  } else {
+    cout << "Skipping all all computation ...\n";
+  }
 
   cout << "Total clusters: " << final_set.Size() << "\n";
 

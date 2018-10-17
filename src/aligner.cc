@@ -137,7 +137,7 @@ void ProteinAligner::FindStartingPoint(const char* seq1, const char* seq2,
 
 int CountUnderscore(const char* buf, int len) {
   int sum = 0;
-  for (size_t i = 0; i < len; i++) {
+  for (int i = 0; i < len; i++) {
     if (buf[i] == '_') sum++;
   }
   return sum;

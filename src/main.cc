@@ -34,7 +34,6 @@ agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
 agd::Status LoadDatasetsJSON(
     const string& dataset_file,
     std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
-
   std::ifstream dataset_stream(dataset_file);
 
   if (!dataset_stream.good()) {
@@ -94,7 +93,13 @@ int main(int argc, char** argv) {
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
   args::PositionalList<std::string> datasets_opts(
-      parser, "datasets", "AGD Protein datasets to cluster.");
+      parser, "datasets",
+      "AGD Protein datasets to cluster. If present, will override `input_list` "
+      "argument.");
+  args::Flag exclude_allall(
+      parser, "exclude_allall",
+      "Don't perform intra-cluster all-all alignment, just do the clustering.",
+      {'x', "exclude_allall"});
 
   try {
     parser.ParseCLI(argc, argv);
@@ -229,10 +234,10 @@ int main(int argc, char** argv) {
 
   auto t0 = std::chrono::high_resolution_clock::now();
   if (cluster_threads == 1) {
-    merger.Run(&executor);
+    merger.Run(&executor, !exclude_allall);
   } else {
     MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
-    merger.RunMulti(cluster_threads, &executor, &merge_executor);
+    merger.RunMulti(cluster_threads, &executor, &merge_executor, !exclude_allall);
   }
 
   // merger.DebugDump();

@@ -20,7 +20,7 @@
 class AllAllExecutor {
  public:
   AllAllExecutor() = delete;
-  typedef std::tuple<const Sequence*, const Sequence*> WorkItem;
+  typedef std::tuple<const Sequence*, const Sequence*, size_t> WorkItem;
 
   AllAllExecutor(size_t num_threads, size_t capacity,
                  AlignmentEnvironments* envs, Parameters* params);
@@ -55,6 +55,7 @@ class AllAllExecutor {
     double score;
     double distance;
     double variance;
+    size_t cluster_size;
     inline bool operator==(const Match& rhs) {
       return seq1_min == rhs.seq1_min && seq1_max == rhs.seq1_max &&
              seq2_min == rhs.seq2_min && seq2_max == rhs.seq2_max &&
@@ -113,6 +114,7 @@ class AllAllExecutor {
 
       auto seq1 = std::get<0>(item);
       auto seq2 = std::get<1>(item);
+      auto cluster_size = std::get<2>(item);
 
       if (seq1->GenomeSize() > seq2->GenomeSize() ||
           ((seq1->GenomeSize() == seq2->GenomeSize()) &&
@@ -167,6 +169,7 @@ class AllAllExecutor {
             new_match.score = alignment.score;
             new_match.variance = alignment.pam_variance;
             new_match.distance = alignment.pam_distance;
+            new_match.cluster_size = cluster_size;
             matches[genome_pair][seq_pair] = new_match;
           }
         }

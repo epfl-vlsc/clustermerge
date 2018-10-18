@@ -121,6 +121,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         ss << ", " << the_match.seq1_min + 1 << ".." << the_match.seq1_max + 1
            << ", " << the_match.seq2_min + 1 << ".." << the_match.seq2_max + 1
            << ", " << round(the_match.variance * 100000000.0f) / 100000000.0f
+           << ", " << the_match.cluster_size
            << "],\n";
 
         /*if (std::distance(it, candidate_map.end()) == 1)

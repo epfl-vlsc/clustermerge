@@ -281,7 +281,8 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-        AllAllExecutor::WorkItem item = std::make_tuple(&(*it), &(*itt));
+        AllAllExecutor::WorkItem item =
+            std::make_tuple(&(*it), &(*itt), cluster.Sequences().size());
         executor->EnqueueAlignment(item);
       }
     }

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include "absl/container/flat_hash_set.h"
 #include "agd/json.hpp"
 #include "aligner.h"
 #include "debug.h"
@@ -270,6 +271,26 @@ void ClusterSet::DebugDump() const {
 }
 
 void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
+  // removing duplicate clusters (clusters with same sequences)
+  // for some reason, absl::InlinedVector doesnt work here
+  absl::flat_hash_set<std::vector<size_t>> set_map;
+
+  size_t num_dups_found = 0;
+  for (auto& c : clusters_) {
+    std::vector<size_t> cluster_set;
+    for (const auto& s : c.Sequences()) {
+      cluster_set.push_back(s.ID());
+    }
+    std::sort(cluster_set.begin(), cluster_set.end());
+
+    auto result = set_map.insert(std::move(cluster_set));
+    if (!result.second) {
+      c.SetDuplicate();
+      num_dups_found++;
+    }
+  }
+
+  std::cout << "Found " << num_dups_found << " duplicate clusters.\n";
   // sort by residue total first
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";

@@ -52,6 +52,7 @@ cc_binary(
     copts = ["-std=c++14"],
     deps = ["@com_google_absl//absl/strings",
             "@com_google_absl//absl/container:flat_hash_map",
+            "@com_google_absl//absl/container:flat_hash_set",
             ":swps3_lib",
             "//src/agd:agd"]
 )

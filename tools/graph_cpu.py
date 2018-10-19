@@ -7,7 +7,7 @@ with open("cpu.csv") as f:
     lines = lines[1:]
     lines = [l.split(',') for l in lines]
 
-print(lines)
+#print(lines)
 
 first_time = int(lines[0][0])
 

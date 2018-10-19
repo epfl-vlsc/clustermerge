@@ -33,8 +33,6 @@ class Cluster {
 
   bool PassesThreshold(const Cluster& other, ProteinAligner* aligner);
 
-  bool IsFullyMerged() const { return fully_merged_; }
-
   const Sequence& Rep() { return seqs_.front(); }
 
   // add (move) seq into seqs_
@@ -43,6 +41,10 @@ class Cluster {
   // mark that this cluster has been fully merged
   // with another, and will go away. seqs_ may not be valid anymore
   void SetFullyMerged() { fully_merged_ = true; }
+  bool IsFullyMerged() const { return fully_merged_; }
+  
+  void SetDuplicate() { duplicate_ = true; }
+  bool IsDuplicate() { return duplicate_; }
 
   const std::list<Sequence>& Sequences() const { return seqs_; }
 
@@ -57,6 +59,7 @@ class Cluster {
   std::list<Sequence> seqs_;
   bool fully_merged_ = false;
   uint64_t residue_total = 0;
+  bool duplicate_ = false;
 
   absl::Mutex mu_; // protects seqs_ and fully_merged_
 

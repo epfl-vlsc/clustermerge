@@ -274,7 +274,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
   std::sort(clusters_.begin(), clusters_.end(),
-            [](Cluster& a, Cluster& b) { return a.Residues() > b.Residues(); });
+            [](Cluster& a, Cluster& b) { return a.LongestLength() > b.LongestLength(); });
   std::cout << "done sorting clusters.\n";
 
   for (const auto& cluster : clusters_) {

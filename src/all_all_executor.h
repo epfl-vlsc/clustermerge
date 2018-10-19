@@ -45,7 +45,8 @@ class AllAllExecutor {
 
   // statistics
   std::atomic<uint64_t> num_full_alignments_{0};
-  std::atomic<uint64_t> num_pass_threshold{0};
+  std::atomic<uint64_t> num_pass_threshold_{0};
+  std::atomic<uint64_t> num_avoided_{0};
 
   struct Match {
     int seq1_min;
@@ -101,7 +102,7 @@ class AllAllExecutor {
                      std::to_string(my_id) + "\n";*/
 
     ProteinAligner aligner(envs_, params_);
-    std::vector<size_t> alignment_times;
+    //std::vector<size_t> alignment_times;
 
     WorkItem item;
     size_t ms_wait = 0;
@@ -149,18 +150,18 @@ class AllAllExecutor {
                                         absl::string_view(seq2->Genome()));
       auto seq_pair = std::make_pair(seq1->GenomeIndex(), seq2->GenomeIndex());
       if (!candidate_map_.ExistsOrInsert(genome_pair, seq_pair)) {
-        num_pass_threshold++;
+        num_pass_threshold_++;
         if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                     seq1->Seq().size(), seq2->Seq().size())) {
-          auto t0 = std::chrono::high_resolution_clock::now();
+          //auto t0 = std::chrono::high_resolution_clock::now();
           agd::Status s = aligner.AlignLocal(
               seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
               seq2->Seq().size(), alignment);
-          auto t1 = std::chrono::high_resolution_clock::now();
+          /*auto t1 = std::chrono::high_resolution_clock::now();
           auto duration = t1 - t0;
           auto msec =
               std::chrono::duration_cast<std::chrono::milliseconds>(duration);
-          alignment_times.push_back(msec.count());
+          alignment_times.push_back(msec.count());*/
           num_full_alignments_++;
 
           if (PassesLengthConstraint(alignment, seq1->Seq().size(),
@@ -178,6 +179,8 @@ class AllAllExecutor {
             matches[genome_pair][seq_pair] = new_match;
           }
         }
+      } else {
+        num_avoided_++;
       }
       // else, we already aligned these two seqs, done
     }

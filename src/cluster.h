@@ -14,13 +14,15 @@ class Cluster {
   Cluster(Cluster&& other) noexcept {
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
-    residue_total = other.residue_total;
+    residue_total_ = other.residue_total_;
+    longest_ = other.longest_;
   }
 
-  Cluster& operator=(Cluster&& other) {
+  Cluster& operator=(Cluster&& other) noexcept {
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
-    residue_total = other.residue_total;
+    residue_total_ = other.residue_total_;
+    longest_ = other.longest_;
     return *this;
   }
 
@@ -48,7 +50,9 @@ class Cluster {
 
   const std::list<Sequence>& Sequences() const { return seqs_; }
 
-  uint64_t Residues() const { return residue_total; }
+  uint64_t Residues() const { return residue_total_; }
+  
+  uint64_t LongestLength() const { return longest_; }
 
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
@@ -58,7 +62,8 @@ class Cluster {
   // use a list so refs aren't invalidated
   std::list<Sequence> seqs_;
   bool fully_merged_ = false;
-  uint64_t residue_total = 0;
+  uint64_t residue_total_ = 0;
+  uint64_t longest_ = 0;
   bool duplicate_ = false;
 
   absl::Mutex mu_; // protects seqs_ and fully_merged_

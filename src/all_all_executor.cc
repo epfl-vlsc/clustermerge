@@ -75,7 +75,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         struct stat info;
         if (stat(path.c_str(), &info) != 0) {
           // doesnt exist, create
-          cout << "creating dir " << path << "\n";
+          //cout << "creating dir " << path << "\n";
           int e = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
           if (e != 0) {
             cout << "could not create output dir " << path << ", exiting ...\n";
@@ -88,7 +88,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         }  // else, dir exists,
 
         absl::StrAppend(&path, "/", genome_pair.second);
-        cout << "opening file " << path << "\n";
+        //cout << "opening file " << path << "\n";
         file_map[genome_pair] = std::ofstream(path);
 
         string line = absl::StrCat("# AllAll of ", genome_pair.first, " vs ",
@@ -143,7 +143,8 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
   cout << "Total matches: " << total_candidates << "\n";
   cout << "Total All-All full alignments: " << num_full_alignments_.load()
        << "\n";
-  cout << "Total threshold alignments: " << num_pass_threshold.load() << "\n";
+  cout << "Total threshold alignments: " << num_pass_threshold_.load() << "\n";
+  cout << "Total full alignments avoided: " << num_avoided_.load() << "\n";
 }
 
 AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,

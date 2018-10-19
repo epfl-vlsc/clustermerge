@@ -3,10 +3,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -103,12 +103,17 @@ class AllAllExecutor {
     ProteinAligner aligner(envs_, params_);
     std::vector<size_t> alignment_times;
 
+    WorkItem item;
+    size_t ms_wait = 0;
     while (run_.load()) {
       // read from queue, and align work item
-      WorkItem item;
+      auto start = std::chrono::steady_clock::now();
       if (!work_queue_->pop(item)) {
         continue;
       }
+      ms_wait += std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - start)
+                     .count();
 
       // std::cout << "aligner thread got work\n";
 
@@ -179,8 +184,9 @@ class AllAllExecutor {
 
     /*auto longest_time =
         max_element(alignment_times.begin(), alignment_times.end());
-    std::cout << absl::StrCat("aligner executor thread ending, max time is ", *longest_time,
-              " ms \n");*/
+    std::cout << absl::StrCat("aligner executor thread ending, max time is ",
+    *longest_time, " ms \n");*/
+    std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, " waiting on queue\n");
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

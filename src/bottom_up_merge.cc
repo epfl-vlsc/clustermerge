@@ -173,15 +173,16 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   auto& final_set = sets_[0];
 
   final_set.DumpJson();
+  cout << "Total clusters: " << final_set.Size() << "\n";
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {
+    cout << "Scheduling all-all alignments ...\n";
     final_set.ScheduleAlignments(executor);
+    cout << "Finished alignment scheduling. \n";
   } else {
     cout << "Skipping all all computation ...\n";
   }
-
-  cout << "Total clusters: " << final_set.Size() << "\n";
 
   return agd::Status::OK();
 }

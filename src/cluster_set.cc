@@ -298,18 +298,50 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
             [](Cluster& a, Cluster& b) { return a.LongestLength() > b.LongestLength(); });
   std::cout << "done sorting clusters.\n";
 
+  CandidateMap candidate_map(1000000); // only a few MB
+  int num_avoided = 0;
+  
   for (const auto& cluster : clusters_) {
-    /*std::cout << "Scheduling cluster with residues " << cluster.Residues()
-              << "\n";*/
+    if (cluster.IsDuplicate()) {
+      continue;
+    }
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-        AllAllExecutor::WorkItem item =
-            std::make_tuple(&(*it), &(*itt), cluster.Sequences().size());
-        executor->EnqueueAlignment(item);
+
+        auto* seq1 = &(*it);
+        auto* seq2 = &(*itt);
+        
+        if (seq1->Genome() == seq2->Genome() &&
+            seq1->GenomeIndex() == seq2->GenomeIndex()) {
+          // not sure if this can actually happen yet, but no need to align
+          // against self
+          continue;
+        }
+
+        if (seq1->GenomeSize() > seq2->GenomeSize() ||
+            ((seq1->GenomeSize() == seq2->GenomeSize()) &&
+            seq1->Genome() > seq2->Genome())) {
+          std::swap(seq1, seq2);
+        } 
+
+        if (seq1->Genome() == seq2->Genome() &&
+            seq1->GenomeIndex() > seq2->GenomeIndex()) {
+          std::swap(seq1, seq2);
+        }
+
+        auto abs_seq_pair = std::make_tuple(seq1->ID(), seq2->ID());
+        if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
+          AllAllExecutor::WorkItem item =
+              std::make_tuple(seq1, seq2, cluster.Sequences().size());
+          executor->EnqueueAlignment(item);
+        } else {
+          num_avoided++;
+        }
       }
     }
   }
+  std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
 void ClusterSet::DumpJson() const {

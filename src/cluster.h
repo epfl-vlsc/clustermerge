@@ -16,6 +16,7 @@ class Cluster {
     fully_merged_ = other.fully_merged_;
     residue_total_ = other.residue_total_;
     longest_ = other.longest_;
+    duplicate_ = other.duplicate_;
   }
 
   Cluster& operator=(Cluster&& other) noexcept {
@@ -23,6 +24,7 @@ class Cluster {
     fully_merged_ = other.fully_merged_;
     residue_total_ = other.residue_total_;
     longest_ = other.longest_;
+    duplicate_ = other.duplicate_;
     return *this;
   }
 
@@ -46,7 +48,7 @@ class Cluster {
   bool IsFullyMerged() const { return fully_merged_; }
   
   void SetDuplicate() { duplicate_ = true; }
-  bool IsDuplicate() { return duplicate_; }
+  bool IsDuplicate() const { return duplicate_; }
 
   const std::list<Sequence>& Sequences() const { return seqs_; }
 

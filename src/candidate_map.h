@@ -5,55 +5,38 @@
 #include <unordered_map>
 #include <utility>
 #include "absl/synchronization/mutex.h"
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
-/*namespace {
-template <class T>
-inline void hash_combine(std::size_t& seed, const T& v)
-{
-    std::hash<T> hasher;
-    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
-}
-}
-
-struct PairHash {
-  template <class T1, class T2>
-  size_t operator()(const std::pair<T1, T2>& p) const {
-    auto h1 = std::hash<T1>{}(p.first);
-    auto h2 = std::hash<T1>{}(p.second);
-    hash_combine(h1, h2);
-    return h1;
-  }
-};*/
 
 typedef std::pair<absl::string_view, absl::string_view>
     GenomePair;  // could be replaced by ints that map to genome strings
 typedef std::pair<int, int> SequencePair;
+typedef std::pair<uint32_t, uint32_t> AbsSequencePair;
 
 class CandidateMap {
-  typedef absl::flat_hash_map<
-      GenomePair, absl::flat_hash_map<SequencePair, bool>>
-      GenomeSequenceMap;
+  typedef absl::flat_hash_set<AbsSequencePair> AbsSequenceMap;
 
  public:
+  CandidateMap() = default;
+  CandidateMap(size_t size) {
+    map_.reserve(size);
+  }
+  // do not copy or move
+  CandidateMap(CandidateMap&& other) = delete;
+  CandidateMap(const CandidateMap& other) = delete;
+
   // returns true, or false and inserts key
-  bool ExistsOrInsert(const GenomePair& g, const SequencePair& s) {
-    absl::MutexLock l(&mu_);
-
-    auto genome_pair_it = map_.find(g);
-    if (genome_pair_it != map_.end()) {
-      auto seq_pair_it = genome_pair_it->second.find(s);
-      if (seq_pair_it != genome_pair_it->second.end()) {
-        return true;
-      }
+  bool ExistsOrInsert(const AbsSequencePair& s) {
+    if (map_.contains(s)) {
+      return true;
+    } else {
+      map_.insert(s);
+      return false;
     }
-
-    map_[g][s] = true;
-    return false;
   }
 
  private:
-  GenomeSequenceMap map_;
+  AbsSequenceMap map_;
   absl::Mutex mu_;
 };

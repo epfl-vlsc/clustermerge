@@ -32,7 +32,6 @@ class AllAllExecutor {
   void Initialize();
 
  private:
-  CandidateMap candidate_map_;
   std::unique_ptr<ConcurrentQueue<WorkItem>> work_queue_;
 
   std::vector<std::thread> threads_;
@@ -122,67 +121,41 @@ class AllAllExecutor {
       auto seq2 = std::get<1>(item);
       auto cluster_size = std::get<2>(item);
 
-      if (seq1->GenomeSize() > seq2->GenomeSize() ||
-          ((seq1->GenomeSize() == seq2->GenomeSize()) &&
-           seq1->Genome() > seq2->Genome())) {
-        // seq1 = sequence;
-        std::swap(seq1, seq2);
-      } else {
-        // seq2 = sequence;
-      }
-
       ProteinAligner::Alignment alignment;
       alignment.score = 0;  // 0 score will signify not to create candidate
-
-      if (seq1->Genome() == seq2->Genome() &&
-          seq1->GenomeIndex() == seq2->GenomeIndex()) {
-        // not sure if this can actually happen yet, but no need to align
-        // against self
-        continue;
-      }
-
-      if (seq1->Genome() == seq2->Genome() &&
-          seq1->GenomeIndex() > seq2->GenomeIndex()) {
-        std::swap(seq1, seq2);
-      }
 
       auto genome_pair = std::make_pair(absl::string_view(seq1->Genome()),
                                         absl::string_view(seq2->Genome()));
       auto seq_pair = std::make_pair(seq1->GenomeIndex(), seq2->GenomeIndex());
-      if (!candidate_map_.ExistsOrInsert(genome_pair, seq_pair)) {
-        num_pass_threshold_++;
-        if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
-                                    seq1->Seq().size(), seq2->Seq().size())) {
-          //auto t0 = std::chrono::high_resolution_clock::now();
-          agd::Status s = aligner.AlignLocal(
-              seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
-              seq2->Seq().size(), alignment);
-          /*auto t1 = std::chrono::high_resolution_clock::now();
-          auto duration = t1 - t0;
-          auto msec =
-              std::chrono::duration_cast<std::chrono::milliseconds>(duration);
-          alignment_times.push_back(msec.count());*/
-          num_full_alignments_++;
+      num_pass_threshold_++;
+      if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
+                                  seq1->Seq().size(), seq2->Seq().size())) {
+        //auto t0 = std::chrono::high_resolution_clock::now();
+        agd::Status s = aligner.AlignLocal(
+            seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
+            seq2->Seq().size(), alignment);
+        /*auto t1 = std::chrono::high_resolution_clock::now();
+        auto duration = t1 - t0;
+        auto msec =
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+        alignment_times.push_back(msec.count());*/
+        num_full_alignments_++;
 
-          if (PassesLengthConstraint(alignment, seq1->Seq().size(),
-                                     seq2->Seq().size()) &&
-              PassesScoreConstraint(params_, alignment.score)) {
-            Match new_match;
-            new_match.seq1_min = alignment.seq1_min;
-            new_match.seq1_max = alignment.seq1_max;
-            new_match.seq2_min = alignment.seq2_min;
-            new_match.seq2_max = alignment.seq2_max;
-            new_match.score = alignment.score;
-            new_match.variance = alignment.pam_variance;
-            new_match.distance = alignment.pam_distance;
-            new_match.cluster_size = cluster_size;
-            matches[genome_pair][seq_pair] = new_match;
-          }
+        if (PassesLengthConstraint(alignment, seq1->Seq().size(),
+                                    seq2->Seq().size()) &&
+            PassesScoreConstraint(params_, alignment.score)) {
+          Match new_match;
+          new_match.seq1_min = alignment.seq1_min;
+          new_match.seq1_max = alignment.seq1_max;
+          new_match.seq2_min = alignment.seq2_min;
+          new_match.seq2_max = alignment.seq2_max;
+          new_match.score = alignment.score;
+          new_match.variance = alignment.pam_variance;
+          new_match.distance = alignment.pam_distance;
+          new_match.cluster_size = cluster_size;
+          matches[genome_pair][seq_pair] = new_match;
         }
-      } else {
-        num_avoided_++;
       }
-      // else, we already aligned these two seqs, done
     }
 
     /*auto longest_time =

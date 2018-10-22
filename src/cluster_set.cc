@@ -9,6 +9,7 @@
 #include "aligner.h"
 #include "debug.h"
 #include "merge_executor.h"
+#include "candidate_map.h"
 
 using std::make_tuple;
 using std::vector;
@@ -298,7 +299,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
             [](Cluster& a, Cluster& b) { return a.LongestLength() > b.LongestLength(); });
   std::cout << "done sorting clusters.\n";
 
-  CandidateMap candidate_map(1000000); // only a few MB
+  CandidateMap candidate_map(3000000); // only a few MB
   int num_avoided = 0;
   
   for (const auto& cluster : clusters_) {
@@ -330,7 +331,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
           std::swap(seq1, seq2);
         }
 
-        auto abs_seq_pair = std::make_tuple(seq1->ID(), seq2->ID());
+        auto abs_seq_pair = std::make_pair(seq1->ID(), seq2->ID());
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
           AllAllExecutor::WorkItem item =
               std::make_tuple(seq1, seq2, cluster.Sequences().size());

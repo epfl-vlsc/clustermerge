@@ -105,15 +105,25 @@ class AllAllExecutor {
 
     WorkItem item;
     size_t ms_wait = 0;
+    int longest_wait = 0;
+    bool first = true;
     while (run_.load()) {
       // read from queue, and align work item
       auto start = std::chrono::steady_clock::now();
       if (!work_queue_->pop(item)) {
         continue;
       }
-      ms_wait += std::chrono::duration_cast<std::chrono::milliseconds>(
-                     std::chrono::steady_clock::now() - start)
-                     .count();
+      if (!first) {
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - start)
+                       .count();
+        ms_wait += diff;
+        if (diff > longest_wait) {
+          longest_wait = diff;
+        }
+      } else {
+        first = false;
+      }
 
       // std::cout << "aligner thread got work\n";
 
@@ -162,7 +172,8 @@ class AllAllExecutor {
         max_element(alignment_times.begin(), alignment_times.end());
     std::cout << absl::StrCat("aligner executor thread ending, max time is ",
     *longest_time, " ms \n");*/
-    std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, " waiting on queue\n");
+    std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, 
+        " waiting on queue\n\t and the longest wait was ", longest_wait, " ms \n");
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

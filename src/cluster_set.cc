@@ -296,10 +296,10 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
   std::sort(clusters_.begin(), clusters_.end(),
-            [](Cluster& a, Cluster& b) { return a.LongestLength() > b.LongestLength(); });
+            [](Cluster& a, Cluster& b) { return a.Sequences().size() > b.Sequences().size(); });
   std::cout << "done sorting clusters.\n";
 
-  CandidateMap candidate_map(3000000); // only a few MB
+  CandidateMap candidate_map(10000000); // only a few MB
   int num_avoided = 0;
   
   for (const auto& cluster : clusters_) {

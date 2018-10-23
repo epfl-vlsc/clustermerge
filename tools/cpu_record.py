@@ -2,7 +2,7 @@
 import subprocess
 from subprocess import PIPE
 
-pidstat_cmd = ["pidstat", "-hrdu", "-p", "pid_list", "1", ]
+pidstat_cmd = ["pidstat", "-hHIrdu", "-p", "pid_list", "1" ]
 
 sed_cmd = ["sed", r'1d;/^[#]/{{4,$d}};/^[#]/s/^[#][ ]*//;/^$/d;s/^[ ]*//;s/[ ]\+/,/g']
 
@@ -31,7 +31,8 @@ sed_in = open("pidout.txt", "r")
 sed_out = open("cpu.csv", "w+")
 sed_proc = subprocess.Popen(sed_cmd, stdin=sed_in, stdout=sed_out)
 
-
 sed_proc.wait()
 
-    
+sed_in.close()
+sed_out.close()
+

@@ -35,6 +35,7 @@ class AllAllExecutor {
   std::unique_ptr<ConcurrentQueue<WorkItem>> work_queue_;
 
   std::vector<std::thread> threads_;
+  std::thread queue_measure_thread_;
 
   std::atomic_uint_fast32_t num_active_threads_, id_{0};
   std::atomic<bool> run_{true};
@@ -46,6 +47,8 @@ class AllAllExecutor {
   std::atomic<uint64_t> num_full_alignments_{0};
   std::atomic<uint64_t> num_pass_threshold_{0};
   std::atomic<uint64_t> num_avoided_{0};
+  std::vector<long int> timestamps_;
+  std::vector<size_t> queue_sizes_;
 
   struct Match {
     int seq1_min;

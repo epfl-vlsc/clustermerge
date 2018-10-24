@@ -7,9 +7,9 @@
 #include "absl/container/flat_hash_set.h"
 #include "agd/json.hpp"
 #include "aligner.h"
+#include "candidate_map.h"
 #include "debug.h"
 #include "merge_executor.h"
-#include "candidate_map.h"
 
 using std::make_tuple;
 using std::vector;
@@ -88,10 +88,18 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
           c_other.Unlock();
           continue;
         }
+        int num_merged = 0;
         for (const auto& seq : cluster->Sequences()) {
-          c_other.AddSequence(seq);
+          if (aligner->PassesThreshold(c_other.Rep().Seq().data(), seq.Seq().data(),
+                                       c_other.Rep().Seq().size(),
+                                       seq.Seq().size())) {
+            c_other.AddSequence(seq);
+            num_merged++;
+          }
         }
-        cluster->SetFullyMerged();
+        if (num_merged == cluster->Sequences().size()) {
+          cluster->SetFullyMerged();
+        }
         c_other.Unlock();
         break;
 
@@ -106,10 +114,18 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
           c_other.Unlock();
           continue;
         }
+        int num_merged = 0;
         for (const auto& seq : c_other.Sequences()) {
-          cluster->AddSequence(seq);
+          if (aligner->PassesThreshold(cluster->Rep().Seq().data(), seq.Seq().data(),
+                                       cluster->Rep().Seq().size(),
+                                       seq.Seq().size())) {
+            cluster->AddSequence(seq);
+            num_merged++;
+          }
         }
-        c_other.SetFullyMerged();
+        if (num_merged == c_other.Sequences().size()) {
+          c_other.SetFullyMerged();
+        }
         c_other.Unlock();
       } else {
         // add c_other_rep into c
@@ -156,9 +172,8 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
 
         auto c_num_uncovered =
             c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
-        auto c_other_num_uncovered =
-            c_other.Rep().Seq().size() -
-            (alignment.seq2_max - alignment.seq2_min);
+        auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+                                     (alignment.seq2_max - alignment.seq2_min);
 
         if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
             alignment.score > aligner->Params()->min_full_merge_score) {
@@ -173,8 +188,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
 
         } else if (c_other_num_uncovered <
                        aligner->Params()->max_n_aa_not_covered &&
-                   alignment.score >
-                       aligner->Params()->min_full_merge_score) {
+                   alignment.score > aligner->Params()->min_full_merge_score) {
           // std::cout << "Nearly complete overlap, merging c_other into c,
           // score is " << alignment.score << "\n";
           for (const auto& seq : c_other.Sequences()) {
@@ -243,13 +257,14 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   // sort by residue total first
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
-  std::sort(clusters_.begin(), clusters_.end(),
-            [](Cluster& a, Cluster& b) { return a.Sequences().size() > b.Sequences().size(); });
+  std::sort(clusters_.begin(), clusters_.end(), [](Cluster& a, Cluster& b) {
+    return a.Sequences().size() > b.Sequences().size();
+  });
   std::cout << "done sorting clusters.\n";
 
-  CandidateMap candidate_map(10000000); // only a few MB
+  CandidateMap candidate_map(10000000);  // only a few MB
   int num_avoided = 0;
-  
+
   for (const auto& cluster : clusters_) {
     if (cluster.IsDuplicate()) {
       continue;
@@ -257,10 +272,9 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-
         auto* seq1 = &(*it);
         auto* seq2 = &(*itt);
-        
+
         if (seq1->Genome() == seq2->Genome() &&
             seq1->GenomeIndex() == seq2->GenomeIndex()) {
           // not sure if this can actually happen yet, but no need to align
@@ -270,9 +284,9 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
 
         if (seq1->GenomeSize() > seq2->GenomeSize() ||
             ((seq1->GenomeSize() == seq2->GenomeSize()) &&
-            seq1->Genome() > seq2->Genome())) {
+             seq1->Genome() > seq2->Genome())) {
           std::swap(seq1, seq2);
-        } 
+        }
 
         if (seq1->Genome() == seq2->Genome() &&
             seq1->GenomeIndex() > seq2->GenomeIndex()) {

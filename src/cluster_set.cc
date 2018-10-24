@@ -62,93 +62,67 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
         cluster->PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = cluster->AlignReps(c_other, &alignment, aligner);
-      // does c contain c_other fully
-      if (size_t(alignment.seq1_max - alignment.seq1_min) ==
-          cluster->Rep().Seq().size()) {
-        // c rep is fully covered, probably contained in c_other rep
-        std::cout << "C rep is fully covered\n";
-        // add all seqs in c into c_other, mark c fully merged, add c_other to
-        // new cluster set
 
+      // situation is :
+      // |-------------------|
+      //            |-------------------|
+      // or opposite. If the coverage of one is within X
+      // of total residues, merge completely. Otherwise, we just
+      // add matching seqs from one to the other
+      // std::cout << "reps are partially overlapped\n";
+
+      auto c_num_uncovered = cluster->Rep().Seq().size() -
+                             (alignment.seq1_max - alignment.seq1_min);
+      auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+                                   (alignment.seq2_max - alignment.seq2_min);
+
+      if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
+          alignment.score > aligner->Params()->min_full_merge_score) {
+        // they are _almost_ overlapped, merge completely
+        // std::cout << "Nearly complete overlap, merging c into c_other,
+        // score is " << alignment.score << "\n";
+
+        // TODO move this code into class Cluster
+        c_other.Lock();
+        if (c_other.IsFullyMerged()) {
+          c_other.Unlock();
+          continue;
+        }
         for (const auto& seq : cluster->Sequences()) {
           c_other.AddSequence(seq);
         }
         cluster->SetFullyMerged();
-        break;  // c is gone, move to next
+        c_other.Unlock();
+        break;
 
-      } else if (size_t(alignment.seq2_max - alignment.seq2_min) ==
-                 c_other.Rep().Seq().size()) {
-        // c_other rep is fully covered, probably contained in c rep
-        std::cout << "C other rep is fully covered\n";
-        // add all seqs in c_other into c, mark c_other fully merged, add c to
-        // new cluster set
+      } else if (c_other_num_uncovered <
+                     aligner->Params()->max_n_aa_not_covered &&
+                 alignment.score > aligner->Params()->min_full_merge_score) {
+        // std::cout << "Nearly complete overlap, merging c_other into c,
+        // score is " << alignment.score << "\n";
+        // TODO move this code into class Cluster
+        c_other.Lock();
+        if (c_other.IsFullyMerged()) {
+          c_other.Unlock();
+          continue;
+        }
         for (const auto& seq : c_other.Sequences()) {
           cluster->AddSequence(seq);
         }
         c_other.SetFullyMerged();
-
+        c_other.Unlock();
       } else {
-        // situation is :
-        // |-------------------|
-        //            |-------------------|
-        // or opposite. If the coverage of one is within X
-        // of total residues, merge completely. Otherwise, we just
-        // add matching seqs from one to the other
-        // std::cout << "reps are partially overlapped\n";
-
-        auto c_num_uncovered = cluster->Rep().Seq().size() -
-                               (alignment.seq1_max - alignment.seq1_min);
-        auto c_other_num_uncovered = c_other.Rep().Seq().size() -
-                                     (alignment.seq2_max - alignment.seq2_min);
-
-        if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
-            alignment.score > aligner->Params()->min_full_merge_score) {
-          // they are _almost_ overlapped, merge completely
-          // std::cout << "Nearly complete overlap, merging c into c_other,
-          // score is " << alignment.score << "\n";
-
-          // TODO move this code into class Cluster
-          c_other.Lock();
-          if (c_other.IsFullyMerged()) {
-            c_other.Unlock();
-            continue;
-          }
-          for (const auto& seq : cluster->Sequences()) {
-            c_other.AddSequence(seq);
-          }
-          cluster->SetFullyMerged();
+        // add c_other_rep into c
+        // for each sequence in c_other, add if it matches c rep
+        // keep both clusters
+        // std::cout << "merging and keeping both clusters\n";
+        c_other.Lock();
+        if (c_other.IsFullyMerged()) {
           c_other.Unlock();
-          break;
-
-        } else if (c_other_num_uncovered <
-                       aligner->Params()->max_n_aa_not_covered &&
-                   alignment.score > aligner->Params()->min_full_merge_score) {
-          // std::cout << "Nearly complete overlap, merging c_other into c,
-          // score is " << alignment.score << "\n";
-          // TODO move this code into class Cluster
-          c_other.Lock();
-          if (c_other.IsFullyMerged()) {
-            c_other.Unlock();
-            continue;
-          }
-          for (const auto& seq : c_other.Sequences()) {
-            cluster->AddSequence(seq);
-          }
-          c_other.SetFullyMerged();
-          c_other.Unlock();
-        } else {
-          // add c_other_rep into c
-          // for each sequence in c_other, add if it matches c rep
-          // keep both clusters
-          // std::cout << "merging and keeping both clusters\n";
-          c_other.Lock();
-          if (c_other.IsFullyMerged()) {
-            c_other.Unlock();
-            continue;
-          }
-          cluster->Merge(&c_other, aligner);
-          c_other.Unlock();
+          continue;
         }
+        cluster->Merge(&c_other, aligner);
+        c_other.Unlock();
       }
     }  // if passes threshold
   }    // for c_other in clusters
@@ -171,74 +145,48 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
       if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
         // std::cout << "passed threshold, aligning ...\n";
         s = c.AlignReps(c_other, &alignment, aligner);
-        // does c contain c_other fully
-        if (size_t(alignment.seq1_max - alignment.seq1_min) ==
-            c.Rep().Seq().size()) {
-          // c rep is fully covered, probably contained in c_other rep
-          std::cout << "C rep is fully covered\n";
-          // add all seqs in c into c_other, mark c fully merged, add c_other to
-          // new cluster set
 
+        // situation is :
+        // |-------------------|
+        //            |-------------------|
+        // or opposite. If the coverage of one is within X
+        // of total residues, merge completely. Otherwise, we just
+        // add matching seqs from one to the other
+        // std::cout << "reps are partially overlapped\n";
+
+        auto c_num_uncovered =
+            c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
+        auto c_other_num_uncovered =
+            c_other.Rep().Seq().size() -
+            (alignment.seq2_max - alignment.seq2_min);
+
+        if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
+            alignment.score > aligner->Params()->min_full_merge_score) {
+          // they are _almost_ overlapped, merge completely
+          // std::cout << "Nearly complete overlap, merging c into c_other,
+          // score is " << alignment.score << "\n";
           for (const auto& seq : c.Sequences()) {
             c_other.AddSequence(seq);
           }
           c.SetFullyMerged();
-          break;  // c is gone, move to next
+          break;
 
-        } else if (size_t(alignment.seq2_max - alignment.seq2_min) ==
-                   c_other.Rep().Seq().size()) {
-          // c_other rep is fully covered, probably contained in c rep
-          std::cout << "C other rep is fully covered\n";
-          // add all seqs in c_other into c, mark c_other fully merged, add c to
-          // new cluster set
+        } else if (c_other_num_uncovered <
+                       aligner->Params()->max_n_aa_not_covered &&
+                   alignment.score >
+                       aligner->Params()->min_full_merge_score) {
+          // std::cout << "Nearly complete overlap, merging c_other into c,
+          // score is " << alignment.score << "\n";
           for (const auto& seq : c_other.Sequences()) {
             c.AddSequence(seq);
           }
           c_other.SetFullyMerged();
-
         } else {
-          // situation is :
-          // |-------------------|
-          //            |-------------------|
-          // or opposite. If the coverage of one is within X
-          // of total residues, merge completely. Otherwise, we just
-          // add matching seqs from one to the other
-          // std::cout << "reps are partially overlapped\n";
-
-          auto c_num_uncovered =
-              c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
-          auto c_other_num_uncovered =
-              c_other.Rep().Seq().size() -
-              (alignment.seq2_max - alignment.seq2_min);
-
-          if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
-              alignment.score > aligner->Params()->min_full_merge_score) {
-            // they are _almost_ overlapped, merge completely
-            // std::cout << "Nearly complete overlap, merging c into c_other,
-            // score is " << alignment.score << "\n";
-            for (const auto& seq : c.Sequences()) {
-              c_other.AddSequence(seq);
-            }
-            c.SetFullyMerged();
-            break;
-
-          } else if (c_other_num_uncovered <
-                         aligner->Params()->max_n_aa_not_covered &&
-                     alignment.score >
-                         aligner->Params()->min_full_merge_score) {
-            // std::cout << "Nearly complete overlap, merging c_other into c,
-            // score is " << alignment.score << "\n";
-            for (const auto& seq : c_other.Sequences()) {
-              c.AddSequence(seq);
-            }
-            c_other.SetFullyMerged();
-          } else {
-            // add c_other_rep into c
-            // for each sequence in c_other, add if it matches c rep
-            // keep both clusters
-            // std::cout << "merging and keeping both clusters\n";
-            c.Merge(&c_other, aligner);
-          }
+          // add c_other_rep into c
+          // for each sequence in c_other, add if it matches c rep
+          // keep both clusters
+          // std::cout << "merging and keeping both clusters\n";
+          c.Merge(&c_other, aligner);
         }
       }  // if passes threshold
     }

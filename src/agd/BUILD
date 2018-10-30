@@ -7,5 +7,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = ["@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+        "@json//:json-cpp"
     ]
 )

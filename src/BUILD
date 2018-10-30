@@ -48,13 +48,13 @@ genrule(
 cc_binary(
     name = "clustermerge",
     srcs = glob(["*.cc", "*.h"]),
-    linkopts = ["-lpthread"],
-    copts = ["-std=c++14"],
+    # bazel currently doesn't look in /usr/local for some reason
+    # so we need to include it for ZMQ
+    linkopts = ["-lpthread", "-L/usr/local/lib", "-lzmq"],
+    copts = ["-std=c++14", "-I/usr/local/include", "-L/usr/local/lib"],
     deps = ["@com_google_absl//absl/strings",
             "@com_google_absl//absl/container:flat_hash_map",
             "@com_google_absl//absl/container:flat_hash_set",
             ":swps3_lib",
             "//src/agd:agd"]
 )
-
-

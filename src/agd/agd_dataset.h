@@ -26,19 +26,21 @@ class AGDDataset {
    public:
     ColumnIterator() = default;
     Status GetNextRecord(const char** data, size_t* size);
+    Status GetNextAt(size_t index, const char** data, size_t* size);
     void Reset();
 
    private:
-    ColumnIterator(std::vector<AGDRecordReader>* readers)
-        : column_readers_(readers) {}
+    ColumnIterator(std::vector<AGDRecordReader>* readers, uint32_t total_records)
+        : column_readers_(readers), total_records_(total_records) {}
 
     std::vector<AGDRecordReader>* column_readers_;
     uint32_t current_reader_ = 0;
+    uint32_t total_records_;
   };
 
   Status Column(const std::string& column, ColumnIterator* iter) {
     if (column_map_.find(column) != column_map_.end()) {
-      *iter = ColumnIterator(&column_map_[column]);
+      *iter = ColumnIterator(&column_map_[column], total_records_);
       return Status::OK();
     } else {
       return NotFound("column ", column, " not found in column map.");

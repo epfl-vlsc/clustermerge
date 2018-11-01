@@ -119,4 +119,19 @@ Status AGDDataset::ColumnIterator::GetNextRecord(const char** data, size_t* size
   return s;
 }
 
+Status AGDDataset::ColumnIterator::GetNextAt(size_t index, const char** data, size_t* size) {
+
+  if (index >= total_records_) {
+    return OutOfRange("index is greater than total records in dataset");
+  }
+
+  size_t chunk_index = index / (*column_readers_)[0].NumRecords();
+  size_t record_index = index % (*column_readers_)[0].NumRecords();
+  Status s = (*column_readers_)[chunk_index].GetRecordAt(record_index, data, size);
+  if (!s.ok()) {
+    return OutOfRange("Last record in column");
+  }
+  return s;
+}
+
 }  // namespace agd

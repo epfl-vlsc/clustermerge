@@ -1,7 +1,8 @@
 
 #include <fstream>
 #include <iostream>
-#include "agd/agd_dataset.h"
+#include "dataset/agd_protein_dataset.h"
+#include "dataset/fasta_dataset.h"
 #include "aligner.h"
 #include "all_all_executor.h"
 #include "args.h"
@@ -13,17 +14,27 @@ using std::string;
 using std::unique_ptr;
 
 agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
-                         std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
+                         std::vector<unique_ptr<Dataset>>* datasets) {
   agd::Status s = agd::Status::OK();
   for (const auto dataset_opt : args::get(datasets_opts)) {
-    unique_ptr<agd::AGDDataset> dataset;
-    try {
-      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
-    } catch (...) {
-      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
-           << "', are you sure it's valid JSON?";
-      throw;
+    unique_ptr<Dataset> dataset;
+    auto dot_pos = dataset_opt.find_last_of('.');
+    auto extension = dataset_opt.substr(dot_pos+1);
+    cout << "extension is " << extension << "\n";
+    if (extension == "json") { // its agd
+      try {
+        s = AGDProteinDataset::Create(dataset_opt, dataset);
+      } catch (...) {
+        cout << "Error parsing AGD metadata for dataet '" << dataset_opt
+            << "', are you sure it's valid JSON?";
+        throw;
+      }
+    } else if (extension == "fasta") { // its fasta
+      s = FastaDataset::Create(dataset_opt, dataset);
+    } else {
+      return agd::errors::InvalidArgument("unrecognized dataset file type: ", dataset_opt);
     }
+
     cout << "data is " << dataset->Name() << " with size " << dataset->Size()
          << "\n";
     datasets->push_back(std::move(dataset));
@@ -33,7 +44,7 @@ agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
 
 agd::Status LoadDatasetsJSON(
     const string& dataset_file,
-    std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
+    std::vector<unique_ptr<Dataset>>* datasets) {
   std::ifstream dataset_stream(dataset_file);
 
   if (!dataset_stream.good()) {
@@ -45,14 +56,25 @@ agd::Status LoadDatasetsJSON(
 
   agd::Status s = agd::Status::OK();
   for (const auto dataset_opt : dataset_json_obj) {
-    unique_ptr<agd::AGDDataset> dataset;
-    try {
-      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
-    } catch (...) {
-      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
-           << "', are you sure it's valid JSON?";
-      throw;
+    auto dataset_opt_str = dataset_opt.get<std::string>();
+    auto dot_pos = dataset_opt_str.find_last_of('.');
+    auto extension = dataset_opt_str.substr(dot_pos+1);
+    cout << "extension is " << extension << "\n";
+    unique_ptr<Dataset> dataset;
+    if (extension == "json") { // its agd
+      try {
+        s = AGDProteinDataset::Create(dataset_opt, dataset);
+      } catch (...) {
+        cout << "Error parsing AGD metadata for dataet '" << dataset_opt
+            << "', are you sure it's valid JSON?";
+        throw;
+      }
+    } else if (extension == "fasta") { // its fasta
+      s = FastaDataset::Create(dataset_opt, dataset);
+    }else {
+      return agd::errors::InvalidArgument("unrecognized dataset file type: ", dataset_opt);
     }
+
     cout << "data is " << dataset->Name() << " with size " << dataset->Size()
          << "\n";
     datasets->push_back(std::move(dataset));
@@ -198,7 +220,7 @@ int main(int argc, char** argv) {
   // init aligner object
   ProteinAligner aligner(&envs, &params);
 
-  std::vector<unique_ptr<agd::AGDDataset>> datasets;
+  std::vector<unique_ptr<Dataset>> datasets;
   agd::Status s;
 
   if (datasets_opts) {
@@ -228,6 +250,7 @@ int main(int argc, char** argv) {
 
   cout << "Data loaded, building merger ...\n";
   BottomUpMerge merger(datasets, &aligner);
+  exit(0);
 
   AllAllExecutor executor(threads, 1000, &envs, &params);
   executor.Initialize();

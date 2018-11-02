@@ -3,7 +3,7 @@
 #include <atomic>
 #include <deque>
 #include <list>
-#include "agd/agd_dataset.h"
+#include "dataset/dataset.h"
 #include "aligner.h"
 #include "all_all_executor.h"
 #include "cluster_set.h"
@@ -12,7 +12,7 @@
 class BottomUpMerge {
  public:
   // build one sequence, put in one cluster, put cluster in one set
-  BottomUpMerge(std::vector<std::unique_ptr<agd::AGDDataset>>& datasets,
+  BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
                 ProteinAligner* aligner);
 
   // single threaded mode

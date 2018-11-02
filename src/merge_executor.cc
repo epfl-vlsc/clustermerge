@@ -29,6 +29,7 @@ MergeExecutor::~MergeExecutor() {
     f.join();
   }
   cout << "All threads finished.\n";
+  cout << "Num pass threshold alignments: " << num_alignments_ << "\n";
 }
 
 void MergeExecutor::EnqueueMerge(const WorkItem& item) {
@@ -63,4 +64,7 @@ void MergeExecutor::Worker() {
     notification->Notify();
 
   }
+
+  num_alignments_ += aligner.NumAlignments();
+
 }

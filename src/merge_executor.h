@@ -34,6 +34,7 @@ class MergeExecutor {
   AlignmentEnvironments* envs_;
   Parameters* params_;
   size_t num_threads_;
+  std::atomic_uint_fast32_t num_alignments_{0};
 
   // thread worker func
   void Worker();

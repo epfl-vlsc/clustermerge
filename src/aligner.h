@@ -61,9 +61,12 @@ class ProteinAligner {
   const Parameters* Params() { return params_; }
   const AlignmentEnvironments* Envs() { return envs_; }
 
+  size_t NumAlignments() { return num_alignments_; }
+
  private:
   const AlignmentEnvironments* envs_;
   const Parameters* params_;
+  size_t num_alignments_ = 0;
 
   struct StartPoint {
     Alignment alignment;

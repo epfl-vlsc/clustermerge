@@ -30,5 +30,4 @@ class FastaDataset : public Dataset {
   std::vector<absl::string_view> seqs_;
   std::vector<std::string> metas_;
   agd::Buffer seqs_buf_;
-  std::string genome_;  // the filename basically
 };

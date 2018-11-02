@@ -253,7 +253,6 @@ int main(int argc, char** argv) {
 
   cout << "Data loaded, building merger ...\n";
   BottomUpMerge merger(datasets, &aligner);
-  exit(0);
 
   AllAllExecutor executor(threads, 1000, &envs, &params);
   executor.Initialize();

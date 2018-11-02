@@ -29,7 +29,7 @@ agd::Status FastaDataset::Initialize(const std::string file_path) {
     slash_or_first_pos = 0;
   }
 
-  genome_ = file_path.substr(slash_or_first_pos, dot_pos);
+  genome_ = file_path.substr(slash_or_first_pos+1, dot_pos - slash_or_first_pos - 1);
   std::cout << "genome is " << genome_ << "\n";
 
   const int fd = open(file_path.c_str(), O_RDONLY);
@@ -55,26 +55,32 @@ agd::Status FastaDataset::Initialize(const std::string file_path) {
     }
     metas_.push_back(std::string(cur, line_end - cur));
     total_records_++;
-    std::cout << "pushing back meta: " << metas_.back() << "\n";
+    //std::cout << "pushing back meta: " << metas_.back() << "\n";
     cur = line_end + 1;
 
     size_t cur_rec_size = 0;
-    line_end = cur;
-    while (*cur != '>') {
+    while (*cur != '>' && cur - mapped < size) {
+      line_end = cur;
       while (*line_end != '\n') {
         line_end++;
       }
       cur_rec_size += line_end - cur;
+      //std::cout << "adding data: " << std::string(cur, line_end - cur) << "\n";
       seqs_buf_.AppendBuffer(cur, line_end - cur);
       cur = line_end + 1;  // skip the `\n`
     }
     record_sizes.push_back(cur_rec_size);
   }
 
+  // normalize values
+  for (size_t i = 0; i < seqs_buf_.size(); i++) {
+    seqs_buf_[i] = seqs_buf_[i] - 'A';
+  }
+
   size_t abs_rec = 0;
   for (auto sz : record_sizes) {
     seqs_.push_back(absl::string_view(&seqs_buf_[abs_rec], sz));
-    std::cout << "pushed back sequence: " << seqs_.back() << "\n";
+    //std::cout << "pushed back sequence: " << seqs_.back() << "\n";
     abs_rec += sz;
   }
 

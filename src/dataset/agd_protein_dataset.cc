@@ -37,6 +37,7 @@ Status AGDProteinDataset::Initialize(const string& agd_json_path) {
   }
 
   total_records_ = dataset_->Size();
+  genome_ = dataset_->Name();
 
   s = dataset_->Column("prot", &prot_iterator_);
   if (!s.ok()) {

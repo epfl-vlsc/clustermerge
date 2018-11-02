@@ -42,7 +42,7 @@ Status AGDProteinDataset::Initialize(const string& agd_json_path) {
   if (!s.ok()) {
     return s;
   }
-  s = dataset_->Column("meta", &meta_iterator_);
+  s = dataset_->Column("metadata", &meta_iterator_);
   if (!s.ok()) {
     return s;
   }
@@ -62,6 +62,7 @@ Status AGDProteinDataset::GetNextRecord(const char** data, size_t* sz,
       return s;
     }
   }
+  return Status::OK();
 }
 
 Status AGDProteinDataset::GetRecordAt(const size_t index, const char** data,

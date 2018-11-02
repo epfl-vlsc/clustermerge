@@ -9,7 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <ctime>
-#include "agd/json.hpp"
+#include "json.hpp"
 #include "absl/strings/str_cat.h"
 #include "aligner.h"
 

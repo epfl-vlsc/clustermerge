@@ -6,7 +6,7 @@ using std::cout;
 using std::string;
 
 BottomUpMerge::BottomUpMerge(
-    std::vector<std::unique_ptr<agd::AGDDataset>>& datasets,
+    std::vector<std::unique_ptr<Dataset>>& datasets,
     ProteinAligner* aligner) {
   aligner_ = aligner;
 
@@ -15,16 +15,8 @@ BottomUpMerge::BottomUpMerge(
   uint32_t id = 0;
   for (auto& dataset : datasets) {
     cout << "Parsing dataset " << dataset->Name() << " ...\n";
-    agd::AGDDataset::ColumnIterator iter;
-    auto s = dataset->Column("prot", &iter);
 
-    if (!s.ok()) {
-      cout << "dataset " << dataset->Name()
-           << " had no prot column, skipping ...";
-      continue;
-    }
-
-    s = iter.GetNextRecord(&data, &size);
+    auto s = dataset->GetNextRecord(&data, &size);
     uint32_t genome_index = 0;
     while (s.ok()) {
       // coverages_.push_back(string());
@@ -41,7 +33,7 @@ BottomUpMerge::BottomUpMerge(
       ClusterSet cs(seq);
 
       sets_.push_back(std::move(cs));
-      s = iter.GetNextRecord(&data, &size);
+      s = dataset->GetNextRecord(&data, &size);
     }
   }
 }

@@ -54,7 +54,10 @@ cc_binary(
             "@com_google_absl//absl/container:flat_hash_map",
             "@com_google_absl//absl/container:flat_hash_set",
             ":swps3_lib",
-            "//src/agd:agd"]
+            "//src/agd:agd",
+            "//src/dataset:dataset",
+            "@json//:json-cpp"
+           ]
 )
 
 

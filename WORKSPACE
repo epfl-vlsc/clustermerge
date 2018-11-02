@@ -8,3 +8,9 @@ local_repository(
   path = "third_party/abseil-cpp",
 )
 
+local_repository(
+  name = "json",
+
+  path = "third_party/json",
+)
+

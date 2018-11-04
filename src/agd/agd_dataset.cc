@@ -134,4 +134,11 @@ Status AGDDataset::ColumnIterator::GetNextAt(size_t index, const char** data, si
   return s;
 }
 
+void AGDDataset::ColumnIterator::Reset() {
+  current_reader_ = 0;
+  for (auto reader : *column_readers_) {
+    reader.Reset();
+  }
+}
+
 }  // namespace agd

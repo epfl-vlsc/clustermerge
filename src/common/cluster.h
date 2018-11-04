@@ -1,7 +1,7 @@
 #pragma once
 
 #include <list>
-#include "agd/errors.h"
+#include "src/agd/errors.h"
 #include "aligner.h"
 #include "sequence.h"
 #include "absl/synchronization/mutex.h"

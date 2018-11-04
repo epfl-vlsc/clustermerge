@@ -1,64 +1,19 @@
 
 #include <fstream>
 #include <iostream>
-#include "agd/agd_dataset.h"
-#include "aligner.h"
-#include "all_all_executor.h"
+#include "dataset/agd_protein_dataset.h"
+#include "dataset/fasta_dataset.h"
+#include "dataset/load_dataset.h"
+#include "src/common/aligner.h"
+#include "src/common/all_all_executor.h"
+#include "src/common/bottom_up_merge.h"
+#include "src/common/debug.h"
 #include "args.h"
-#include "bottom_up_merge.h"
-#include "debug.h"
 
 using std::cout;
 using std::string;
 using std::unique_ptr;
 
-agd::Status LoadDatasets(args::PositionalList<std::string>& datasets_opts,
-                         std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
-  agd::Status s = agd::Status::OK();
-  for (const auto dataset_opt : args::get(datasets_opts)) {
-    unique_ptr<agd::AGDDataset> dataset;
-    try {
-      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
-    } catch (...) {
-      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
-           << "', are you sure it's valid JSON?";
-      throw;
-    }
-    cout << "data is " << dataset->Name() << " with size " << dataset->Size()
-         << "\n";
-    datasets->push_back(std::move(dataset));
-  }
-  return s;
-}
-
-agd::Status LoadDatasetsJSON(
-    const string& dataset_file,
-    std::vector<unique_ptr<agd::AGDDataset>>* datasets) {
-  std::ifstream dataset_stream(dataset_file);
-
-  if (!dataset_stream.good()) {
-    return agd::errors::NotFound("No such file: ", dataset_file);
-  }
-
-  json dataset_json_obj;
-  dataset_stream >> dataset_json_obj;
-
-  agd::Status s = agd::Status::OK();
-  for (const auto dataset_opt : dataset_json_obj) {
-    unique_ptr<agd::AGDDataset> dataset;
-    try {
-      s = agd::AGDDataset::Create(dataset_opt, dataset, {"prot"});
-    } catch (...) {
-      cout << "Error parsing AGD metadata for dataet '" << dataset_opt
-           << "', are you sure it's valid JSON?";
-      throw;
-    }
-    cout << "data is " << dataset->Name() << " with size " << dataset->Size()
-         << "\n";
-    datasets->push_back(std::move(dataset));
-  }
-  return s;
-}
 
 int main(int argc, char** argv) {
   args::ArgumentParser parser("ClusterMerge",
@@ -198,7 +153,7 @@ int main(int argc, char** argv) {
   // init aligner object
   ProteinAligner aligner(&envs, &params);
 
-  std::vector<unique_ptr<agd::AGDDataset>> datasets;
+  std::vector<unique_ptr<Dataset>> datasets;
   agd::Status s;
 
   if (datasets_opts) {
@@ -208,7 +163,7 @@ int main(int argc, char** argv) {
     if (input_file_list) {
       cout << "WARNING: ignoring input file list and using positionals!\n";
     }
-    s = LoadDatasets(datasets_opts, &datasets);
+    s = LoadDatasetsPositional(datasets_opts, &datasets);
   } else if (input_file_list) {
     s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
   } else {

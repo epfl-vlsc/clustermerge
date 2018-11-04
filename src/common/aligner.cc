@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include "agd/agd_dataset.h"
+//#include "agd/agd_dataset.h"
 #include "debug.h"
 extern "C" {
 #include "swps3/DynProgr_sse_double.h"
@@ -285,6 +285,7 @@ agd::Status ProteinAligner::AlignDouble(const char* seq1, const char* seq2,
 
 bool ProteinAligner::PassesThreshold(const char* seq1, const char* seq2,
                                      int seq1_len, int seq2_len) {
+  num_alignments_++;
   // we use the short (int16) version for this
   const auto& env = envs_->JustScoreEnv();
   ProfileShort* profile =

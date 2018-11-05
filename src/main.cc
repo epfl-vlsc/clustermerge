@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
       threads = std::thread::hardware_concurrency();
     }
   }
-  cout << "Using " << threads << " hardware threads for alignment.\n";
+  //cout << "Using " << threads << " hardware threads for alignment.\n";
 
   unsigned int cluster_threads = std::thread::hardware_concurrency();
   if (cluster_threads_arg) {
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
       cluster_threads = std::thread::hardware_concurrency();
     }
   }
-  cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
+  //cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
 
   unsigned int merge_threads = std::thread::hardware_concurrency();
   if (merge_threads_arg) {
@@ -169,7 +169,7 @@ int main(int argc, char** argv) {
       merge_threads = std::thread::hardware_concurrency();
     }
   }
-  cout << "Using " << merge_threads << " hardware threads for merging.\n";
+  //cout << "Using " << merge_threads << " hardware threads for merging.\n";
 
   // get output dir to use
   string dir("output_matches");
@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
   AlignmentEnvironments envs;
 
   // initializing envs is expensive, so don't copy this
-  cout << "Initializing environments from " << json_dir_path << "\n";
+  cout << "Initializing alignment environments from " << json_dir_path << "\n";
   envs.InitFromJSON(logpam_json, all_matrices_json);
   cout << "Done.\n";
 
@@ -237,7 +237,7 @@ int main(int argc, char** argv) {
   } else if (input_file_list) {
     s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
   } else {
-    cout << "No AGD datasets provided. See usage: \n";
+    cout << "No datasets provided. See usage: \n";
     std::cerr << parser;
     exit(0);
   }

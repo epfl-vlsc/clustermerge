@@ -24,7 +24,15 @@ Mac/Linux (opt)
 
 ## Running 
 
-Usage:
+First, set the thread stack limit to 64MB:
+
+```sh
+$ ulimit -s 65532000
+```
+
+This is to accomodate some alignment routines that stack allocate a lot of data. 
+
+Clustermerge usage:
 
 ```sh
 $ ./bazel-bin/src/clustermerge file1.fa file2.fa

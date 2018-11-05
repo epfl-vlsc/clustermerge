@@ -10,6 +10,8 @@ $ sudo apt-get install bazel
 
 Bazel will use the default C++ compiler on your system. 
 
+## Building
+
 Linux (dbg):
 `bazel build -c dbg src:clustermerge`
 
@@ -19,6 +21,8 @@ Mac (dbg):
 
 Mac/Linux (opt)
 `bazel build -c opt src:clustermerge`
+
+## Running 
 
 Usage:
 

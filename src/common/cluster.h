@@ -9,7 +9,7 @@
 class Cluster {
  public:
   Cluster() = default;  // an empty cluster
-  Cluster(Sequence& seed) { seqs_.push_back(seed); }
+  Cluster(const Sequence& seed) { seqs_.push_back(seed); }
 
   Cluster(Cluster&& other) noexcept {
     seqs_ = std::move(other.seqs_);

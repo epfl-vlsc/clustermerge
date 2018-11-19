@@ -5,14 +5,37 @@
 #include <iomanip>
 #include <iostream>
 #include "absl/container/flat_hash_set.h"
-#include "json.hpp"
 #include "aligner.h"
-#include "debug.h"
-#include "merge_executor.h"
 #include "candidate_map.h"
+#include "debug.h"
+#include "json.hpp"
+#include "merge_executor.h"
 
 using std::make_tuple;
 using std::vector;
+
+ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
+                       const std::vector<Sequence>& sequences) {
+  std::vector<Cluster> clusters(set_proto.clusters_size());
+  for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
+    const auto& cluster_proto = set_proto.clusters(cs_i);
+    Cluster c(sequences[cluster_proto.indexes(0)]);
+    for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
+      c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);
+    }
+    clusters_.push_back(std::move(c));
+  }
+}
+
+void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
+
+  for (const auto& c : clusters_) {
+    auto* c_proto = set_proto->add_clusters();
+    for (const auto& s : c.Sequences()) {
+      c_proto->add_indexes(s.ID());
+    }
+  }
+}
 
 ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
                                              MergeExecutor* executor) {
@@ -156,9 +179,8 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
 
         auto c_num_uncovered =
             c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
-        auto c_other_num_uncovered =
-            c_other.Rep().Seq().size() -
-            (alignment.seq2_max - alignment.seq2_min);
+        auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+                                     (alignment.seq2_max - alignment.seq2_min);
 
         if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
             alignment.score > aligner->Params()->min_full_merge_score) {
@@ -173,8 +195,7 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
 
         } else if (c_other_num_uncovered <
                        aligner->Params()->max_n_aa_not_covered &&
-                   alignment.score >
-                       aligner->Params()->min_full_merge_score) {
+                   alignment.score > aligner->Params()->min_full_merge_score) {
           // std::cout << "Nearly complete overlap, merging c_other into c,
           // score is " << alignment.score << "\n";
           for (const auto& seq : c_other.Sequences()) {
@@ -243,13 +264,14 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   // sort by residue total first
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
-  std::sort(clusters_.begin(), clusters_.end(),
-            [](Cluster& a, Cluster& b) { return a.Sequences().size() > b.Sequences().size(); });
+  std::sort(clusters_.begin(), clusters_.end(), [](Cluster& a, Cluster& b) {
+    return a.Sequences().size() > b.Sequences().size();
+  });
   std::cout << "done sorting clusters.\n";
 
-  CandidateMap candidate_map(10000000); // only a few MB
+  CandidateMap candidate_map(10000000);  // only a few MB
   int num_avoided = 0;
-  
+
   for (const auto& cluster : clusters_) {
     if (cluster.IsDuplicate()) {
       continue;
@@ -257,10 +279,9 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-
         auto* seq1 = &(*it);
         auto* seq2 = &(*itt);
-        
+
         if (seq1->Genome() == seq2->Genome() &&
             seq1->GenomeIndex() == seq2->GenomeIndex()) {
           // not sure if this can actually happen yet, but no need to align
@@ -270,9 +291,9 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
 
         if (seq1->GenomeSize() > seq2->GenomeSize() ||
             ((seq1->GenomeSize() == seq2->GenomeSize()) &&
-            seq1->Genome() > seq2->Genome())) {
+             seq1->Genome() > seq2->Genome())) {
           std::swap(seq1, seq2);
-        } 
+        }
 
         if (seq1->Genome() == seq2->Genome() &&
             seq1->GenomeIndex() > seq2->GenomeIndex()) {

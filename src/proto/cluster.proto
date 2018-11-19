@@ -1,6 +1,8 @@
 
 syntax = "proto3";
 
+//option cc_enable_arenas = true;
+
 package cmproto;
 
 // A cluster is just a collectin of absolute indexes of the sequences
@@ -8,6 +10,7 @@ package cmproto;
 // The first one is the representative
 message Cluster {
   repeated uint32 indexes = 1;
+  bool fully_merged = 2; // possibly not needed
 }
 
 message ClusterSet {

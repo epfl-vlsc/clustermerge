@@ -2,33 +2,39 @@
 // Entry point for the master server for the distributed
 // clustering implementation
 
+#include <fstream>
 #include <iostream>
 #include <thread>
-#include <fstream>
 #include "args.h"
-#include "src/dataset/load_dataset.h"
+#include "controller.h"
 #include "src/common/alignment_environment.h"
 #include "src/common/params.h"
-#include "src/dist/proto/requests.pb.h"
-#include "zmq.hpp"
+#include "src/dataset/load_dataset.h"
+#include "worker.h"
+/*#include "src/dist/proto/requests.pb.h"
+#include "zmq.hpp"*/
 
 using namespace std;
 
 constexpr char cluster_format[] =
     "{\n"
     " \"controller\": \"<ip/addr>\",\n"
-    " \"push_port\": <port num>,\n"
-    " \"pull_port\": <port num>,\n"
+    " \"request_queue_port\": <port num>,\n"
+    " \"response_queue_port\": <port num>,\n"
     "}\n";
 
 /*
 Server cluster format example
 {
   "controller": "<ip/addr>",
-  "push_port": <port num>,
+  "request_queue_port": <port num>,
   "pull_port": <port num>
 }
 */
+
+#define DEFAULT_QUEUE_DEPTH 5
+#define DEFAULT_RESPONSE_QUEUE_PORT 5556
+#define DEFAULT_REQUEST_QUEUE_PORT 5555
 
 int main(int argc, char* argv[]) {
   args::ArgumentParser parser("ClusterMerge",
@@ -44,16 +50,9 @@ int main(int argc, char* argv[]) {
       absl::StrCat("Number of threads to use for all-all [",
                    std::thread::hardware_concurrency(), "]"),
       {'t', "threads"});
-  args::ValueFlag<unsigned int> cluster_threads_arg(
-      parser, "cluster_threads",
-      absl::StrCat("Number of threads to use for clustering [",
-                   std::thread::hardware_concurrency(), "]"),
-      {'c', "cluster-threads"});
-  args::ValueFlag<unsigned int> merge_threads_arg(
-      parser, "merge_threads",
-      absl::StrCat("Number of threads to use for merging [",
-                   std::thread::hardware_concurrency(), "]"),
-      {'m', "merge-threads"});
+  args::ValueFlag<unsigned int> queue_depth_arg(
+      parser, "queue_depth", "Depth of the local work and response queue",
+      {'q', "queue_depth"});
   args::ValueFlag<std::string> input_file_list(
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
@@ -72,10 +71,9 @@ int main(int argc, char* argv[]) {
       parser, "datasets",
       "AGD Protein datasets to cluster. If present, will override `input_list` "
       "argument.");
-  args::Flag controller(
-      parser, "controller",
-      "Designate this process as the cluster controller.",
-      {'C', "controller"});
+  args::Flag controller(parser, "controller",
+                        "Designate this process as the cluster controller.",
+                        {'C', "controller"});
 
   try {
     parser.ParseCLI(argc, argv);
@@ -92,7 +90,8 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // parse the server cluster config file to see if we are a worker or the controller
+  // parse the server cluster config file to see if we are a worker or the
+  // controller
 
   bool is_controller = false;
   if (controller) {
@@ -101,8 +100,8 @@ int main(int argc, char* argv[]) {
 
   json server_config_json;
   string controller_ip;
-  int push_port;
-  int pull_port;
+  int request_queue_port;
+  int response_queue_port;
   if (server_config_file) {
     string server_config_path = args::get(server_config_file);
     std::ifstream server_config_stream(server_config_path);
@@ -111,7 +110,7 @@ int main(int argc, char* argv[]) {
       std::cerr << "File " << server_config_path << " not found.\n";
       return 1;
     }
-  
+
     server_config_stream >> server_config_json;
 
   } else {
@@ -121,24 +120,25 @@ int main(int argc, char* argv[]) {
 
   auto controller_it = server_config_json.find("controller");
   if (controller_it == server_config_json.end() && !is_controller) {
-    cout << "This process is not controller and server config lacks controller addr\n";
+    cout << "This process is not controller and server config lacks controller "
+            "addr\n";
     return 1;
   } else {
     controller_ip = *controller_it;
   }
 
-  auto push_port_it = server_config_json.find("push_port");
-  if (push_port_it == server_config_json.end()) {
-    push_port = 5555; // default
+  auto request_queue_port_it = server_config_json.find("request_queue_port");
+  if (request_queue_port_it == server_config_json.end()) {
+    request_queue_port = DEFAULT_REQUEST_QUEUE_PORT;  // default
   } else {
-    push_port = *push_port_it;
+    request_queue_port = *request_queue_port_it;
   }
-  
-  auto pull_port_it = server_config_json.find("push_port");
-  if (pull_port_it == server_config_json.end()) {
-    pull_port = 5555; // default
+
+  auto response_queue_port_it = server_config_json.find("response_queue_port");
+  if (response_queue_port_it == server_config_json.end()) {
+    response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT;  // default
   } else {
-    pull_port = *push_port_it;
+    response_queue_port = *response_queue_port_it;
   }
 
   unsigned int threads = std::thread::hardware_concurrency();
@@ -151,25 +151,10 @@ int main(int argc, char* argv[]) {
   }
   cout << "Using " << threads << " hardware threads for alignment.\n";
 
-  unsigned int cluster_threads = std::thread::hardware_concurrency();
-  if (cluster_threads_arg) {
-    cluster_threads = args::get(cluster_threads_arg);
-    // do not allow more than hardware threads
-    if (cluster_threads > std::thread::hardware_concurrency()) {
-      cluster_threads = std::thread::hardware_concurrency();
-    }
+  unsigned int queue_depth = DEFAULT_QUEUE_DEPTH;
+  if (queue_depth_arg) {
+    queue_depth = args::get(queue_depth_arg);
   }
-  cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
-
-  unsigned int merge_threads = std::thread::hardware_concurrency();
-  if (merge_threads_arg) {
-    merge_threads = args::get(merge_threads_arg);
-    // do not allow more than hardware threads
-    if (merge_threads > std::thread::hardware_concurrency()) {
-      merge_threads = std::thread::hardware_concurrency();
-    }
-  }
-  cout << "Using " << merge_threads << " hardware threads for merging.\n";
 
   // get output dir to use, only needed if controller
   string dir("output_matches");
@@ -187,80 +172,41 @@ int main(int argc, char* argv[]) {
       json_dir_path += '/';
     }
   }
-  string logpam_json_file = json_dir_path + "logPAM1.json";
-  string all_matrices_json_file = json_dir_path + "all_matrices.json";
 
-  std::ifstream logpam_stream(logpam_json_file);
-  std::ifstream allmat_stream(all_matrices_json_file);
+  std::vector<unique_ptr<Dataset>> datasets;
+  agd::Status s;
 
-  if (!logpam_stream.good()) {
-    std::cerr << "File " << logpam_json_file << " not found.\n";
-    return 1;
+  if (datasets_opts) {
+    // load and parse protein datasets
+    // cluster merge sequences are simply string_views over this data
+    // so these structures must live until computations complete
+    if (input_file_list) {
+      cout << "WARNING: ignoring input file list and using positionals!\n";
+    }
+    s = LoadDatasetsPositional(datasets_opts, &datasets);
+  } else if (input_file_list) {
+    s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
+  } else {
+    cout << "No datasets provided. See usage: \n";
+    std::cerr << parser;
+    exit(0);
   }
 
-  if (!allmat_stream.good()) {
-    std::cerr << "File " << all_matrices_json_file << " not found.\n";
-    return 1;
+  if (!s.ok()) {
+    cout << s.ToString() << "\n";
+    return 0;
   }
-
-  json logpam_json;
-  logpam_stream >> logpam_json;
-
-  json all_matrices_json;
-  allmat_stream >> all_matrices_json;
-
-  AlignmentEnvironments envs;
-
-  // initializing envs is expensive, so don't copy this
-  cout << "Initializing environments from " << json_dir_path << "\n";
-  envs.InitFromJSON(logpam_json, all_matrices_json);
-  cout << "Done.\n";
-
-  // done init envs
-
-  Parameters params;  // using default params for now
-
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
+
   } else {
-    // launch worker(args, controller_ip, push_port, pull_port)  
+    // load datasets, launch worker
+    // launch worker(args, controller_ip, push_port, pull_port)
+    Worker worker;
+    worker.Run(threads, queue_depth, json_dir_path, controller_ip, request_queue_port,
+               response_queue_port, datasets);
   }
 
-
-
-
-  cmproto::Cluster c;
-  c.add_indexes(1);
-
-  cmproto::MergeBatch batch;
-  auto* set = batch.add_sets();
-  auto* cluster = set->add_clusters();
-  *cluster = c;
-
-  cmproto::MergeRequest r;
-  /*auto* b = r.mutable_batch();
-   *b = batch;*/
-
-  if (r.has_batch()) {
-    cout << "its a batch\n";
-  } else if (r.has_partial()) {
-    cout << "has partial\n";
-  } else {
-    cout << "has none\n";
-  }
-
-  // parse servers json, determine role
-  // load datasets
-
-  // if controller
-  // connect to zmq queues
-  // push initial batch mergers to ingress queue
-  // loop (possibly with threads), pulling from egress queue
-  //   construct new batches
-  //   if received cluster set is large (some threshold?), construct partial
-  //   merge requests
-
-  // else if worker server
   return 0;
 }

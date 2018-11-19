@@ -2,7 +2,7 @@
 syntax = "proto3";
 
 package cmproto;
-import "src/dist/proto/cluster.proto";
+import "src/proto/cluster.proto";
 
 message Response {
   uint32 id = 1; // corresponds to the request ID

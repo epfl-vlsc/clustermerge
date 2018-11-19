@@ -46,10 +46,11 @@ cc_library(
     deps = ["@com_google_absl//absl/strings",
             "@com_google_absl//absl/container:flat_hash_map",
             "@com_google_absl//absl/container:flat_hash_set",
-            ":swps3_lib",
+            "@json//:json-cpp",
+            "@args//:args",
+            "//src/proto:clustermerge_cc_proto",
             "//src/agd:agd",
             "//src/dataset:dataset",
-            "@json//:json-cpp",
-            "@args//:args"
+            ":swps3_lib",
            ]
 )

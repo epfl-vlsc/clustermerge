@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
   } else if (input_file_list) {
     s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
   } else {
-    cout << "No AGD datasets provided. See usage: \n";
+    cout << "No datasets provided. See usage: \n";
     std::cerr << parser;
     exit(0);
   }

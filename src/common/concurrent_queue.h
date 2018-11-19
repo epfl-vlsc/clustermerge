@@ -17,6 +17,7 @@ class ConcurrentQueue {
   // return true if pushed, false otherwise
   // will block until pushed if block_ is true
   bool push(const T& item);
+  bool push(const T&& item);
   // return true if success and item is valid, false otherwise
   bool pop(T& item);
 
@@ -116,7 +117,7 @@ bool ConcurrentQueue<T>::pop(T& item) {
     }
 
     if (!queue_.empty()) {
-      item = queue_.front();
+      item = std::move(queue_.front());
       queue_.pop();
       popped = true;
     }
@@ -145,6 +146,37 @@ bool ConcurrentQueue<T>::push(const T& item) {
 
     if (queue_.size() < capacity_) {
       queue_.push(item);
+      pushed = true;
+    }
+  }
+
+  if (pushed) {
+    // tell someone blocking on read they can now read from the queue
+    // TODO maybe notify_all is better here? If so, good to drop the notify_one
+    // in peek
+    queue_pop_cv_.Signal();
+    num_push_++;
+    return true;
+  } else
+    return false;
+}
+
+template <typename T>
+bool ConcurrentQueue<T>::push(const T&& item) {
+  bool pushed = false;
+  {
+    absl::MutexLock l(&mu_);
+    // we block until something pops and makes room for us
+    // unless blocking is set to false
+    if (queue_.size() == capacity_ && block_) {
+      num_push_waits_++;
+      while (queue_.size() == capacity_ && block_) {
+        queue_push_cv_.Wait(&mu_);
+      }
+    }
+
+    if (queue_.size() < capacity_) {
+      queue_.push(std::move(item));
       pushed = true;
     }
   }

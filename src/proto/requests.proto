@@ -1,8 +1,10 @@
 
 syntax = "proto3";
 
+//option cc_enable_arenas = true;
+
 package cmproto;
-import "src/dist/proto/cluster.proto";
+import "src/proto/cluster.proto";
 
 message MergeBatch {
   repeated ClusterSet sets = 1;

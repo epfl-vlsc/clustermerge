@@ -1,4 +1,7 @@
 
+# serializable messages corresponding to clusters, clustersets
+# and requests/responses to do merging work remotely
+
 cc_proto_library(
     name = "clustermerge_cc_proto",
     deps = [":clustermerge_proto"],

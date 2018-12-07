@@ -2,6 +2,10 @@
 import gzip
 import os
 import argparse
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 
 
 class ListComparer:
@@ -199,6 +203,22 @@ def main():
 
     print("additional in data:\n {}".format(additional_pairs_in_data))
     print("additional in ref:\n {}".format(additional_pairs_in_ref))
+
+    missed_scores = []
+    for key, value in additional_pairs_in_ref.iteritems():
+        #print("key {}, value {}".format(key, value))
+        # iterate over values, get all missed scores
+        for v in value:
+            missed_scores.append(int(v[-1]))
+
+    missed_scores.sort(reverse=True)
+    print("missed scores are {}".format(missed_scores))
+    fig = plt.hist(missed_scores)
+    plt.title("ClusterMerge: Scores of Missed Matches")
+    plt.xlabel("Score")
+    plt.ylabel("Number of Missed Matches")
+    plt.savefig("hist.png")
+
     percent_both = round(float(reported_by_both) / total_pairs_in_ref, 7) * 100
     percent_reference = round(float(reported_by_ref_only) / total_pairs_in_ref, 7) * 100
     percent_data = round(float(reported_by_data_only) / total_pairs_in_ref, 7) * 100

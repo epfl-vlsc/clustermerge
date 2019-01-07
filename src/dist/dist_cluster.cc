@@ -199,13 +199,21 @@ int main(int argc, char* argv[]) {
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
-
+    Controller controller;
+    Status stat = controller.Run(threads, queue_depth, controller_ip, request_queue_port,
+                   response_queue_port, json_dir_path, datasets);
+    if (!stat.ok()) {
+      cout << "Error: " << stat.error_message() << "\n";
+    }
   } else {
     // load datasets, launch worker
     // launch worker(args, controller_ip, push_port, pull_port)
     Worker worker;
-    worker.Run(threads, queue_depth, json_dir_path, controller_ip, request_queue_port,
-               response_queue_port, datasets);
+    Status stat = worker.Run(threads, queue_depth, json_dir_path, controller_ip,
+               request_queue_port, response_queue_port, datasets);
+    if (!stat.ok()) {
+      cout << "Error: " << stat.error_message() << "\n";
+    }
   }
 
   return 0;

@@ -10,7 +10,7 @@ package cmproto;
 // The first one is the representative
 message Cluster {
   repeated uint32 indexes = 1;
-  bool fully_merged = 2; // possibly not needed
+  bool fully_merged = 2; // needed for merge at controller
 }
 
 message ClusterSet {

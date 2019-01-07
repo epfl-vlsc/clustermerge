@@ -162,6 +162,20 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
       } else if (request.has_partial()) {
         cout << "has partial\n";
         auto& partial = request.partial();
+        // execute a partial merge, merge cluster into cluster set
+        // do not remove any clusters, simply mark fully merged so 
+        // the controller can merge other partial merge requests
+         ClusterSet cs(partial.set(), sequences_);
+         Cluster c(partial.cluster(), sequences_);
+
+         cs.MergeCluster(c, &aligner);
+
+         cmproto::Response response;
+         auto* new_cs_proto = response.mutable_set();
+         cs.ConstructProto(new_cs_proto);
+
+         result_queue_->push(response);
+
       } else {
         cout << "request was empty!!\n";
         return;

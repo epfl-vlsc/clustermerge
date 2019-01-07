@@ -17,7 +17,8 @@
 class Controller {
  public:
   agd::Status Run(size_t num_threads, size_t queue_depth, const std::string& controller_ip,
-                  int push_port, int pull_port,
+                  int request_queue_port, int response_queue_port,
+                  const std::string& data_dir_path,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:
@@ -37,7 +38,7 @@ class Controller {
   // in merge map), lookup and merge with partial_set, if partial set complete,
   //    push ready to merge sets to sets_to_merge_queue 
   std::unique_ptr<ConcurrentQueue<cmproto::ClusterSet>> sets_to_merge_queue_;
-  std::vector<std::thread> worker_threads_;
+  std::thread worker_thread_;
 
   // merge scheduler thread
   // reads sets from sets to merge queue until a large enough batch is ready
@@ -58,14 +59,16 @@ class Controller {
     cmproto::ClusterSet partial_set;
     uint32_t num_expected;
     uint32_t num_received;
+    uint32_t original_size;
   };
+
   absl::flat_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
 
-  uint32_t current_request_id_ = 0;
+  //uint32_t current_request_id_ = 0;
   uint32_t batch_size_ = 100;
 
   volatile bool run_ = true;
-  std::atomic_uint_fast32_t outstanding_merges_{0};
+  uint32_t outstanding_merges_ = 0;
   absl::Mutex mu_; // for partial_merge_map_
 
 };

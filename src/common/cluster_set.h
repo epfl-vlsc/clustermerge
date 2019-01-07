@@ -31,6 +31,11 @@ class ClusterSet {
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
 
+  // execute a PartialMerge for the distributed runtime 
+  // merge cluster into cluster set
+  // keep any fully merged cluster, but mark it
+  ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner);
+
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);
 

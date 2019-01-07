@@ -34,6 +34,7 @@ void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
     for (const auto& s : c.Sequences()) {
       c_proto->add_indexes(s.ID());
     }
+    c_proto->set_fully_merged(c.IsFullyMerged());
   }
 }
 
@@ -238,6 +239,69 @@ void ClusterSet::DebugDump() const {
                 << "\n\n";
     }
   }
+}
+
+ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
+
+  // for the dist version, we keep fully merged clusters around, 
+  // because this is a partial merge of two large sets,
+  // the results of which need to be merged by the controller
+  ClusterSet new_cluster_set(clusters_.size() + 1);
+
+  ProteinAligner::Alignment alignment;
+  agd::Status s;
+  for (auto& c : clusters_) {
+    if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
+      // std::cout << "passed threshold, aligning ...\n";
+      s = c.AlignReps(c_other, &alignment, aligner);
+
+      // situation is :
+      // |-------------------|
+      //            |-------------------|
+      // or opposite. If the coverage of one is within X
+      // of total residues, merge completely. Otherwise, we just
+      // add matching seqs from one to the other
+      // std::cout << "reps are partially overlapped\n";
+
+      auto c_num_uncovered =
+          c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
+      auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+                                    (alignment.seq2_max - alignment.seq2_min);
+
+      if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
+          alignment.score > aligner->Params()->min_full_merge_score) {
+        // they are _almost_ overlapped, merge completely
+        // std::cout << "Nearly complete overlap, merging c into c_other,
+        // score is " << alignment.score << "\n";
+        for (const auto& seq : c.Sequences()) {
+          c_other.AddSequence(seq);
+        }
+        c.SetFullyMerged();
+
+      } else if (c_other_num_uncovered <
+                      aligner->Params()->max_n_aa_not_covered &&
+                  alignment.score > aligner->Params()->min_full_merge_score) {
+        // std::cout << "Nearly complete overlap, merging c_other into c,
+        // score is " << alignment.score << "\n";
+        for (const auto& seq : c_other.Sequences()) {
+          c.AddSequence(seq);
+        }
+        c_other.SetFullyMerged();
+      } else {
+        // add c_other_rep into c
+        // for each sequence in c_other, add if it matches c rep
+        // keep both clusters
+        // std::cout << "merging and keeping both clusters\n";
+        c.Merge(&c_other, aligner);
+      }
+    }  // if passes threshold
+
+    new_cluster_set.clusters_.push_back(std::move(c));
+  }
+    
+  new_cluster_set.clusters_.push_back(std::move(c_other));
+  
+  return new_cluster_set;
 }
 
 void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {

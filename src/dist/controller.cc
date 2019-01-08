@@ -239,6 +239,9 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     sets_to_merge_queue_->push(std::move(set));
   }
 
+  cout << "sets to merge queue is loaded and ready, make sure workers are ready, press key to compute...\n";
+  std::cin.get();
+
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
@@ -265,8 +268,9 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
            << ", set two size: " << sets[1].clusters_size() << "\n";
 
       // form request, push to queue
-      if (sets[0].clusters_size() > 10 || sets[1].clusters_size() > 10) {
+      if (sets[0].clusters_size() < 10 || sets[1].clusters_size() < 10) {
         // create a batch, they are small
+        cout << "two sets are small, batching ...\n";
         cmproto::MergeBatch* batch = request.mutable_batch();
         uint32_t total_clusters =
             sets[0].clusters_size() + sets[1].clusters_size();
@@ -329,6 +333,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   if (sets_to_merge_queue_->size() != 1) {
     cout << "where did the last set go??\n";
   } else {
+    cout << "scheduling final alignments on controller...\n";
     cmproto::ClusterSet final_set;
     sets_to_merge_queue_->peek(final_set);
 

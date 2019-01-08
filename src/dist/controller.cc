@@ -239,6 +239,8 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     sets_to_merge_queue_->push(std::move(set));
   }
 
+  cout << "sets to merge queue size is " << sets_to_merge_queue_->size() << "\n";
+  cout << "outstanding merges: " << outstanding_merges_ << "\n";
   cout << "sets to merge queue is loaded and ready, make sure workers are ready, press key to compute...\n";
   std::cin.get();
 
@@ -329,6 +331,11 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       }
     }
   }
+
+  // we must now wait for the last results to come in
+  // wait for worker thread to push last merged set
+  // TODO add a timeout or something?
+  while (sets_to_merge_queue_->size() != 1);;
 
   if (sets_to_merge_queue_->size() != 1) {
     cout << "where did the last set go??\n";

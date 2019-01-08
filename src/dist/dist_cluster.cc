@@ -1,6 +1,9 @@
-
+//
 // Entry point for the master server for the distributed
 // clustering implementation
+//
+// Stuart Byma, EPFL
+//
 
 #include <fstream>
 #include <iostream>
@@ -11,8 +14,6 @@
 #include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
-/*#include "src/dist/proto/requests.pb.h"
-#include "zmq.hpp"*/
 
 using namespace std;
 
@@ -31,6 +32,8 @@ Server cluster format example
   "pull_port": <port num>
 }
 */
+
+constexpr char cluster_config_default[] = "data/default_cluster.json";
 
 #define DEFAULT_QUEUE_DEPTH 5
 #define DEFAULT_RESPONSE_QUEUE_PORT 5556
@@ -114,8 +117,14 @@ int main(int argc, char* argv[]) {
     server_config_stream >> server_config_json;
 
   } else {
-    cout << "The server config file (--server_config) is required.\n";
-    return 1;
+    std::ifstream server_config_stream(cluster_config_default);
+
+    if (!server_config_stream.good()) {
+      std::cerr << "File " << cluster_config_default << " not found.\n";
+      return 1;
+    }
+
+    server_config_stream >> server_config_json;
   }
 
   auto controller_it = server_config_json.find("controller");
@@ -125,6 +134,10 @@ int main(int argc, char* argv[]) {
     return 1;
   } else {
     controller_ip = *controller_it;
+  }
+  cout << "controller ip: " << controller_ip << "\n";
+  if (is_controller) {
+    cout << "The process is controller\n";
   }
 
   auto request_queue_port_it = server_config_json.find("request_queue_port");

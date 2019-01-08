@@ -9,3 +9,8 @@ Mac (dbg):
 
 Mac/Linux (opt)
 `bazel build -c opt src:clustermerge`
+
+## Distributed Version
+
+`bazel build -c opt //src/dist:dist_cluster`
+

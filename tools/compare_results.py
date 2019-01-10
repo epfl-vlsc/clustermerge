@@ -127,7 +127,7 @@ def fill_dictionary(folderpath, dictionary):
             genome2 = compressed_file.split("/")[-1].split("_")[0].split(".gz")[0]
             full_file_path = os.path.join(folder, compressed_file)
             candidates = process_compressed_file(full_file_path)
-            key = tuple([genome1, genome2])
+            key = tuple([genome1.lower(), genome2.lower()])
             if not key in dictionary:
                 dictionary[key] = list()
             dictionary[key].extend(candidates)
@@ -149,7 +149,7 @@ def fill_dictionary_nogz(folderpath, dictionary):
             # print("genome 2 is {}".format(genome2))
             full_file_path = os.path.join(folder, compressed_file)
             candidates = process_file(full_file_path)
-            key = tuple([genome1, genome2])
+            key = tuple([genome1.lower(), genome2.lower()])
             if key not in dictionary:
                 dictionary[key] = list()
             dictionary[key].extend(candidates)

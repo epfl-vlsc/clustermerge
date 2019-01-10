@@ -206,6 +206,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       auto id = response.id();
       cout << "repsonse id is " << id << "\n";
       // will need to lock this section
+      absl::MutexLock l(&mu_);
       auto partial_it = partial_merge_map_.find(id);
       if (partial_it != partial_merge_map_.end()) {
         cout << "preparing to merge partial result... \n";
@@ -219,6 +220,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         if (partial_item.num_expected == partial_item.num_received) {
           sets_to_merge_queue_->push(std::move(partial_item.partial_set));
           // remove partial it, its done now
+          cout << "partial id " << id << " is complete\n";
           partial_merge_map_.erase(partial_it);
         }
       } else {
@@ -291,6 +293,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
           c = batch->add_sets();
           c->CopyFrom(sets[0]);
           outstanding_merges_--;
+          total_clusters += sets[0].clusters_size();
         }
         request.set_id(0);
         // if the queue uses copy semantics im not sure how protobufs
@@ -307,7 +310,6 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         PartialMergeItem item;
         item.num_received = 0;
         // use the outstanding merges as id
-        request.set_id(outstanding_merges_);
         if (sets[0].clusters_size() < sets[1].clusters_size()) {
           sets[0].Swap(&sets[1]);
         }
@@ -316,25 +318,31 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         item.num_expected = sets[0].clusters_size();
         item.partial_set.CopyFrom(sets[1]);
         item.original_size = sets[1].clusters_size();
-        partial_merge_map_.insert_or_assign(outstanding_merges_, item);
+        {
+          absl::MutexLock l(&mu_);
+          partial_merge_map_.insert_or_assign(outstanding_merges_, item);
+        }
 
         for (const auto& c : sets[0].clusters()) {
+          request.set_id(outstanding_merges_);
           cmproto::MergePartial* partial_request = request.mutable_partial();
           auto* cluster = partial_request->mutable_cluster();
           cluster->CopyFrom(c);
           auto* cluster_set = partial_request->mutable_set();
           cluster_set->CopyFrom(sets[1]);
-          cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set\n";
+          cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
           request_queue_->push(std::move(request));
           request.Clear();
         }
       }
+      cout << "outstanding merges: " << oustanding_merges_ << "\n";
     }
   }
 
   // we must now wait for the last results to come in
   // wait for worker thread to push last merged set
   // TODO add a timeout or something?
+  cout << "done and waiting for final result...\n";
   while (sets_to_merge_queue_->size() != 1);;
 
   if (sets_to_merge_queue_->size() != 1) {
@@ -343,9 +351,11 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     cout << "scheduling final alignments on controller...\n";
     cmproto::ClusterSet final_set;
     sets_to_merge_queue_->peek(final_set);
+    cout << "final set size is " << final_set.clusters_size() << " clusters\n";
 
     ClusterSet set(final_set, sequences_);
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &params);
+    executor.Initialize();
     set.ScheduleAlignments(&executor);
     executor.FinishAndOutput("output_dir");
   }

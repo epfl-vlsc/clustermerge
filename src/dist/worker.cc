@@ -148,10 +148,12 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         }
         // sets are constructed and in the queue, proceed to merge them
         // MergeSets(sets_to_merge)
+        cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
+        cout << "the merged set has " << final_set.Size() << " clusters\n";
         
         cmproto::Response response;
         auto* new_cs_proto = response.mutable_set();
@@ -165,16 +167,21 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so 
         // the controller can merge other partial merge requests
-         ClusterSet cs(partial.set(), sequences_);
-         Cluster c(partial.cluster(), sequences_);
 
-         cs.MergeCluster(c, &aligner);
+        cout << "set has " << partial.set().clusters_size() << " clusters\n";
+        ClusterSet cs(partial.set(), sequences_);
+        Cluster c(partial.cluster(), sequences_);
 
-         cmproto::Response response;
-         auto* new_cs_proto = response.mutable_set();
-         cs.ConstructProto(new_cs_proto);
+        cout << "merging cluster set with cluster\n";
+        cs.MergeCluster(c, &aligner);
+        cout << "cluster set now has " << cs.Size() << " clusters\n";
 
-         result_queue_->push(response);
+        cmproto::Response response;
+        response.set_id(request.id());
+        auto* new_cs_proto = response.mutable_set();
+        cs.ConstructProto(new_cs_proto);
+
+        result_queue_->push(response);
 
       } else {
         cout << "request was empty!!\n";

@@ -65,7 +65,7 @@ class Controller {
   absl::flat_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
 
   //uint32_t current_request_id_ = 0;
-  uint32_t batch_size_ = 100;
+  uint32_t batch_size_ = 10;
 
   volatile bool run_ = true;
   uint32_t outstanding_merges_ = 0;

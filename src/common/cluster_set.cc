@@ -19,6 +19,7 @@ ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
   std::vector<Cluster> clusters(set_proto.clusters_size());
   for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
     const auto& cluster_proto = set_proto.clusters(cs_i);
+    std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
     Cluster c(sequences[cluster_proto.indexes(0)]);
     for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
       c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);

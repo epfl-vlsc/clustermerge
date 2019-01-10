@@ -283,6 +283,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         c->CopyFrom(sets[0]);
         c = batch->add_sets();
         c->CopyFrom(sets[1]);
+        outstanding_merges_--;
         while (total_clusters < batch_size_ && outstanding_merges_ > 1) {
           // add more cluster sets to batch
           if (!sets_to_merge_queue_->pop(sets[0])) {
@@ -295,6 +296,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
           outstanding_merges_--;
           total_clusters += sets[0].clusters_size();
         }
+        cout << "batched " << batch->sets_size() << "\n";
         request.set_id(0);
         // if the queue uses copy semantics im not sure how protobufs
         // with submessages will behave
@@ -335,7 +337,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
           request.Clear();
         }
       }
-      cout << "outstanding merges: " << oustanding_merges_ << "\n";
+      cout << "outstanding merges: " << outstanding_merges_ << "\n";
     }
   }
 

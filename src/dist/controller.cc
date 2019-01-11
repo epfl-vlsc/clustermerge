@@ -190,6 +190,9 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     cout << "Work queue thread ending.\n";
   });
 
+  // partial mergers in this thread may need to be more fully parallelized to 
+  // prevent bottlenecks. May be required to use a different structure for tracking 
+  // partial mergers rather than the current map, which needs to be locked
   worker_thread_ = thread([this]() {
     // read from result queue
     // if is a batch result and is small enough, push to WorkManager
@@ -205,28 +208,37 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
 
       auto id = response.id();
       cout << "repsonse id is " << id << "\n";
-      // will need to lock this section
-      absl::MutexLock l(&mu_);
-      auto partial_it = partial_merge_map_.find(id);
-      if (partial_it != partial_merge_map_.end()) {
-        cout << "preparing to merge partial result... \n";
-        // its part of a larger merger
-        auto& partial_item = partial_it->second;
-        // merge response_set into partial_item.partial_set
-        MergePartials(partial_item.partial_set, response.set(),
-                      partial_item.original_size);
-        // check if this was the last one
-        partial_item.num_received++;
-        if (partial_item.num_expected == partial_item.num_received) {
-          sets_to_merge_queue_->push(std::move(partial_item.partial_set));
-          // remove partial it, its done now
-          cout << "partial id " << id << " is complete\n";
-          partial_merge_map_.erase(partial_it);
+      PartialMergeItem* partial_item;
+
+      {
+        absl::MutexLock l(&mu_);
+        auto partial_it = partial_merge_map_.find(id);
+        if (partial_it == partial_merge_map_.end()) {
+          cout << "pushing full result \n";
+          sets_to_merge_queue_->push(std::move(response.set()));
+          continue;
+        } else {
+          // do assign
+          partial_item = &partial_it->second;
         }
-      } else {
-        // it's a full result
-        cout << "pushing full result \n";
-        sets_to_merge_queue_->push(std::move(response.set()));
+      }
+
+      cout << "preparing to merge partial result... \n";
+      // its part of a larger merger
+      //auto& partial_item = partial_it->second;
+      // merge response_set into partial_item.partial_set
+      MergePartials(partial_item->partial_set, response.set(),
+                    partial_item->original_size);
+      // check if this was the last one
+      partial_item->num_received++;
+      if (partial_item->num_expected == partial_item->num_received) {
+        sets_to_merge_queue_->push(std::move(partial_item->partial_set));
+        // remove partial it, its done now
+        cout << "partial id " << id << " is complete\n";
+        {
+          absl::MutexLock l(&mu_);
+          partial_merge_map_.erase(id);
+        }
       }
     }
   });
@@ -362,7 +374,18 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     executor.FinishAndOutput("output_dir");
   }
 
-  cout << "clustering complete!!\n";
+  cout << "clustering complete!! Joining threads ...\n";
+
+  run_ = false;
+  response_queue_->unblock();
+  request_queue_->unblock();
+  sets_to_merge_queue_->unblock();
+  worker_thread_.join();
+  request_queue_thread_.join();
+  response_queue_thread_.join();
+
+  cout << "All threads joined.\n";
+
 
   return agd::Status::OK();
 }

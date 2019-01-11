@@ -2,7 +2,7 @@
 #pragma once
 
 #include <thread>
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/sequence.h"
 #include "src/dataset/dataset.h"
@@ -33,19 +33,12 @@ class Controller {
   
   // controller work threads
   // read from response queue
-  // if is a batch result and is small enough, push to WorkManager
+  // if is a batch result, push to sets_to_merge_queue_
   // if is partial result (ID will be
   // in merge map), lookup and merge with partial_set, if partial set complete,
   //    push ready to merge sets to sets_to_merge_queue 
   std::unique_ptr<ConcurrentQueue<cmproto::ClusterSet>> sets_to_merge_queue_;
   std::thread worker_thread_;
-
-  // merge scheduler thread
-  // reads sets from sets to merge queue until a large enough batch is ready
-  // if 2 large sets, split into multiple requests
-  // form MergeRequest, push to request queue
-  // might be bottleneck, we'll see
-  std::thread merge_scheduler_thread_;
 
   // thread reads from request queue and pushes to zmq
   std::unique_ptr<ConcurrentQueue<cmproto::MergeRequest>> request_queue_;
@@ -62,9 +55,12 @@ class Controller {
     uint32_t original_size;
   };
 
-  absl::flat_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
+  // we use a node map so that pointers remain stable, and we can reduce the 
+  // time spent in critical sections
+  absl::node_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
 
   //uint32_t current_request_id_ = 0;
+  // TODO make this a parameter
   uint32_t batch_size_ = 10;
 
   volatile bool run_ = true;

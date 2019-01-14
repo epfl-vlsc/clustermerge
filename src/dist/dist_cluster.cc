@@ -62,8 +62,8 @@ int main(int argc, char* argv[]) {
   args::ValueFlag<std::string> output_dir(
       parser, "output_dir",
       "Output directory. Will be overwritten if exists."
-      "[./output_matches]",
-      {'o', "output_dir"});
+      "[./dist_output_matches]",
+      {'o', "dist_output_matches"});
   args::ValueFlag<std::string> server_config_file(
       parser, "server_config",
       absl::StrCat(

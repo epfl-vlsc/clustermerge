@@ -63,10 +63,10 @@ int main(int argc, char* argv[]) {
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
   args::ValueFlag<std::string> output_dir(
-      parser, "output_dir",
+      parser, "output dir",
       "Output directory. Will be overwritten if exists."
-      "[./dist_output_matches]",
-      {'o', "dist_output_matches"});
+      "[./dist_output_dir]",
+      {'o', "output_dir"});
   args::ValueFlag<std::string> server_config_file(
       parser, "server_config",
       absl::StrCat(
@@ -178,7 +178,7 @@ int main(int argc, char* argv[]) {
   }
 
   // get output dir to use, only needed if controller
-  string dir("output_matches");
+  string dir("dist_output_dir");
   if (output_dir) {
     dir = args::get(output_dir);
   }

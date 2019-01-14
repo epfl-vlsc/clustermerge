@@ -175,7 +175,12 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     cmproto::Response response;
     zmq::message_t msg;
     while (run_) {
-      zmq_recv_socket_->recv(&msg);
+      bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+      // basically implements polling to avoid blocking recv calls
+      // not ideal but whatever, this is a research project! :-D
+      if (!msg_received) {
+        continue;
+      }
 
       if (!response.ParseFromArray(msg.data(), msg.size())) {
         cout << "Failed to parse merge request protobuf!!\n";

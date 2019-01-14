@@ -42,7 +42,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
 agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
                             const std::string& controller_ip,
                             int request_queue_port, int response_queue_port,
-                            const std::string& data_dir_path,
+                            const std::string& data_dir_path, uint32_t batch_size,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   // index all sequences
   agd::Status s = Status::OK();
@@ -289,7 +289,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
            << ", set two size: " << sets[1].clusters_size() << "\n";
 
       // form request, push to queue
-      if (sets[0].clusters_size() < 10 || sets[1].clusters_size() < 10) {
+      if (sets[0].clusters_size() < batch_size || sets[1].clusters_size() < batch_size) {
         // create a batch, they are small
         cout << "two sets are small, batching ...\n";
         cmproto::MergeBatch* batch = request.mutable_batch();
@@ -301,7 +301,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         c = batch->add_sets();
         c->CopyFrom(sets[1]);
         outstanding_merges_--;
-        while (total_clusters < batch_size_ && outstanding_merges_ > 1) {
+        while (total_clusters < batch_size && outstanding_merges_ > 1) {
           // add more cluster sets to batch
           if (!sets_to_merge_queue_->pop(sets[0])) {
             return agd::errors::Internal(

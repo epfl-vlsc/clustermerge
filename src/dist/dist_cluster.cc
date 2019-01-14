@@ -54,8 +54,11 @@ int main(int argc, char* argv[]) {
                    std::thread::hardware_concurrency(), "]"),
       {'t', "threads"});
   args::ValueFlag<unsigned int> queue_depth_arg(
-      parser, "queue_depth", "Depth of the local work and response queue",
+      parser, "queue_depth", "Depth of the local work and response queue.",
       {'q', "queue_depth"});
+  args::ValueFlag<unsigned int> batch_size_arg(
+      parser, "batch size", "How many small clusters should be batched together.",
+      {'b', "batch_size"});
   args::ValueFlag<std::string> input_file_list(
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
@@ -99,6 +102,11 @@ int main(int argc, char* argv[]) {
   bool is_controller = false;
   if (controller) {
     is_controller = args::get(controller);
+  }
+
+  uint32_t batch_size = 100; 
+  if (batch_size_arg) {
+    batch_size = args::get(batch_size_arg);
   }
 
   json server_config_json;
@@ -214,7 +222,7 @@ int main(int argc, char* argv[]) {
     // launch controller(push_port, pull_port)
     Controller controller;
     Status stat = controller.Run(threads, queue_depth, controller_ip, request_queue_port,
-                   response_queue_port, json_dir_path, datasets);
+                   response_queue_port, json_dir_path, batch_size, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

@@ -18,7 +18,7 @@ class Controller {
  public:
   agd::Status Run(size_t num_threads, size_t queue_depth, const std::string& controller_ip,
                   int request_queue_port, int response_queue_port,
-                  const std::string& data_dir_path,
+                  const std::string& data_dir_path, uint32_t batch_size,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:
@@ -60,8 +60,6 @@ class Controller {
   absl::node_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
 
   //uint32_t current_request_id_ = 0;
-  // TODO make this a parameter
-  uint32_t batch_size_ = 10;
 
   volatile bool run_ = true;
   uint32_t outstanding_merges_ = 0;

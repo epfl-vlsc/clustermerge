@@ -5,6 +5,7 @@
 #include "src/agd/errors.h"
 #include "src/common/cluster_set.h"
 #include "src/common/all_all_executor.h"
+#include <google/protobuf/text_format.h>
 
 using std::cout;
 using std::thread;
@@ -20,19 +21,26 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
   cout << "merging partial clusters ...\n";
   for (uint32_t i = 0; i < original_size; i++) {
     auto* mut_cluster = set.mutable_clusters(i);
-    auto cluster = other.clusters(i);
+    auto& cluster = other.clusters(i);
+    /*string s;
+    google::protobuf::TextFormat::PrintToString(*mut_cluster, &s);
+    cout << "Merging partial: " << s << "\n";
+    google::protobuf::TextFormat::PrintToString(cluster, &s);
+    cout << "with " << s << "\n";*/
 
     for (auto index : cluster.indexes()) {
       if (std::find(mut_cluster->indexes().begin(),
                     mut_cluster->indexes().end(),
                     index) == mut_cluster->indexes().end()) {
         // doesnt exist, add
+        cout << "merger adding index to cluster\n";
         mut_cluster->add_indexes(index);
       }
     }
   }
   // if the partial merge generated a new cluster, add it to the set
   if (other.clusters_size() > original_size) {
+    cout << "adding new cluster!\n";
     assert(original_size == other.clusters_size() - 1);
     auto* c = set.add_clusters();
     c->CopyFrom(other.clusters(other.clusters_size() - 1));
@@ -269,93 +277,99 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   cmproto::MergeRequest request;
   std::vector<cmproto::ClusterSet> sets;
   sets.resize(2);
-  while (outstanding_merges_ > 1) {
+  while (outstanding_merges_ > 0) {
     sets[0].Clear();
     sets[1].Clear();
     if (!sets_to_merge_queue_->pop(sets[0])) {
       continue;
     }
-    if (outstanding_merges_ == 1) {
-      // we are done
-      cout << "last set is completed.\n";
-    } else if (outstanding_merges_ > 1) {
-      // get next so we have two to merge
-      if (!sets_to_merge_queue_->pop(sets[1])) {
-        return agd::errors::Internal(
-            "error: did not get set for second to merge with.");
-      }
-      cout << "processing two sets ...\n";
-      cout << "set one size: " << sets[0].clusters_size()
-           << ", set two size: " << sets[1].clusters_size() << "\n";
+    // get next so we have two to merge
+    if (!sets_to_merge_queue_->pop(sets[1])) {
+      return agd::errors::Internal(
+          "error: did not get set for second to merge with.");
+    }
+    cout << "processing two sets ...\n";
+    cout << "set one size: " << sets[0].clusters_size()
+         << ", set two size: " << sets[1].clusters_size() << "\n\n";
 
-      // form request, push to queue
-      if (sets[0].clusters_size() < batch_size || sets[1].clusters_size() < batch_size) {
-        // create a batch, they are small
-        cout << "two sets are small, batching ...\n";
-        cmproto::MergeBatch* batch = request.mutable_batch();
-        uint32_t total_clusters =
-            sets[0].clusters_size() + sets[1].clusters_size();
+    // form request, push to queue
+    if (sets[0].clusters_size() < batch_size || sets[1].clusters_size() < batch_size) {
+      // create a batch, they are small
+      cout << "two sets are small, batching ...\n";
+      cmproto::MergeBatch* batch = request.mutable_batch();
+      uint32_t total_clusters =
+          sets[0].clusters_size() + sets[1].clusters_size();
 
-        auto* c = batch->add_sets();
-        c->CopyFrom(sets[0]);
-        c = batch->add_sets();
-        c->CopyFrom(sets[1]);
-        outstanding_merges_--;
-        while (total_clusters < batch_size && outstanding_merges_ > 1) {
-          // add more cluster sets to batch
-          if (!sets_to_merge_queue_->pop(sets[0])) {
-            return agd::errors::Internal(
-                "ERROR: did not get set for second to merge with.");
-          }
-
-          c = batch->add_sets();
-          c->CopyFrom(sets[0]);
-          outstanding_merges_--;
-          total_clusters += sets[0].clusters_size();
+      auto* c = batch->add_sets();
+      c->CopyFrom(sets[0]);
+      c = batch->add_sets();
+      c->CopyFrom(sets[1]);
+      outstanding_merges_--;
+      while (total_clusters < batch_size && outstanding_merges_ > 0) {
+        // add more cluster sets to batch
+        if (!sets_to_merge_queue_->pop(sets[0])) {
+          return agd::errors::Internal(
+              "ERROR: did not get set for second to merge with.");
         }
-        cout << "batched " << batch->sets_size() << "\n";
-        request.set_id(0);
-        // if the queue uses copy semantics im not sure how protobufs
-        // with submessages will behave
+
+        c = batch->add_sets();
+        c->CopyFrom(sets[0]);
+        outstanding_merges_--;
+        total_clusters += sets[0].clusters_size();
+      }
+      cout << "batched " << batch->sets_size() << " sets\n";
+      request.set_id(-1);
+      // if the queue uses copy semantics im not sure how protobufs
+      // with submessages will behave
+      request_queue_->push(std::move(request));
+      request.Clear();
+
+    } else {
+      // either set is large enough, split the computation into multiple
+      // requests
+      cout << "splitting merger of two large sets into partial mergers\n";
+      outstanding_merges_--;
+      if (outstanding_merges_ == 0) {
+        cout << "final two merging\n\n\n";
+        for (int i = 0; i < sets[0].clusters_size(); i++) {
+          cout << "cluster has " << sets[0].clusters(i).indexes_size() << " seqs\n";
+        }
+        cout << "\n";
+        for (int i = 0; i < sets[1].clusters_size(); i++) {
+          cout << "cluster has " << sets[1].clusters(i).indexes_size() << " seqs\n";
+        }
+      }
+      // make a map entry for this multi-part request
+      PartialMergeItem item;
+      item.num_received = 0;
+      // use the outstanding merges as id
+      if (sets[0].clusters_size() < sets[1].clusters_size()) {
+        sets[0].Swap(&sets[1]);
+      }
+      // each work item does a partial merge of one cluster in sets[0] to
+      // all clusters in sets[1]
+      item.num_expected = sets[0].clusters_size();
+      item.partial_set.CopyFrom(sets[1]);
+      item.original_size = sets[1].clusters_size();
+      {
+        absl::MutexLock l(&mu_);
+        partial_merge_map_.insert_or_assign(outstanding_merges_, item);
+      }
+
+      for (const auto& c : sets[0].clusters()) {
+        request.set_id(outstanding_merges_);
+        cmproto::MergePartial* partial_request = request.mutable_partial();
+        auto* cluster = partial_request->mutable_cluster();
+        cluster->CopyFrom(c);
+        auto* cluster_set = partial_request->mutable_set();
+        cluster_set->CopyFrom(sets[1]);
+        cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
         request_queue_->push(std::move(request));
         request.Clear();
-
-      } else {
-        // either set is large enough, split the computation into multiple
-        // requests
-        cout << "splitting merger of two large sets into partial mergers\n";
-        outstanding_merges_--;
-        // make a map entry for this multi-part request
-        PartialMergeItem item;
-        item.num_received = 0;
-        // use the outstanding merges as id
-        if (sets[0].clusters_size() < sets[1].clusters_size()) {
-          sets[0].Swap(&sets[1]);
-        }
-        // each work item does a partial merge of one cluster in sets[0] to
-        // all clusters in sets[1]
-        item.num_expected = sets[0].clusters_size();
-        item.partial_set.CopyFrom(sets[1]);
-        item.original_size = sets[1].clusters_size();
-        {
-          absl::MutexLock l(&mu_);
-          partial_merge_map_.insert_or_assign(outstanding_merges_, item);
-        }
-
-        for (const auto& c : sets[0].clusters()) {
-          request.set_id(outstanding_merges_);
-          cmproto::MergePartial* partial_request = request.mutable_partial();
-          auto* cluster = partial_request->mutable_cluster();
-          cluster->CopyFrom(c);
-          auto* cluster_set = partial_request->mutable_set();
-          cluster_set->CopyFrom(sets[1]);
-          cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
-          request_queue_->push(std::move(request));
-          request.Clear();
-        }
       }
-      cout << "outstanding merges: " << outstanding_merges_ << "\n";
+
     }
+    cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
 
   // we must now wait for the last results to come in
@@ -363,6 +377,10 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   // TODO add a timeout or something?
   cout << "done and waiting for final result...\n";
   while (sets_to_merge_queue_->size() != 1);;
+  
+  cout << "key to continue\n";
+  std::cin.get();
+  cout << "there are " << sets_to_merge_queue_->size() << " sets in queue, map size is " << partial_merge_map_.size() << "\n";
 
   if (sets_to_merge_queue_->size() != 1) {
     cout << "where did the last set go??\n";
@@ -376,7 +394,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &params);
     executor.Initialize();
     set.ScheduleAlignments(&executor);
-    executor.FinishAndOutput("output_dir");
+    executor.FinishAndOutput("dist_output_dir");
   }
 
   cout << "clustering complete!! Joining threads ...\n";

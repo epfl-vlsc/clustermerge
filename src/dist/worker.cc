@@ -160,6 +160,7 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         final_set.ConstructProto(new_cs_proto);
 
         result_queue_->push(response);
+        sets_to_merge.clear();
 
       } else if (request.has_partial()) {
         cout << "has partial\n";
@@ -173,13 +174,13 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         Cluster c(partial.cluster(), sequences_);
 
         cout << "merging cluster set with cluster\n";
-        cs.MergeCluster(c, &aligner);
-        cout << "cluster set now has " << cs.Size() << " clusters\n";
+        auto new_cs = cs.MergeCluster(c, &aligner);
+        cout << "cluster set now has " << new_cs.Size() << " clusters\n";
 
         cmproto::Response response;
         response.set_id(request.id());
         auto* new_cs_proto = response.mutable_set();
-        cs.ConstructProto(new_cs_proto);
+        new_cs.ConstructProto(new_cs_proto);
 
         result_queue_->push(response);
 

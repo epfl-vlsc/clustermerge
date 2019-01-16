@@ -299,8 +299,9 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
 
     new_cluster_set.clusters_.push_back(std::move(c));
   }
-    
-  new_cluster_set.clusters_.push_back(std::move(c_other));
+  
+  if (!c_other.IsFullyMerged()) 
+    new_cluster_set.clusters_.push_back(std::move(c_other));
   
   return new_cluster_set;
 }
@@ -338,6 +339,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   int num_avoided = 0;
 
   for (const auto& cluster : clusters_) {
+    std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
     if (cluster.IsDuplicate()) {
       continue;
     }

@@ -34,6 +34,7 @@ class Cluster {
     for (size_t seq_i = 0; seq_i < cluster_proto.indexes_size(); seq_i++) {
       AddSequence(sequences[cluster_proto.indexes(seq_i)]);
     }
+    fully_merged_ = cluster_proto.fully_merged();
   }
 
   void Merge(Cluster* other, ProteinAligner* aligner);

@@ -2,6 +2,7 @@
 #include "controller.h"
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "src/agd/errors.h"
 #include "src/common/cluster_set.h"
 #include "src/common/all_all_executor.h"
@@ -18,7 +19,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
   // where any new cluster is the last element
   // we do not "fully merge" any of the clusters in `set`
 
-  cout << "merging partial clusters ...\n";
+  //cout << "merging partial clusters ...\n";
   for (uint32_t i = 0; i < original_size; i++) {
     auto* mut_cluster = set.mutable_clusters(i);
     auto& cluster = other.clusters(i);
@@ -27,24 +28,27 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
     cout << "Merging partial: " << s << "\n";
     google::protobuf::TextFormat::PrintToString(cluster, &s);
     cout << "with " << s << "\n";*/
+    if (cluster.fully_merged()) {
+      mut_cluster->set_fully_merged(true);
+    }
 
     for (auto index : cluster.indexes()) {
       if (std::find(mut_cluster->indexes().begin(),
                     mut_cluster->indexes().end(),
                     index) == mut_cluster->indexes().end()) {
         // doesnt exist, add
-        cout << "merger adding index to cluster\n";
+        //cout << "merger adding index to cluster\n";
         mut_cluster->add_indexes(index);
       }
     }
   }
   // if the partial merge generated a new cluster, add it to the set
   if (other.clusters_size() > original_size) {
-    cout << "adding new cluster!\n";
     assert(original_size == other.clusters_size() - 1);
     auto* c = set.add_clusters();
     c->CopyFrom(other.clusters(other.clusters_size() - 1));
   }
+  //cout << "done merging\n";
 }
 
 agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
@@ -159,8 +163,8 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       }
       auto size = merge_request.ByteSizeLong();
       zmq::message_t msg(size);
-      cout << "pushing request of size " << size << " of type "
-           << (merge_request.has_batch() ? "batch " : "partial ") << "\n";
+      /*cout << "pushing request of size " << size << " of type "
+           << (merge_request.has_batch() ? "batch " : "partial ") << "\n";*/
       auto success = merge_request.SerializeToArray(msg.data(), size);
       if (!success) {
         cout << "Thread failed to serialize request protobuf!\n";
@@ -194,8 +198,8 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         cout << "Failed to parse merge request protobuf!!\n";
         return;
       }
-      cout << "parsed a zmq response with " << msg.size() << " bytes and "
-           << response.set().clusters_size() << " clusters\n";
+      /*cout << "parsed a zmq response with " << msg.size() << " bytes and "
+           << response.set().clusters_size() << " clusters\n";*/
 
       response_queue_->push(response);
     }
@@ -220,14 +224,14 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       }
 
       auto id = response.id();
-      cout << "repsonse id is " << id << "\n";
+      //cout << "repsonse id is " << id << "\n";
       PartialMergeItem* partial_item;
 
       {
         absl::MutexLock l(&mu_);
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
-          cout << "pushing full result \n";
+          //cout << "pushing full result \n";
           sets_to_merge_queue_->push(std::move(response.set()));
           continue;
         } else {
@@ -236,18 +240,32 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         }
       }
 
-      cout << "preparing to merge partial result... \n";
+      //cout << "preparing to merge partial result... \n";
       // its part of a larger merger
       //auto& partial_item = partial_it->second;
       // merge response_set into partial_item.partial_set
       MergePartials(partial_item->partial_set, response.set(),
                     partial_item->original_size);
+      //cout << "done\n";
       // check if this was the last one
       partial_item->num_received++;
       if (partial_item->num_expected == partial_item->num_received) {
+        // go through  and delete any fully merged clusters
+        auto cluster_it = partial_item->partial_set.mutable_clusters()->begin();
+        int num_removed = 0;
+        while (cluster_it != partial_item->partial_set.mutable_clusters()->end()) {
+          if (cluster_it->fully_merged()) {
+            cluster_it = partial_item->partial_set.mutable_clusters()->erase(cluster_it);
+            num_removed++;
+            continue;
+          }
+          cluster_it++;
+        }
+        cout << "removed " << num_removed << " fully merged clusters";
+        
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
-        cout << "partial id " << id << " is complete\n";
+        //cout << "partial id " << id << " is complete\n";
         {
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);
@@ -271,6 +289,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   cout << "sets to merge queue is loaded and ready, make sure workers are ready, press key to compute...\n";
   std::cin.get();
 
+  auto t0 = std::chrono::high_resolution_clock::now();
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
@@ -329,7 +348,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       // requests
       cout << "splitting merger of two large sets into partial mergers\n";
       outstanding_merges_--;
-      if (outstanding_merges_ == 0) {
+      /*if (outstanding_merges_ == 0) {
         cout << "final two merging\n\n\n";
         for (int i = 0; i < sets[0].clusters_size(); i++) {
           cout << "cluster has " << sets[0].clusters(i).indexes_size() << " seqs\n";
@@ -338,7 +357,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         for (int i = 0; i < sets[1].clusters_size(); i++) {
           cout << "cluster has " << sets[1].clusters(i).indexes_size() << " seqs\n";
         }
-      }
+      }*/
       // make a map entry for this multi-part request
       PartialMergeItem item;
       item.num_received = 0;
@@ -363,7 +382,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         cluster->CopyFrom(c);
         auto* cluster_set = partial_request->mutable_set();
         cluster_set->CopyFrom(sets[1]);
-        cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
+        //cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
         request_queue_->push(std::move(request));
         request.Clear();
       }
@@ -376,26 +395,23 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   // wait for worker thread to push last merged set
   // TODO add a timeout or something?
   cout << "done and waiting for final result...\n";
-  while (sets_to_merge_queue_->size() != 1);;
+  //while (sets_to_merge_queue_->size() != 1);;
   
-  cout << "key to continue\n";
-  std::cin.get();
-  cout << "there are " << sets_to_merge_queue_->size() << " sets in queue, map size is " << partial_merge_map_.size() << "\n";
+  cout << "scheduling final alignments on controller...\n";
+  cmproto::ClusterSet final_set;
+  sets_to_merge_queue_->peek(final_set);
+  cout << "final set size is " << final_set.clusters_size() << " clusters\n";
+  auto t1 = std::chrono::high_resolution_clock::now();
 
-  if (sets_to_merge_queue_->size() != 1) {
-    cout << "where did the last set go??\n";
-  } else {
-    cout << "scheduling final alignments on controller...\n";
-    cmproto::ClusterSet final_set;
-    sets_to_merge_queue_->peek(final_set);
-    cout << "final set size is " << final_set.clusters_size() << " clusters\n";
+  auto duration = t1 - t0;
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  cout << "Clustering execution time: " << sec.count() << " seconds.\n";
 
-    ClusterSet set(final_set, sequences_);
-    AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &params);
-    executor.Initialize();
-    set.ScheduleAlignments(&executor);
-    executor.FinishAndOutput("dist_output_dir");
-  }
+  ClusterSet set(final_set, sequences_);
+  AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &params);
+  executor.Initialize();
+  set.ScheduleAlignments(&executor);
+  executor.FinishAndOutput("dist_output_dir");
 
   cout << "clustering complete!! Joining threads ...\n";
 

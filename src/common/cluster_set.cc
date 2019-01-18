@@ -19,10 +19,13 @@ ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
   std::vector<Cluster> clusters(set_proto.clusters_size());
   for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
     const auto& cluster_proto = set_proto.clusters(cs_i);
-    std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    //std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
     Cluster c(sequences[cluster_proto.indexes(0)]);
     for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
       c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);
+    }
+    if (cluster_proto.fully_merged()) {
+      c.SetFullyMerged();
     }
     clusters_.push_back(std::move(c));
   }
@@ -278,7 +281,6 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
           c_other.AddSequence(seq);
         }
         c.SetFullyMerged();
-
       } else if (c_other_num_uncovered <
                       aligner->Params()->max_n_aa_not_covered &&
                   alignment.score > aligner->Params()->min_full_merge_score) {

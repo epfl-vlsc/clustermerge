@@ -137,7 +137,7 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
       // encode result, put in queue
 
       if (request.has_batch()) {
-        cout << "its a batch\n";
+        //cout << "its a batch\n";
         auto& batch = request.batch();
         for (size_t i = 0; i < batch.sets_size(); i++) { 
           auto& set_proto = batch.sets(i);
@@ -148,12 +148,12 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         }
         // sets are constructed and in the queue, proceed to merge them
         // MergeSets(sets_to_merge)
-        cout << "merging a batch...\n";
+        //cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
-        cout << "the merged set has " << final_set.Size() << " clusters\n";
+        //cout << "the merged set has " << final_set.Size() << " clusters\n";
         
         cmproto::Response response;
         auto* new_cs_proto = response.mutable_set();
@@ -163,19 +163,19 @@ agd::Status Worker::Run(size_t num_threads, size_t queue_depth,
         sets_to_merge.clear();
 
       } else if (request.has_partial()) {
-        cout << "has partial\n";
+        //cout << "has partial\n";
         auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so 
         // the controller can merge other partial merge requests
 
-        cout << "set has " << partial.set().clusters_size() << " clusters\n";
+        //cout << "set has " << partial.set().clusters_size() << " clusters\n";
         ClusterSet cs(partial.set(), sequences_);
         Cluster c(partial.cluster(), sequences_);
 
-        cout << "merging cluster set with cluster\n";
+        //cout << "merging cluster set with cluster\n";
         auto new_cs = cs.MergeCluster(c, &aligner);
-        cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        //cout << "cluster set now has " << new_cs.Size() << " clusters\n";
 
         cmproto::Response response;
         response.set_id(request.id());

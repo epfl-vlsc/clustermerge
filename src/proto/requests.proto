@@ -1,0 +1,24 @@
+
+syntax = "proto3";
+
+//option cc_enable_arenas = true;
+
+package cmproto;
+import "src/proto/cluster.proto";
+
+message MergeBatch {
+  repeated ClusterSet sets = 1;
+}
+
+message MergePartial {
+  Cluster cluster = 1;
+  ClusterSet set = 2;
+}
+
+message MergeRequest {
+  uint32 id = 1;
+  oneof request {
+    MergeBatch batch = 2;
+    MergePartial partial = 3;
+  }
+}

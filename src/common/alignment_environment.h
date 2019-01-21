@@ -1,6 +1,6 @@
 
 #pragma once
-#include "agd/errors.h"
+#include "src/agd/errors.h"
 extern "C" {
 #include "swps3/EstimatePam.h"
 #include "swps3/swps3.h"

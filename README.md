@@ -68,4 +68,7 @@ If you have complete all vs. all results you want to compare against, `tools` ha
 python2 tools/compare_results.py path/to/AllAll/ path/to/clustermerge/output_matches/
 ```
 
+## Distributed Version
+
+`bazel build -c opt //src/dist:dist_cluster`
 

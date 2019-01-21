@@ -1,0 +1,18 @@
+
+syntax = "proto3";
+
+//option cc_enable_arenas = true;
+
+package cmproto;
+
+// A cluster is just a collectin of absolute indexes of the sequences
+// that make it up.
+// The first one is the representative
+message Cluster {
+  repeated uint32 indexes = 1;
+  bool fully_merged = 2; // needed for merge at controller
+}
+
+message ClusterSet {
+  repeated Cluster clusters = 1;
+}

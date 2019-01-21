@@ -1,6 +1,6 @@
 
 cc_library(
-  name = "json-cpp",
-  hdrs = ["json.hpp"],
+  name = "args",
+  hdrs = ["args.h"],
   visibility = ["//visibility:public"]
 )

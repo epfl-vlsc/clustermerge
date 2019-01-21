@@ -5,6 +5,7 @@ cc_library(
     hdrs = glob(["*.h"]),
     visibility = ["//visibility:public"],
     deps = ["@com_google_absl//absl/strings",
-            "//src/agd:agd"
+            "//src/agd:agd",
+            "@args//:args"
     ]
 )

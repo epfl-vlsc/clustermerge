@@ -29,5 +29,5 @@ class Sequence {
   const std::string& genome_;
   uint32_t genome_size_;
   uint32_t genome_index_;
-  uint32_t id_;
+  uint32_t id_; // absolute index 
 };

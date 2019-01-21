@@ -1,0 +1,11 @@
+
+syntax = "proto3";
+
+package cmproto;
+import "src/proto/cluster.proto";
+
+message Response {
+  uint32 id = 1; // corresponds to the request ID
+                 // needed to reconstruct partial mergers
+  ClusterSet set = 2;
+}

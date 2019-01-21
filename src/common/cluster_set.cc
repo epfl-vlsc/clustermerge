@@ -341,7 +341,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   int num_avoided = 0;
 
   for (const auto& cluster : clusters_) {
-    std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
+    //std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
     if (cluster.IsDuplicate()) {
       continue;
     }

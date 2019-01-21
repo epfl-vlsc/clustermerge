@@ -252,16 +252,13 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       if (partial_item->num_expected == partial_item->num_received) {
         // go through  and delete any fully merged clusters
         auto cluster_it = partial_item->partial_set.mutable_clusters()->begin();
-        int num_removed = 0;
         while (cluster_it != partial_item->partial_set.mutable_clusters()->end()) {
           if (cluster_it->fully_merged()) {
             cluster_it = partial_item->partial_set.mutable_clusters()->erase(cluster_it);
-            num_removed++;
             continue;
           }
           cluster_it++;
         }
-        cout << "removed " << num_removed << " fully merged clusters";
         
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
@@ -284,11 +281,6 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     sets_to_merge_queue_->push(std::move(set));
   }
 
-  cout << "sets to merge queue size is " << sets_to_merge_queue_->size() << "\n";
-  cout << "outstanding merges: " << outstanding_merges_ << "\n";
-  cout << "sets to merge queue is loaded and ready, make sure workers are ready, press key to compute...\n";
-  std::cin.get();
-
   auto t0 = std::chrono::high_resolution_clock::now();
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
@@ -307,14 +299,14 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
       return agd::errors::Internal(
           "error: did not get set for second to merge with.");
     }
-    cout << "processing two sets ...\n";
+    /*cout << "processing two sets ...\n";
     cout << "set one size: " << sets[0].clusters_size()
-         << ", set two size: " << sets[1].clusters_size() << "\n\n";
+         << ", set two size: " << sets[1].clusters_size() << "\n\n";*/
 
     // form request, push to queue
     if (sets[0].clusters_size() < batch_size || sets[1].clusters_size() < batch_size) {
       // create a batch, they are small
-      cout << "two sets are small, batching ...\n";
+      //cout << "two sets are small, batching ...\n";
       cmproto::MergeBatch* batch = request.mutable_batch();
       uint32_t total_clusters =
           sets[0].clusters_size() + sets[1].clusters_size();
@@ -336,7 +328,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         outstanding_merges_--;
         total_clusters += sets[0].clusters_size();
       }
-      cout << "batched " << batch->sets_size() << " sets\n";
+      //cout << "batched " << batch->sets_size() << " sets\n";
       request.set_id(-1);
       // if the queue uses copy semantics im not sure how protobufs
       // with submessages will behave
@@ -346,7 +338,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
     } else {
       // either set is large enough, split the computation into multiple
       // requests
-      cout << "splitting merger of two large sets into partial mergers\n";
+      //cout << "splitting merger of two large sets into partial mergers\n";
       outstanding_merges_--;
       /*if (outstanding_merges_ == 0) {
         cout << "final two merging\n\n\n";

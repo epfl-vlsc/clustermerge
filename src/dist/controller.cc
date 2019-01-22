@@ -12,6 +12,29 @@ using std::cout;
 using std::thread;
 using std::string;
 
+void RemoveDuplicates(cmproto::ClusterSet& set) {
+  
+  absl::flat_hash_set<std::vector<size_t>> set_map;
+
+  auto cluster_it = set.mutable_clusters()->begin();
+  std::vector<size_t> cluster_set;
+  while (cluster_it != set.mutable_clusters()->end()) {
+    
+    for (const auto& s : cluster_it->indexes()) {
+      cluster_set.push_back(s);
+    }
+    std::sort(cluster_set.begin(), cluster_set.end());
+
+    auto result = set_map.insert(std::move(cluster_set));
+    if (!result.second) {
+      cluster_it = set.mutable_clusters()->erase(cluster_it);
+    } else {
+      cluster_it++;
+    }
+    cluster_set.clear();
+  }
+}
+
 // merge other into
 void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
                    uint32_t original_size) {
@@ -110,9 +133,6 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   // done init envs
 
   Parameters params;  // using default params for now
-
-
-
 
   // connect to zmq queues
   auto address = std::string("tcp://*:");
@@ -232,6 +252,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
           //cout << "pushing full result \n";
+          RemoveDuplicates(*response.mutable_set());
           sets_to_merge_queue_->push(std::move(response.set()));
           continue;
         } else {
@@ -259,7 +280,8 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
           }
           cluster_it++;
         }
-        
+
+        RemoveDuplicates(partial_item->partial_set);
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
         //cout << "partial id " << id << " is complete\n";

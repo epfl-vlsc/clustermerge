@@ -34,6 +34,8 @@ class ClusterSet {
   // execute a PartialMerge for the distributed runtime 
   // merge cluster into cluster set
   // keep any fully merged cluster, but mark it
+  // the central controller will eliminate fully merged clusters
+  // after merging partial results
   ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner);
 
   // merge two cluster sets by building a new one, in parallel (uses std::async)
@@ -44,6 +46,9 @@ class ClusterSet {
 
   // schedule all-all alignments onto the executor threadpool
   void ScheduleAlignments(AllAllExecutor* executor);
+
+  // remove duplicate clusters from this set
+  void RemoveDuplicates();
 
   void DebugDump() const;
   void DumpJson() const;

@@ -301,7 +301,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
 
     new_cluster_set.clusters_.push_back(std::move(c));
   }
-  
+
+  // we can leave out without confusing the controller 
   if (!c_other.IsFullyMerged()) 
     new_cluster_set.clusters_.push_back(std::move(c_other));
   
@@ -400,4 +401,28 @@ void ClusterSet::DumpJson() const {
   std::ofstream o("clusters.json");
 
   o << std::setw(2) << j << std::endl;
+}
+
+void ClusterSet::RemoveDuplicates() {
+  
+  absl::flat_hash_set<std::vector<size_t>> set_map;
+
+  auto cluster_it = clusters_.begin();
+  std::vector<size_t> cluster_set;
+  while (cluster_it != clusters_.end()) {
+    
+    for (const auto& s : cluster_it->Sequences()) {
+      cluster_set.push_back(s.ID());
+    }
+    std::sort(cluster_set.begin(), cluster_set.end());
+
+    auto result = set_map.insert(std::move(cluster_set));
+    if (!result.second) {
+      cluster_it = clusters_.erase(cluster_it);
+    } else {
+      std::next(cluster_it);
+    }
+    cluster_set.clear();
+  }
+
 }

@@ -8,10 +8,10 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <limits.h>
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
-#include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
 
@@ -59,6 +59,9 @@ int main(int argc, char* argv[]) {
   args::ValueFlag<unsigned int> batch_size_arg(
       parser, "batch size", "How many small clusters should be batched together.",
       {'b', "batch_size"});
+  args::ValueFlag<unsigned int> dup_removal_threshold_arg(
+      parser, "duplicate removal threshold", "How big a set of clusters should be before duplicates are filtered out [MAX_INT]",
+      {'r', "dup_removal_thresh"});
   args::ValueFlag<std::string> input_file_list(
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
@@ -107,6 +110,11 @@ int main(int argc, char* argv[]) {
   uint32_t batch_size = 100; 
   if (batch_size_arg) {
     batch_size = args::get(batch_size_arg);
+  }
+  
+  uint32_t dup_removal_threshold = UINT_MAX; 
+  if (dup_removal_threshold_arg) {
+    dup_removal_threshold = args::get(dup_removal_threshold_arg);
   }
 
   json server_config_json;
@@ -221,8 +229,16 @@ int main(int argc, char* argv[]) {
   if (is_controller) {
     // launch controller(push_port, pull_port)
     Controller controller;
-    Status stat = controller.Run(threads, queue_depth, controller_ip, request_queue_port,
-                   response_queue_port, json_dir_path, batch_size, datasets);
+    Controller::Params params;
+    params.batch_size = batch_size;
+    params.controller_ip = controller_ip;
+    params.data_dir_path = json_dir_path;
+    params.num_threads = threads;
+    params.queue_depth = queue_depth;
+    params.request_queue_port = request_queue_port;
+    params.response_queue_port = response_queue_port;
+    params.dup_removal_thresh = dup_removal_threshold;
+    Status stat = controller.Run(params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }
@@ -230,8 +246,14 @@ int main(int argc, char* argv[]) {
     // load datasets, launch worker
     // launch worker(args, controller_ip, push_port, pull_port)
     Worker worker;
-    Status stat = worker.Run(threads, queue_depth, json_dir_path, controller_ip,
-               request_queue_port, response_queue_port, datasets);
+    Worker::Params params;
+    params.controller_ip = controller_ip;
+    params.data_dir_path = json_dir_path;
+    params.num_threads = threads;
+    params.queue_depth = queue_depth;
+    params.request_queue_port = request_queue_port;
+    params.response_queue_port = response_queue_port;
+    Status stat = worker.Run(params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

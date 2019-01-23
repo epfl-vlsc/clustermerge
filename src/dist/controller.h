@@ -16,9 +16,19 @@
 // to be replaced with a load balancing pattern
 class Controller {
  public:
-  agd::Status Run(size_t num_threads, size_t queue_depth, const std::string& controller_ip,
-                  int request_queue_port, int response_queue_port,
-                  const std::string& data_dir_path, uint32_t batch_size,
+  
+  struct Params {
+    size_t num_threads;
+    size_t queue_depth;
+    absl::string_view controller_ip;
+    int request_queue_port; 
+    int response_queue_port;
+    absl::string_view data_dir_path;
+    uint32_t batch_size;
+    uint32_t dup_removal_thresh;
+  };
+
+  agd::Status Run(const Params& params,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:

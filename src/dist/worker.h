@@ -14,13 +14,20 @@
 class Worker {
  public:
   Worker() {}
+
+  struct Params {
+    size_t num_threads;
+    size_t queue_depth;
+    absl::string_view controller_ip;
+    int request_queue_port;
+    int response_queue_port;
+    absl::string_view data_dir_path;
+  };
+
   // main worker entry point
   // reuse agd status for error passing
   // requires num_threads, data_dir_path, controller_ip, push_port, pull_port
-  agd::Status Run(size_t num_threads, size_t queue_depth,
-                  const std::string& data_dir_path,
-                  const std::string& controller_ip, int push_port,
-                  int pull_port,
+  agd::Status Run(const Params& params,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:
@@ -42,5 +49,5 @@ class Worker {
 
   volatile bool run_ = true;
 
-  std::vector<Sequence> sequences_; // abs indexable sequences
+  std::vector<Sequence> sequences_;  // abs indexable sequences
 };

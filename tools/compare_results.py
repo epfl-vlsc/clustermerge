@@ -218,6 +218,8 @@ def main():
     plt.xlabel("Score")
     plt.ylabel("Number of Missed Matches")
     plt.savefig("hist.png")
+    print("average missed score is {}".format(sum(missed_scores) / len(missed_scores)))
+    print("median missed score is {}".format(missed_scores[len(missed_scores)/2]))
 
     percent_both = round(float(reported_by_both) / total_pairs_in_ref, 7) * 100
     percent_reference = round(float(reported_by_ref_only) / total_pairs_in_ref, 7) * 100

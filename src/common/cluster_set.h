@@ -51,7 +51,7 @@ class ClusterSet {
   void RemoveDuplicates();
 
   void DebugDump() const;
-  void DumpJson() const;
+  void DumpJson(const std::string& filename) const;
 
   size_t Size() { return clusters_.size(); }
 

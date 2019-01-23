@@ -252,7 +252,9 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
           //cout << "pushing full result \n";
-          RemoveDuplicates(*response.mutable_set());
+          if (response.set().clusters_size() > 2500) {
+            RemoveDuplicates(*response.mutable_set());
+          }
           sets_to_merge_queue_->push(std::move(response.set()));
           continue;
         } else {
@@ -281,7 +283,9 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
           cluster_it++;
         }
 
-        RemoveDuplicates(partial_item->partial_set);
+        if (partial_item->partial_set.clusters_size() > 2500) {
+          RemoveDuplicates(partial_item->partial_set);
+        }
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
         //cout << "partial id " << id << " is complete\n";
@@ -422,6 +426,7 @@ agd::Status Controller::Run(size_t num_threads, size_t queue_depth,
   cout << "Clustering execution time: " << sec.count() << " seconds.\n";
 
   ClusterSet set(final_set, sequences_);
+  set.DumpJson("dist_clusters.json");
   AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &params);
   executor.Initialize();
   set.ScheduleAlignments(&executor);

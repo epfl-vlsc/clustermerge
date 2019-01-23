@@ -76,6 +76,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
               return a.Rep().Seq().size() > b.Rep().Seq().size();
             });
 
+  new_cluster_set.RemoveDuplicates();
   return new_cluster_set;
 }
 
@@ -384,7 +385,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
-void ClusterSet::DumpJson() const {
+void ClusterSet::DumpJson(const std::string& filename) const {
   vector<vector<size_t>> cluster_seqs;
   for (const auto& c : clusters_) {
     vector<size_t> seq_ids;
@@ -398,7 +399,7 @@ void ClusterSet::DumpJson() const {
   nlohmann::json j(cluster_seqs);
 
   std::cout << "dumping clusters ...\n";
-  std::ofstream o("clusters.json");
+  std::ofstream o(filename);
 
   o << std::setw(2) << j << std::endl;
 }
@@ -408,21 +409,20 @@ void ClusterSet::RemoveDuplicates() {
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
   auto cluster_it = clusters_.begin();
-  std::vector<size_t> cluster_set;
   while (cluster_it != clusters_.end()) {
+    std::vector<size_t> cluster_set;
     
     for (const auto& s : cluster_it->Sequences()) {
       cluster_set.push_back(s.ID());
     }
-    std::sort(cluster_set.begin(), cluster_set.end());
+    //std::sort(cluster_set.begin(), cluster_set.end());
 
     auto result = set_map.insert(std::move(cluster_set));
     if (!result.second) {
       cluster_it = clusters_.erase(cluster_it);
     } else {
-      std::next(cluster_it);
+      cluster_it++;
     }
-    cluster_set.clear();
   }
 
 }

@@ -164,7 +164,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   // now we are all finished clustering
   auto& final_set = sets_[0];
 
-  final_set.DumpJson();
+  final_set.DumpJson("clusters.json");
   cout << "Total clusters: " << final_set.Size() << "\n";
 
   // for all clusters in final set, schedule all-all alignments with executor
@@ -210,7 +210,7 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor, bool do_allall) {
 
   auto& final_set = sets_[0];
 
-  final_set.DumpJson();
+  final_set.DumpJson("clusters.json");
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {

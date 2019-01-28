@@ -175,8 +175,8 @@ class AllAllExecutor {
         max_element(alignment_times.begin(), alignment_times.end());
     std::cout << absl::StrCat("aligner executor thread ending, max time is ",
     *longest_time, " ms \n");*/
-    std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, 
-        " waiting on queue\n\t and the longest wait was ", longest_wait, " ms \n");
+    /*std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, 
+        " waiting on queue\n\t and the longest wait was ", longest_wait, " ms \n");*/
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

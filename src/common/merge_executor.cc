@@ -13,22 +13,22 @@ MergeExecutor::MergeExecutor(size_t num_threads, size_t capacity,
   for (size_t i = 0; i < num_threads_; i++) {
     threads_.push_back(std::thread(&MergeExecutor::Worker, this));
   }
-  cout << "merge executor started threads\n";
+  //cout << "merge executor started threads\n";
 }
 
 MergeExecutor::~MergeExecutor() {
-  cout << "MergeExecutor waiting for work queue to empty\n";
+  //cout << "MergeExecutor waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
     std::this_thread::sleep_for(1s);
-    cout << "MergeExecutor work queue has " << work_queue_->size() << " entries left\n";
+    //cout << "MergeExecutor work queue has " << work_queue_->size() << " entries left\n";
   }
-  cout << "MergeExecutor Queue emptied, unblocking...\n";
+  //cout << "MergeExecutor Queue emptied, unblocking...\n";
   run_ = false;
   work_queue_->unblock();
   for (auto& f : threads_) {
     f.join();
   }
-  cout << "All threads finished.\n";
+  //cout << "All threads finished.\n";
   cout << "Num pass threshold alignments: " << num_alignments_ << "\n";
 }
 
@@ -41,8 +41,8 @@ void MergeExecutor::EnqueueMerge(const WorkItem& item) {
 void MergeExecutor::Worker() {
   int my_id = id_.fetch_add(1, std::memory_order_relaxed);
 
-  std::cout << absl::StrCat("merger thread spinning up with id ",
-                   my_id, "\n");
+  //std::cout << absl::StrCat("merger thread spinning up with id ",
+                   //my_id, "\n");
 
   ProteinAligner aligner(envs_, params_);
 

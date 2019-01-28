@@ -29,9 +29,9 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
   cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
     std::this_thread::sleep_for(1s);
-    cout << "work queue has " << work_queue_->size() << " entries left\n";
+    //cout << "work queue has " << work_queue_->size() << " entries left\n";
   }
-  cout << "Queue emptied, unblocking...\n";
+  //cout << "Queue emptied, unblocking...\n";
   run_ = false;
   work_queue_->unblock();
   for (auto& f : threads_) {
@@ -157,7 +157,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
 
   nlohmann::json j(values);
 
-  std::cout << "dumping queue sizes ...\n";
+  //std::cout << "dumping queue sizes ...\n";
   std::ofstream o("queue.json");
 
   o << std::setw(2) << j << std::endl;

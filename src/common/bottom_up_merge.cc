@@ -53,7 +53,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
   // launch threads, join threads
   auto cluster_worker = [this, &merge_executor, &dup_removal_threshold]() {
-    cout << "cluster worker starting\n";
+    //cout << "cluster worker starting\n";
     // need own aligner per thread
     ProteinAligner aligner(aligner_->Envs(), aligner_->Params());
 
@@ -148,7 +148,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
       }
     }
 
-    cout << "Cluster eval thread finishing...\n";
+    //cout << "Cluster eval thread finishing...\n";
   };
 
   cout << "scheduling cluster threads, sets remaining: "

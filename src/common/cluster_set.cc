@@ -76,7 +76,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
               return a.Rep().Seq().size() > b.Rep().Seq().size();
             });
 
-  new_cluster_set.RemoveDuplicates();
+  //new_cluster_set.RemoveDuplicates();
   return new_cluster_set;
 }
 

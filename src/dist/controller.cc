@@ -97,6 +97,7 @@ agd::Status Controller::Run(const Params& params,
   auto total_merges = sequences_.size() - 1;
   outstanding_merges_ = total_merges;
   cout << "outstanding merges to complete: " << outstanding_merges_ << "\n";
+  cout << "dup removal thresh is " << params.dup_removal_thresh << "\n";
 
   // create envs, params
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");

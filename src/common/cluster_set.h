@@ -17,7 +17,7 @@ class ClusterSet {
     Cluster c(seed);
     clusters_.push_back(std::move(c));
   }
-  
+
   ClusterSet(size_t num) { clusters_.reserve(num); }
 
   // construct from protobuf (for dist version)
@@ -31,7 +31,7 @@ class ClusterSet {
   // merge two cluster sets by building a new one
   ClusterSet MergeClusters(ClusterSet& other, ProteinAligner* aligner);
 
-  // execute a PartialMerge for the distributed runtime 
+  // execute a PartialMerge for the distributed runtime
   // merge cluster into cluster set
   // keep any fully merged cluster, but mark it
   // the central controller will eliminate fully merged clusters

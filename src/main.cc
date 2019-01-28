@@ -1,6 +1,7 @@
 
 #include <fstream>
 #include <iostream>
+#include "args.h"
 #include "dataset/agd_protein_dataset.h"
 #include "dataset/fasta_dataset.h"
 #include "dataset/load_dataset.h"
@@ -8,12 +9,10 @@
 #include "src/common/all_all_executor.h"
 #include "src/common/bottom_up_merge.h"
 #include "src/common/debug.h"
-#include "args.h"
 
 using std::cout;
 using std::string;
 using std::unique_ptr;
-
 
 int main(int argc, char** argv) {
   args::ArgumentParser parser("ClusterMerge",
@@ -34,6 +33,11 @@ int main(int argc, char** argv) {
       absl::StrCat("Number of threads to use for merging [",
                    std::thread::hardware_concurrency(), "]"),
       {'m', "merge-threads"});
+  args::ValueFlag<unsigned int> dup_removal_threshold_arg(
+      parser, "duplicate removal threshold",
+      "How big a set of clusters should be before duplicates are filtered out "
+      "[MAX_INT]",
+      {'r', "dup_removal_thresh"});
   args::ValueFlag<std::string> json_data_dir(
       parser, "data_dir",
       "Directory containing alignment environment matrices in JSON "
@@ -79,7 +83,7 @@ int main(int argc, char** argv) {
       threads = std::thread::hardware_concurrency();
     }
   }
-  //cout << "Using " << threads << " hardware threads for alignment.\n";
+  // cout << "Using " << threads << " hardware threads for alignment.\n";
 
   unsigned int cluster_threads = std::thread::hardware_concurrency();
   if (cluster_threads_arg) {
@@ -89,7 +93,8 @@ int main(int argc, char** argv) {
       cluster_threads = std::thread::hardware_concurrency();
     }
   }
-  //cout << "Using " << cluster_threads << " hardware threads for clustering.\n";
+  // cout << "Using " << cluster_threads << " hardware threads for
+  // clustering.\n";
 
   unsigned int merge_threads = std::thread::hardware_concurrency();
   if (merge_threads_arg) {
@@ -99,7 +104,12 @@ int main(int argc, char** argv) {
       merge_threads = std::thread::hardware_concurrency();
     }
   }
-  //cout << "Using " << merge_threads << " hardware threads for merging.\n";
+  // cout << "Using " << merge_threads << " hardware threads for merging.\n";
+
+  uint32_t dup_removal_threshold = UINT_MAX;
+  if (dup_removal_threshold_arg) {
+    dup_removal_threshold = args::get(dup_removal_threshold_arg);
+  }
 
   // get output dir to use
   string dir("output_matches");
@@ -189,10 +199,12 @@ int main(int argc, char** argv) {
 
   auto t0 = std::chrono::high_resolution_clock::now();
   if (cluster_threads == 1) {
-    merger.Run(&executor, !exclude_allall);
+    // TODO reverse the logic on exclude all all to avoid unintuitive NOT here
+    merger.Run(&executor, dup_removal_threshold, !exclude_allall);
   } else {
     MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
-    merger.RunMulti(cluster_threads, &executor, &merge_executor, !exclude_allall);
+    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                    &merge_executor, !exclude_allall);
   }
 
   // merger.DebugDump();

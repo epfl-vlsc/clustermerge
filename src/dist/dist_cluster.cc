@@ -5,10 +5,10 @@
 // Stuart Byma, EPFL
 //
 
+#include <limits.h>
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include <limits.h>
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
@@ -57,10 +57,13 @@ int main(int argc, char* argv[]) {
       parser, "queue_depth", "Depth of the local work and response queue.",
       {'q', "queue_depth"});
   args::ValueFlag<unsigned int> batch_size_arg(
-      parser, "batch size", "How many small clusters should be batched together.",
+      parser, "batch size",
+      "How many small clusters should be batched together.",
       {'b', "batch_size"});
   args::ValueFlag<unsigned int> dup_removal_threshold_arg(
-      parser, "duplicate removal threshold", "How big a set of clusters should be before duplicates are filtered out [MAX_INT]",
+      parser, "duplicate removal threshold",
+      "How big a set of clusters should be before duplicates are filtered out "
+      "[MAX_INT]",
       {'r', "dup_removal_thresh"});
   args::ValueFlag<std::string> input_file_list(
       parser, "file_list", "JSON containing list of input AGD datasets.",
@@ -107,12 +110,12 @@ int main(int argc, char* argv[]) {
     is_controller = args::get(controller);
   }
 
-  uint32_t batch_size = 100; 
+  uint32_t batch_size = 100;
   if (batch_size_arg) {
     batch_size = args::get(batch_size_arg);
   }
-  
-  uint32_t dup_removal_threshold = UINT_MAX; 
+
+  uint32_t dup_removal_threshold = UINT_MAX;
   if (dup_removal_threshold_arg) {
     dup_removal_threshold = args::get(dup_removal_threshold_arg);
   }

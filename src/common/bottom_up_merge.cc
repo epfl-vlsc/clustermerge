@@ -5,9 +5,8 @@
 using std::cout;
 using std::string;
 
-BottomUpMerge::BottomUpMerge(
-    std::vector<std::unique_ptr<Dataset>>& datasets,
-    ProteinAligner* aligner) {
+BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
+                             ProteinAligner* aligner) {
   aligner_ = aligner;
 
   const char* data;
@@ -46,12 +45,14 @@ void BottomUpMerge::DebugDump() {
 }
 
 agd::Status BottomUpMerge::RunMulti(size_t num_threads,
+                                    size_t dup_removal_threshold,
                                     AllAllExecutor* executor,
-                                    MergeExecutor* merge_executor, bool do_allall) {
+                                    MergeExecutor* merge_executor,
+                                    bool do_allall) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
-  auto cluster_worker = [this, &merge_executor]() {
+  auto cluster_worker = [this, &merge_executor, &dup_removal_threshold]() {
     cout << "cluster worker starting\n";
     // need own aligner per thread
     ProteinAligner aligner(aligner_->Envs(), aligner_->Params());
@@ -65,7 +66,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        //cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
+        // cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
 
         // this part takes a while for larger sets
@@ -78,7 +79,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         // in a larger number of smaller work items
         if (s1.Size() < s2.Size()) {
           s1.Swap(&s2);
-          //cout << "swapped89\n";
+          // cout << "swapped89\n";
         }
 
         auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
@@ -86,7 +87,11 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         auto duration = t1 - t0;
         auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-        //cout << "merge took: " << sec.count() << " seconds.\n";
+        // cout << "merge took: " << sec.count() << " seconds.\n";
+
+        if (merged_set.Size() > dup_removal_threshold) {
+          merged_set.RemoveDuplicates();
+        }
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
@@ -109,14 +114,14 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
         auto s2 = std::move(sets_.front());
         sets_.pop_front();
         cluster_sets_left_.fetch_sub(1);
-        //cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
+        // cout << "cluster sets left: " << cluster_sets_left_.load() << "\n";
         queue_mu_.Unlock();
 
         // swap so we have the larger set first, this results
         // in a larger number of smaller work items
         if (s1.Size() < s2.Size()) {
           s1.Swap(&s2);
-          //cout << "swapped127\n";
+          // cout << "swapped127\n";
         }
 
         // this part takes a while for larger sets
@@ -126,7 +131,11 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
         auto duration = t1 - t0;
         auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-        //cout << "merge took: " << sec.count() << " seconds.\n";
+        // cout << "merge took: " << sec.count() << " seconds.\n";
+
+        if (merged_set.Size() > dup_removal_threshold) {
+          merged_set.RemoveDuplicates();
+        }
 
         queue_mu_.Lock();
         sets_.push_back(std::move(merged_set));
@@ -179,7 +188,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   return agd::Status::OK();
 }
 
-agd::Status BottomUpMerge::Run(AllAllExecutor* executor, bool do_allall) {
+agd::Status BottomUpMerge::Run(AllAllExecutor* executor, size_t dup_removal_threshold, bool do_allall) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets
@@ -197,6 +206,9 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor, bool do_allall) {
     // s2.DebugDump();
     auto merged_set = s1.MergeClusters(s2, aligner_);
 
+    if (merged_set.Size() > dup_removal_threshold) {
+      merged_set.RemoveDuplicates();
+    }
     sets_.pop_front();
     sets_.pop_front();
     sets_.push_back(std::move(merged_set));

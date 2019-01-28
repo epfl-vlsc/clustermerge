@@ -19,7 +19,7 @@ ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
   std::vector<Cluster> clusters(set_proto.clusters_size());
   for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
     const auto& cluster_proto = set_proto.clusters(cs_i);
-    //std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
     Cluster c(sequences[cluster_proto.indexes(0)]);
     for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
       c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);
@@ -32,7 +32,6 @@ ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
 }
 
 void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
-
   for (const auto& c : clusters_) {
     auto* c_proto = set_proto->add_clusters();
     for (const auto& s : c.Sequences()) {
@@ -76,7 +75,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
               return a.Rep().Seq().size() > b.Rep().Seq().size();
             });
 
-  //new_cluster_set.RemoveDuplicates();
+  // new_cluster_set.RemoveDuplicates();
   return new_cluster_set;
 }
 
@@ -247,8 +246,7 @@ void ClusterSet::DebugDump() const {
 }
 
 ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
-
-  // for the dist version, we keep fully merged clusters around, 
+  // for the dist version, we keep fully merged clusters around,
   // because this is a partial merge of two large sets,
   // the results of which need to be merged by the controller
   ClusterSet new_cluster_set(clusters_.size() + 1);
@@ -271,7 +269,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
       auto c_num_uncovered =
           c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
       auto c_other_num_uncovered = c_other.Rep().Seq().size() -
-                                    (alignment.seq2_max - alignment.seq2_min);
+                                   (alignment.seq2_max - alignment.seq2_min);
 
       if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
           alignment.score > aligner->Params()->min_full_merge_score) {
@@ -283,8 +281,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
         }
         c.SetFullyMerged();
       } else if (c_other_num_uncovered <
-                      aligner->Params()->max_n_aa_not_covered &&
-                  alignment.score > aligner->Params()->min_full_merge_score) {
+                     aligner->Params()->max_n_aa_not_covered &&
+                 alignment.score > aligner->Params()->min_full_merge_score) {
         // std::cout << "Nearly complete overlap, merging c_other into c,
         // score is " << alignment.score << "\n";
         for (const auto& seq : c_other.Sequences()) {
@@ -303,10 +301,10 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
     new_cluster_set.clusters_.push_back(std::move(c));
   }
 
-  // we can leave out without confusing the controller 
-  if (!c_other.IsFullyMerged()) 
+  // we can leave out without confusing the controller
+  if (!c_other.IsFullyMerged())
     new_cluster_set.clusters_.push_back(std::move(c_other));
-  
+
   return new_cluster_set;
 }
 
@@ -343,7 +341,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   int num_avoided = 0;
 
   for (const auto& cluster : clusters_) {
-    //std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
+    // std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
     if (cluster.IsDuplicate()) {
       continue;
     }
@@ -405,17 +403,16 @@ void ClusterSet::DumpJson(const std::string& filename) const {
 }
 
 void ClusterSet::RemoveDuplicates() {
-  
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
   auto cluster_it = clusters_.begin();
   while (cluster_it != clusters_.end()) {
     std::vector<size_t> cluster_set;
-    
+
     for (const auto& s : cluster_it->Sequences()) {
       cluster_set.push_back(s.ID());
     }
-    //std::sort(cluster_set.begin(), cluster_set.end());
+    // std::sort(cluster_set.begin(), cluster_set.end());
 
     auto result = set_map.insert(std::move(cluster_set));
     if (!result.second) {
@@ -424,5 +421,4 @@ void ClusterSet::RemoveDuplicates() {
       cluster_it++;
     }
   }
-
 }

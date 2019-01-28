@@ -12,16 +12,15 @@
 
 // one exists in a cluster
 // coordinates work among workers, merges results
-// currently using zmq push/pull to distribute work, but this may need 
+// currently using zmq push/pull to distribute work, but this may need
 // to be replaced with a load balancing pattern
 class Controller {
  public:
-  
   struct Params {
     size_t num_threads;
     size_t queue_depth;
     absl::string_view controller_ip;
-    int request_queue_port; 
+    int request_queue_port;
     int response_queue_port;
     absl::string_view data_dir_path;
     uint32_t batch_size;
@@ -32,7 +31,6 @@ class Controller {
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:
-
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
@@ -40,13 +38,13 @@ class Controller {
   // thread reads from zmq and puts into response queue
   std::unique_ptr<ConcurrentQueue<cmproto::Response>> response_queue_;
   std::thread response_queue_thread_;
-  
+
   // controller work threads
   // read from response queue
   // if is a batch result, push to sets_to_merge_queue_
   // if is partial result (ID will be
   // in merge map), lookup and merge with partial_set, if partial set complete,
-  //    push ready to merge sets to sets_to_merge_queue 
+  //    push ready to merge sets to sets_to_merge_queue
   std::unique_ptr<ConcurrentQueue<cmproto::ClusterSet>> sets_to_merge_queue_;
   std::thread worker_thread_;
 
@@ -65,14 +63,13 @@ class Controller {
     uint32_t original_size;
   };
 
-  // we use a node map so that pointers remain stable, and we can reduce the 
+  // we use a node map so that pointers remain stable, and we can reduce the
   // time spent in critical sections
   absl::node_hash_map<uint32_t, PartialMergeItem> partial_merge_map_;
 
-  //uint32_t current_request_id_ = 0;
+  // uint32_t current_request_id_ = 0;
 
   volatile bool run_ = true;
   uint32_t outstanding_merges_ = 0;
-  absl::Mutex mu_; // for partial_merge_map_
-
+  absl::Mutex mu_;  // for partial_merge_map_
 };

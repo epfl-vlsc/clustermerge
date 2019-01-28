@@ -35,7 +35,8 @@ agd::Status Worker::Run(const Params& params,
 
   // create envs, params
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");
-  string all_matrices_json_file = absl::StrCat(params.data_dir_path, "all_matrices.json");
+  string all_matrices_json_file =
+      absl::StrCat(params.data_dir_path, "all_matrices.json");
 
   std::ifstream logpam_stream(logpam_json_file);
   std::ifstream allmat_stream(all_matrices_json_file);
@@ -58,7 +59,8 @@ agd::Status Worker::Run(const Params& params,
   AlignmentEnvironments envs;
 
   // initializing envs is expensive, so don't copy this
-  cout << "Worker initializing environments from " << params.data_dir_path << "\n";
+  cout << "Worker initializing environments from " << params.data_dir_path
+       << "\n";
   envs.InitFromJSON(logpam_json, all_matrices_json);
   cout << "Done.\n";
 
@@ -68,7 +70,8 @@ agd::Status Worker::Run(const Params& params,
 
   // connect to zmq queues
   auto address = absl::StrCat("tcp://", params.controller_ip, ":");
-  auto response_queue_address = absl::StrCat(address, params.response_queue_port);
+  auto response_queue_address =
+      absl::StrCat(address, params.response_queue_port);
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
 
   context_ = zmq::context_t(1);
@@ -98,8 +101,10 @@ agd::Status Worker::Run(const Params& params,
                                  response_queue_address);
   }
 
-  work_queue_.reset(new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
-  result_queue_.reset(new ConcurrentQueue<cmproto::Response>(params.queue_depth));
+  work_queue_.reset(
+      new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
+  result_queue_.reset(
+      new ConcurrentQueue<cmproto::Response>(params.queue_depth));
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq

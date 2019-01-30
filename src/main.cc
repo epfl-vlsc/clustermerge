@@ -198,14 +198,9 @@ int main(int argc, char** argv) {
   executor.Initialize();
 
   auto t0 = std::chrono::high_resolution_clock::now();
-  if (cluster_threads == 1) {
-    // TODO reverse the logic on exclude all all to avoid unintuitive NOT here
-    merger.Run(&executor, dup_removal_threshold, !exclude_allall);
-  } else {
-    MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
-    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                    &merge_executor, !exclude_allall);
-  }
+  MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
+  merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                  &merge_executor, !exclude_allall);
 
   // merger.DebugDump();
   // wait and finish call on executor

@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
     std::ifstream aligner_params_stream(aligner_params_file);
 
     if (!aligner_params_stream.good()) {
-      std::cerr << "File " << aligner_params_file << " not found.\n";
+      std::cerr << "Provided file " << aligner_params_file << " not found.\n";
       return 1;
     }
 
@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
     std::ifstream aligner_params_stream(aligner_params_file);
 
     if (!aligner_params_stream.good()) {
-      std::cerr << "File " << aligner_params_file << " not found.\n";
+      std::cerr << "Default file " << aligner_params_file << " not found.\n";
       return 1;
     }
 

@@ -178,17 +178,16 @@ AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
 
   queue_measure_thread_ = std::thread([this](){
       // get timestamp, queue size
-      cout << "queue measure thread starting ...\n";
+      //cout << "queue measure thread starting ...\n";
       while(run_) {
         time_t result = std::time(nullptr);
         timestamps_.push_back(static_cast<long int>(result));
         queue_sizes_.push_back(work_queue_->size());
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
       }
-      cout << "queue measure thread finished\n";
+      //cout << "queue measure thread finished\n";
     }
   );
-
 
 }
 

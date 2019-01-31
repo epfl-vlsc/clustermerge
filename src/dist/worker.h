@@ -27,7 +27,7 @@ class Worker {
   // main worker entry point
   // reuse agd status for error passing
   // requires num_threads, data_dir_path, controller_ip, push_port, pull_port
-  agd::Status Run(const Params& params,
+  agd::Status Run(const Params& params, const Parameters& aligner_params,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:

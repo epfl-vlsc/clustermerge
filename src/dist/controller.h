@@ -27,7 +27,7 @@ class Controller {
     uint32_t dup_removal_thresh;
   };
 
-  agd::Status Run(const Params& params,
+  agd::Status Run(const Params& params, const Parameters& aligner_params,
                   std::vector<std::unique_ptr<Dataset>>& datasets);
 
  private:

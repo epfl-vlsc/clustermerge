@@ -13,7 +13,7 @@ using std::cout;
 using std::string;
 using std::thread;
 
-agd::Status Worker::Run(const Params& params,
+agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                         std::vector<std::unique_ptr<Dataset>>& datasets) {
   // index all sequences
   agd::Status s = Status::OK();

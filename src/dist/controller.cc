@@ -74,7 +74,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
   //cout << "done merging\n";
 }
 
-agd::Status Controller::Run(const Params& params,
+agd::Status Controller::Run(const Params& params, const Parameters& aligner_params,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   // index all sequences
   agd::Status s = Status::OK();

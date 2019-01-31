@@ -48,12 +48,15 @@ int main(int argc, char** argv) {
       "Output directory. Will be overwritten if exists."
       "[./output_matches]",
       {'o', "output_dir"});
+  args::ValueFlag<std::string> aligner_params_arg(
+      parser, "aligner parameters", "JSON containing alignment and clustering parameters [data/default_aligner_params.json].",
+      {'a', "aligner_params"});
   args::ValueFlag<std::string> input_file_list(
-      parser, "file_list", "JSON containing list of input AGD datasets.",
+      parser, "file_list", "JSON containing list of input AGD/FASTA datasets.",
       {'i', "input_list"});
   args::PositionalList<std::string> datasets_opts(
       parser, "datasets",
-      "AGD Protein datasets to cluster. If present, will override `input_list` "
+      "AGD/FASTA Protein datasets to cluster. If present, will override `input_list` "
       "argument.");
   args::Flag exclude_allall(
       parser, "exclude_allall",
@@ -158,11 +161,6 @@ int main(int argc, char** argv) {
 
   // done init envs
 
-  Parameters params;  // using default params for now
-
-  // init aligner object
-  ProteinAligner aligner(&envs, &params);
-
   std::vector<unique_ptr<Dataset>> datasets;
   agd::Status s;
 
@@ -187,18 +185,62 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  json aligner_params_json;
+  if (aligner_params_arg) {
+    string aligner_params_file = args::get(aligner_params_arg);
+    
+    std::ifstream aligner_params_stream(aligner_params_file);
+
+    if (!aligner_params_stream.good()) {
+      std::cerr << "File " << aligner_params_file << " not found.\n";
+      return 1;
+    }
+    
+    aligner_params_stream >> aligner_params_json;
+  } else {
+    string aligner_params_file("data/default_aligner_params.json");
+    std::ifstream aligner_params_stream(aligner_params_file);
+
+    if (!aligner_params_stream.good()) {
+      std::cerr << "File " << aligner_params_file << " not found.\n";
+      return 1;
+    }
+
+    aligner_params_stream >> aligner_params_json;
+  }
+
+  Parameters aligner_params;
+
+  auto min_score_it = aligner_params_json.find("min_score");
+  if (min_score_it != aligner_params_json.end()) {
+    aligner_params.min_score = *min_score_it;
+  }
+  
+  auto max_aa_uncovered_it = aligner_params_json.find("max_aa_uncovered");
+  if (max_aa_uncovered_it != aligner_params_json.end()) {
+    aligner_params.max_n_aa_not_covered = *max_aa_uncovered_it;
+  }
+
+  auto min_full_merge_score_it = aligner_params_json.find("min_full_merge_score");
+  if (min_full_merge_score_it != aligner_params_json.end()) {
+    aligner_params.min_full_merge_score = *min_full_merge_score_it;
+  }
+
+  // init aligner object
+  ProteinAligner aligner(&envs, &aligner_params);
+
   // build initial clustersets
   // one sequence, in one cluster, in one set
   // then, we bottom-up merge them
-
-  cout << "Data loaded, building merger ...\n";
+  
+  cout << "Datasets loaded ...\n";
   BottomUpMerge merger(datasets, &aligner);
 
-  AllAllExecutor executor(threads, 1000, &envs, &params);
+  AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
   executor.Initialize();
 
   auto t0 = std::chrono::high_resolution_clock::now();
-  MergeExecutor merge_executor(merge_threads, 200, &envs, &params);
+  MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
   merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
                   &merge_executor, !exclude_allall);
 

@@ -12,6 +12,7 @@
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
+#include "src/common/parameters.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
 
@@ -68,6 +69,9 @@ int main(int argc, char* argv[]) {
   args::ValueFlag<std::string> input_file_list(
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
+  args::ValueFlag<std::string> aligner_params_arg(
+      parser, "aligner parameters", "JSON containing alignment and clustering parameters.",
+      {'a', "aligner_params"});
   args::ValueFlag<std::string> output_dir(
       parser, "output dir",
       "Output directory. Will be overwritten if exists."
@@ -229,6 +233,35 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  Parameters aligner_params;
+  if (aligner_params_arg) {
+    json aligner_params_json;
+    string aligner_params_file = args::get(aligner_params_arg);
+    std::ifstream aligner_params_stream(aligner_params_file);
+
+    if (!aligner_params_stream.good()) {
+      std::cerr << "File " << aligner_params_file << " not found.\n";
+      return 1;
+    }
+
+    aligner_params_stream >> aligner_params_json;
+
+    auto min_score_it = aligner_params_json.find("min_score");
+    if (min_score_it != aligner_params_json.end()) {
+      aligner_params.min_score = *min_score_it;
+    }
+    
+    auto max_aa_uncovered_it = aligner_params_json.find("max_aa_uncovered");
+    if (max_aa_uncovered_it != aligner_params_json.end()) {
+      aligner_params.max_n_aa_not_covered = *max_aa_uncovered_it;
+    }
+
+    auto min_full_merge_score_it = aligner_params_json.find("min_full_merge_score");
+    if (min_full_merge_score_it != aligner_params_json.end()) {
+      aligner_params.min_full_merge_score = *min_full_merge_score_it;
+    }
+  } // if not present, aligner params defaults used
+
   if (is_controller) {
     // launch controller(push_port, pull_port)
     Controller controller;
@@ -241,7 +274,7 @@ int main(int argc, char* argv[]) {
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
     params.dup_removal_thresh = dup_removal_threshold;
-    Status stat = controller.Run(params, datasets);
+    Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }
@@ -256,7 +289,7 @@ int main(int argc, char* argv[]) {
     params.queue_depth = queue_depth;
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
-    Status stat = worker.Run(params, datasets);
+    Status stat = worker.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

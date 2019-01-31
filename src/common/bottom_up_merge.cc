@@ -53,7 +53,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
   // launch threads, join threads
   auto cluster_worker = [this, &merge_executor, &dup_removal_threshold]() {
-    //cout << "cluster worker starting\n";
+    // cout << "cluster worker starting\n";
     // need own aligner per thread
     ProteinAligner aligner(aligner_->Envs(), aligner_->Params());
 
@@ -148,7 +148,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
       }
     }
 
-    //cout << "Cluster eval thread finishing...\n";
+    // cout << "Cluster eval thread finishing...\n";
   };
 
   /*cout << "scheduling cluster threads, sets remaining: "
@@ -174,7 +174,8 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   auto& final_set = sets_[0];
 
   final_set.DumpJson("clusters.json");
-  cout << "Total clusters: " << final_set.Size() << ", dumped to clusters.json.\n";
+  cout << "Total clusters: " << final_set.Size()
+       << ", dumped to clusters.json.\n";
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {
@@ -188,7 +189,8 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   return agd::Status::OK();
 }
 
-agd::Status BottomUpMerge::Run(AllAllExecutor* executor, size_t dup_removal_threshold, bool do_allall) {
+agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
+                               size_t dup_removal_threshold, bool do_allall) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets

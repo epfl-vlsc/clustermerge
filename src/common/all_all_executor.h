@@ -104,7 +104,7 @@ class AllAllExecutor {
                      std::to_string(my_id) + "\n";*/
 
     ProteinAligner aligner(envs_, params_);
-    //std::vector<size_t> alignment_times;
+    // std::vector<size_t> alignment_times;
 
     WorkItem item;
     size_t ms_wait = 0;
@@ -118,8 +118,8 @@ class AllAllExecutor {
       }
       if (!first) {
         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now() - start)
-                       .count();
+                        std::chrono::steady_clock::now() - start)
+                        .count();
         ms_wait += diff;
         if (diff > longest_wait) {
           longest_wait = diff;
@@ -143,7 +143,7 @@ class AllAllExecutor {
       num_pass_threshold_++;
       if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                   seq1->Seq().size(), seq2->Seq().size())) {
-        //auto t0 = std::chrono::high_resolution_clock::now();
+        // auto t0 = std::chrono::high_resolution_clock::now();
         agd::Status s = aligner.AlignLocal(
             seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
             seq2->Seq().size(), alignment);
@@ -155,7 +155,7 @@ class AllAllExecutor {
         num_full_alignments_++;
 
         if (PassesLengthConstraint(alignment, seq1->Seq().size(),
-                                    seq2->Seq().size()) &&
+                                   seq2->Seq().size()) &&
             PassesScoreConstraint(params_, alignment.score)) {
           Match new_match;
           new_match.seq1_min = alignment.seq1_min;
@@ -175,8 +175,9 @@ class AllAllExecutor {
         max_element(alignment_times.begin(), alignment_times.end());
     std::cout << absl::StrCat("aligner executor thread ending, max time is ",
     *longest_time, " ms \n");*/
-    /*std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f, 
-        " waiting on queue\n\t and the longest wait was ", longest_wait, " ms \n");*/
+    /*std::cout << absl::StrCat("spent ", float(ms_wait) / 1000.0f,
+        " waiting on queue\n\t and the longest wait was ", longest_wait, " ms
+       \n");*/
     num_active_threads_.fetch_sub(1, std::memory_order_relaxed);
     return 0;
   }

@@ -1,25 +1,23 @@
 
 #include "controller.h"
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include "src/agd/errors.h"
-#include "src/common/cluster_set.h"
-#include "src/common/all_all_executor.h"
 #include <google/protobuf/text_format.h>
+#include <chrono>
+#include <fstream>
+#include <iostream>
+#include "src/agd/errors.h"
+#include "src/common/all_all_executor.h"
+#include "src/common/cluster_set.h"
 
 using std::cout;
-using std::thread;
 using std::string;
+using std::thread;
 
 void RemoveDuplicates(cmproto::ClusterSet& set) {
-  
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
   auto cluster_it = set.mutable_clusters()->begin();
   std::vector<size_t> cluster_set;
   while (cluster_it != set.mutable_clusters()->end()) {
-    
     for (const auto& s : cluster_it->indexes()) {
       cluster_set.push_back(s);
     }
@@ -42,7 +40,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
   // where any new cluster is the last element
   // we do not "fully merge" any of the clusters in `set`
 
-  //cout << "merging partial clusters ...\n";
+  // cout << "merging partial clusters ...\n";
   for (uint32_t i = 0; i < original_size; i++) {
     auto* mut_cluster = set.mutable_clusters(i);
     auto& cluster = other.clusters(i);
@@ -60,7 +58,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
                     mut_cluster->indexes().end(),
                     index) == mut_cluster->indexes().end()) {
         // doesnt exist, add
-        //cout << "merger adding index to cluster\n";
+        // cout << "merger adding index to cluster\n";
         mut_cluster->add_indexes(index);
       }
     }
@@ -71,10 +69,11 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
     auto* c = set.add_clusters();
     c->CopyFrom(other.clusters(other.clusters_size() - 1));
   }
-  //cout << "done merging\n";
+  // cout << "done merging\n";
 }
 
-agd::Status Controller::Run(const Params& params, const Parameters& aligner_params,
+agd::Status Controller::Run(const Params& params,
+                            const Parameters& aligner_params,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   // index all sequences
   agd::Status s = Status::OK();
@@ -101,7 +100,8 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
 
   // create envs, params
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");
-  string all_matrices_json_file = absl::StrCat(params.data_dir_path, "all_matrices.json");
+  string all_matrices_json_file =
+      absl::StrCat(params.data_dir_path, "all_matrices.json");
 
   std::ifstream logpam_stream(logpam_json_file);
   std::ifstream allmat_stream(all_matrices_json_file);
@@ -124,7 +124,8 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
   AlignmentEnvironments envs;
 
   // initializing envs is expensive, so don't copy this
-  cout << "Worker initializing environments from " << params.data_dir_path << "\n";
+  cout << "Worker initializing environments from " << params.data_dir_path
+       << "\n";
   envs.InitFromJSON(logpam_json, all_matrices_json);
   cout << "Done.\n";
 
@@ -132,7 +133,8 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
 
   // connect to zmq queues
   auto address = std::string("tcp://*:");
-  auto response_queue_address = absl::StrCat(address, params.response_queue_port);
+  auto response_queue_address =
+      absl::StrCat(address, params.response_queue_port);
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
 
   context_ = zmq::context_t(1);
@@ -162,8 +164,10 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
                                  request_queue_address);
   }
 
-  request_queue_.reset(new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
-  response_queue_.reset(new ConcurrentQueue<cmproto::Response>(params.queue_depth));
+  request_queue_.reset(
+      new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
+  response_queue_.reset(
+      new ConcurrentQueue<cmproto::Response>(params.queue_depth));
   sets_to_merge_queue_.reset(
       new ConcurrentQueue<cmproto::ClusterSet>(sequences_.size()));
 
@@ -223,9 +227,10 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
     cout << "Work queue thread ending.\n";
   });
 
-  // partial mergers in this thread may need to be more fully parallelized to 
-  // prevent bottlenecks. May be required to use a different structure for tracking 
-  // partial mergers rather than the current map, which needs to be locked
+  // partial mergers in this thread may need to be more fully parallelized to
+  // prevent bottlenecks. May be required to use a different structure for
+  // tracking partial mergers rather than the current map, which needs to be
+  // locked
   worker_thread_ = thread([this, &params]() {
     // read from result queue
     // if is a batch result and is small enough, push to WorkManager
@@ -240,14 +245,14 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
       }
 
       auto id = response.id();
-      //cout << "repsonse id is " << id << "\n";
+      // cout << "repsonse id is " << id << "\n";
       PartialMergeItem* partial_item;
 
       {
         absl::MutexLock l(&mu_);
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
-          //cout << "pushing full result \n";
+          // cout << "pushing full result \n";
           if (response.set().clusters_size() > params.dup_removal_thresh) {
             RemoveDuplicates(*response.mutable_set());
           }
@@ -259,32 +264,35 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
         }
       }
 
-      //cout << "preparing to merge partial result... \n";
+      // cout << "preparing to merge partial result... \n";
       // its part of a larger merger
-      //auto& partial_item = partial_it->second;
+      // auto& partial_item = partial_it->second;
       // merge response_set into partial_item.partial_set
       MergePartials(partial_item->partial_set, response.set(),
                     partial_item->original_size);
-      //cout << "done\n";
+      // cout << "done\n";
       // check if this was the last one
       partial_item->num_received++;
       if (partial_item->num_expected == partial_item->num_received) {
         // go through  and delete any fully merged clusters
         auto cluster_it = partial_item->partial_set.mutable_clusters()->begin();
-        while (cluster_it != partial_item->partial_set.mutable_clusters()->end()) {
+        while (cluster_it !=
+               partial_item->partial_set.mutable_clusters()->end()) {
           if (cluster_it->fully_merged()) {
-            cluster_it = partial_item->partial_set.mutable_clusters()->erase(cluster_it);
+            cluster_it =
+                partial_item->partial_set.mutable_clusters()->erase(cluster_it);
             continue;
           }
           cluster_it++;
         }
 
-        if (partial_item->partial_set.clusters_size() > params.dup_removal_thresh) {
+        if (partial_item->partial_set.clusters_size() >
+            params.dup_removal_thresh) {
           RemoveDuplicates(partial_item->partial_set);
         }
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
-        //cout << "partial id " << id << " is complete\n";
+        // cout << "partial id " << id << " is complete\n";
         {
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);
@@ -326,9 +334,10 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
          << ", set two size: " << sets[1].clusters_size() << "\n\n";*/
 
     // form request, push to queue
-    if (sets[0].clusters_size() < params.batch_size || sets[1].clusters_size() < params.batch_size) {
+    if (sets[0].clusters_size() < params.batch_size ||
+        sets[1].clusters_size() < params.batch_size) {
       // create a batch, they are small
-      //cout << "two sets are small, batching ...\n";
+      // cout << "two sets are small, batching ...\n";
       cmproto::MergeBatch* batch = request.mutable_batch();
       uint32_t total_clusters =
           sets[0].clusters_size() + sets[1].clusters_size();
@@ -350,7 +359,7 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
         outstanding_merges_--;
         total_clusters += sets[0].clusters_size();
       }
-      //cout << "batched " << batch->sets_size() << " sets\n";
+      // cout << "batched " << batch->sets_size() << " sets\n";
       request.set_id(-1);
       // if the queue uses copy semantics im not sure how protobufs
       // with submessages will behave
@@ -360,16 +369,18 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
     } else {
       // either set is large enough, split the computation into multiple
       // requests
-      //cout << "splitting merger of two large sets into partial mergers\n";
+      // cout << "splitting merger of two large sets into partial mergers\n";
       outstanding_merges_--;
       /*if (outstanding_merges_ == 0) {
         cout << "final two merging\n\n\n";
         for (int i = 0; i < sets[0].clusters_size(); i++) {
-          cout << "cluster has " << sets[0].clusters(i).indexes_size() << " seqs\n";
+          cout << "cluster has " << sets[0].clusters(i).indexes_size() << "
+      seqs\n";
         }
         cout << "\n";
         for (int i = 0; i < sets[1].clusters_size(); i++) {
-          cout << "cluster has " << sets[1].clusters(i).indexes_size() << " seqs\n";
+          cout << "cluster has " << sets[1].clusters(i).indexes_size() << "
+      seqs\n";
         }
       }*/
       // make a map entry for this multi-part request
@@ -396,11 +407,12 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
         cluster->CopyFrom(c);
         auto* cluster_set = partial_request->mutable_set();
         cluster_set->CopyFrom(sets[1]);
-        //cout << "pushing partial request with " << partial_request->set().clusters_size() << " clusters in set and ID: " << request.id() << "\n";
+        // cout << "pushing partial request with " <<
+        // partial_request->set().clusters_size() << " clusters in set and ID: "
+        // << request.id() << "\n";
         request_queue_->push(std::move(request));
         request.Clear();
       }
-
     }
     cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
@@ -409,8 +421,8 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
   // wait for worker thread to push last merged set
   // TODO add a timeout or something?
   cout << "done and waiting for final result...\n";
-  //while (sets_to_merge_queue_->size() != 1);;
-  
+  // while (sets_to_merge_queue_->size() != 1);;
+
   cout << "scheduling final alignments on controller...\n";
   cmproto::ClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
@@ -423,7 +435,8 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
 
   ClusterSet set(final_set, sequences_);
   set.DumpJson("dist_clusters.json");
-  AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs, &aligner_params);
+  AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
+                          &aligner_params);
   executor.Initialize();
   set.ScheduleAlignments(&executor);
   executor.FinishAndOutput("dist_output_dir");
@@ -439,7 +452,6 @@ agd::Status Controller::Run(const Params& params, const Parameters& aligner_para
   response_queue_thread_.join();
 
   cout << "All threads joined.\n";
-
 
   return agd::Status::OK();
 }

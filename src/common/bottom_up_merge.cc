@@ -151,8 +151,8 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
     // cout << "Cluster eval thread finishing...\n";
   };
 
-  /*cout << "scheduling cluster threads, sets remaining: "
-       << cluster_sets_left_.load();*/
+  cout << "Clustering " << cluster_sets_left_.load() << " sequences...\n";
+
   auto t0 = std::chrono::high_resolution_clock::now();
   threads_.reserve(num_threads);
   for (size_t i = 0; i < num_threads; i++) {

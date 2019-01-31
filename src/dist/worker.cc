@@ -66,8 +66,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   // done init envs
 
-  Parameters aligner_params;  // using default params for now
-
   // connect to zmq queues
   auto address = absl::StrCat("tcp://", params.controller_ip, ":");
   auto response_queue_address =

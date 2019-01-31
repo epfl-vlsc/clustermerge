@@ -165,7 +165,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
 }
 
 AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
-                               AlignmentEnvironments* envs, Parameters* params)
+                               AlignmentEnvironments* envs, const Parameters* params)
     : envs_(envs), params_(params), num_threads_(num_threads) {
   work_queue_.reset(new ConcurrentQueue<WorkItem>(capacity));
   matches_per_thread_.resize(num_threads);

@@ -12,7 +12,7 @@
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
-#include "src/common/parameters.h"
+#include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
 

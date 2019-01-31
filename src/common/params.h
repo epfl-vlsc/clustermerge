@@ -1,6 +1,7 @@
 
 #pragma once
 
+// TODO rename to something less generic e.g AlignerParams
 struct Parameters {
   int min_score = 181;
   //bool subsequence_homology = true;

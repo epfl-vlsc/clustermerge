@@ -5,6 +5,7 @@
 #include "absl/container/node_hash_map.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/sequence.h"
+#include "src/common/params.h"
 #include "src/dataset/dataset.h"
 #include "src/proto/requests.pb.h"
 #include "src/proto/responses.pb.h"

@@ -23,7 +23,7 @@ class AllAllExecutor {
   typedef std::tuple<const Sequence*, const Sequence*, size_t> WorkItem;
 
   AllAllExecutor(size_t num_threads, size_t capacity,
-                 AlignmentEnvironments* envs, Parameters* params);
+                 AlignmentEnvironments* envs, const Parameters* params);
 
   void EnqueueAlignment(const WorkItem& item);
 
@@ -40,7 +40,7 @@ class AllAllExecutor {
   std::atomic_uint_fast32_t num_active_threads_, id_{0};
   std::atomic<bool> run_{true};
   AlignmentEnvironments* envs_;
-  Parameters* params_;
+  const Parameters* params_;
   size_t num_threads_;
 
   // statistics

@@ -6,7 +6,8 @@ pidstat_cmd = ["pidstat", "-hHIrdu", "-p", "pid_list", "1" ]
 
 sed_cmd = ["sed", r'1d;/^[#]/{{4,$d}};/^[#]/s/^[#][ ]*//;/^$/d;s/^[ ]*//;s/[ ]\+/,/g']
 
-proc = subprocess.Popen(["./bazel-bin/src/clustermerge", "-c", "48", "-m", "48", "-t", "48", "-i", "bacteria_datasets.json"]) 
+proc = subprocess.Popen(["./bazel-bin/src/dist/dist_cluster", "-i", "bacteria_datasets.json"]) 
+#proc = subprocess.Popen(["./bazel-bin/src/clustermerge", "-c", "48", "-m", "48", "-t", "48", "-i", "bacteria_datasets.json"]) 
 #proc = subprocess.Popen(["./bazel-bin/src/clustermerge", "-c", "48", "-m", "48", "-t", "48", "-i", "four_datasets.json"]) 
 
 print("the pid is {}".format(proc.pid))

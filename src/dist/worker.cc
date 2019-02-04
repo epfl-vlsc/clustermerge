@@ -162,6 +162,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         auto* new_cs_proto = response.mutable_set();
         final_set.ConstructProto(new_cs_proto);
 
+        response.set_id(request.id());
         result_queue_->push(response);
         sets_to_merge.clear();
 
@@ -195,6 +196,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   };
 
   worker_threads_.reserve(params.num_threads);
+  cout << "spinning up " << params.num_threads << " threads. \n";
   for (size_t i = 0; i < params.num_threads; i++) {
     worker_threads_.push_back(std::thread(worker_func));
   }

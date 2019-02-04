@@ -138,8 +138,9 @@ agd::Status Controller::Run(const Params& params,
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
 
   context_ = zmq::context_t(1);
+  context_sink_ = zmq::context_t(2);
   try {
-    zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_PULL));
+    zmq_recv_socket_.reset(new zmq::socket_t(context_sink_, ZMQ_PULL));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PULL socket ");
   }
@@ -177,6 +178,7 @@ agd::Status Controller::Run(const Params& params,
     // put in work queue zmq
     // repeat
     cmproto::MergeRequest merge_request;
+    int total_sent = 0;
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
         continue;
@@ -194,9 +196,10 @@ agd::Status Controller::Run(const Params& params,
       if (!success) {
         cout << "Thread failed to send request over zmq!\n";
       }
+      total_sent++;
     }
 
-    cout << "Work queue thread ending.\n";
+    cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
 
   response_queue_thread_ = thread([this]() {
@@ -206,6 +209,7 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     cmproto::Response response;
     zmq::message_t msg;
+    int total_received = 0;
     while (run_) {
       bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
       // basically implements polling to avoid blocking recv calls
@@ -213,6 +217,7 @@ agd::Status Controller::Run(const Params& params,
       if (!msg_received) {
         continue;
       }
+      total_received++;
 
       if (!response.ParseFromArray(msg.data(), msg.size())) {
         cout << "Failed to parse merge request protobuf!!\n";
@@ -224,7 +229,7 @@ agd::Status Controller::Run(const Params& params,
       response_queue_->push(response);
     }
 
-    cout << "Work queue thread ending.\n";
+    cout << "Work queue thread ending. Total received: " << total_received << "\n";
   });
 
   // partial mergers in this thread may need to be more fully parallelized to
@@ -427,6 +432,7 @@ agd::Status Controller::Run(const Params& params,
   cmproto::ClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
   cout << "final set size is " << final_set.clusters_size() << " clusters\n";
+  cout << "partial merge map size is " << partial_merge_map_.size() << "\n";
   auto t1 = std::chrono::high_resolution_clock::now();
 
   auto duration = t1 - t0;
@@ -435,11 +441,11 @@ agd::Status Controller::Run(const Params& params,
 
   ClusterSet set(final_set, sequences_);
   set.DumpJson("dist_clusters.json");
-  AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
+  /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
                           &aligner_params);
   executor.Initialize();
   set.ScheduleAlignments(&executor);
-  executor.FinishAndOutput("dist_output_dir");
+  executor.FinishAndOutput("dist_output_dir");*/
 
   cout << "clustering complete!! Joining threads ...\n";
 

@@ -305,7 +305,7 @@ agd::Status Controller::Run(const Params& params,
         }
         sets_to_merge_queue_->push(std::move(partial_item->partial_set));
         // remove partial it, its done now
-        // cout << "partial id " << id << " is complete\n";
+        cout << "partial id " << id << " is complete\n";
         {
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);
@@ -413,6 +413,7 @@ agd::Status Controller::Run(const Params& params,
         partial_merge_map_.insert_or_assign(outstanding_merges_, item);
       }
 
+      cout << "pushing id " << outstanding_merges_ << "\n";
       for (const auto& c : sets[0].clusters()) {
         request.set_id(outstanding_merges_);
         cmproto::MergePartial* partial_request = request.mutable_partial();

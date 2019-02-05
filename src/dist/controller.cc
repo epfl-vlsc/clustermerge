@@ -151,6 +151,10 @@ agd::Status Controller::Run(const Params& params,
     return agd::errors::Internal("Could not create zmq PUSH socket ");
   }
 
+  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 1);
+  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  cout << "snd hwm value is " << val << " \n";
+
   try {
     zmq_recv_socket_->bind(response_queue_address.c_str());
   } catch (...) {

@@ -16,7 +16,7 @@ message MergePartial {
 }
 
 message MergeRequest {
-  uint32 id = 1;
+  int32 id = 1;
   oneof request {
     MergeBatch batch = 2;
     MergePartial partial = 3;

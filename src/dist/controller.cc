@@ -257,6 +257,10 @@ agd::Status Controller::Run(const Params& params,
         absl::MutexLock l(&mu_);
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
+          if (id != -1) {
+            cout << "error thing in map was not -1\n";
+            exit(0);
+          }
           // cout << "pushing full result \n";
           if (response.set().clusters_size() > params.dup_removal_thresh) {
             RemoveDuplicates(*response.mutable_set());
@@ -267,14 +271,14 @@ agd::Status Controller::Run(const Params& params,
           // do assign
           partial_item = &partial_it->second;
         }
+        // cout << "preparing to merge partial result... \n";
+        // its part of a larger merger
+        // auto& partial_item = partial_it->second;
+        // merge response_set into partial_item.partial_set
+        MergePartials(partial_item->partial_set, response.set(),
+                      partial_item->original_size);
       }
 
-      // cout << "preparing to merge partial result... \n";
-      // its part of a larger merger
-      // auto& partial_item = partial_it->second;
-      // merge response_set into partial_item.partial_set
-      MergePartials(partial_item->partial_set, response.set(),
-                    partial_item->original_size);
       // cout << "done\n";
       // check if this was the last one
       partial_item->num_received++;
@@ -441,11 +445,11 @@ agd::Status Controller::Run(const Params& params,
 
   ClusterSet set(final_set, sequences_);
   set.DumpJson("dist_clusters.json");
-  /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
+  AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
                           &aligner_params);
   executor.Initialize();
   set.ScheduleAlignments(&executor);
-  executor.FinishAndOutput("dist_output_dir");*/
+  executor.FinishAndOutput("dist_output_dir");
 
   cout << "clustering complete!! Joining threads ...\n";
 

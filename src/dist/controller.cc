@@ -310,6 +310,8 @@ agd::Status Controller::Run(const Params& params,
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);
         }
+        // set partial not outstanding
+        outstanding_partial_ = false;
       }
     }
   });
@@ -397,6 +399,12 @@ agd::Status Controller::Run(const Params& params,
         }
       }*/
       // make a map entry for this multi-part request
+
+      cout << "waiting for outstanding partial\n";
+      while(outstanding_partial_) {
+        ;;
+      }
+      cout << "outstanding finished\n";
       PartialMergeItem item;
       item.num_received = 0;
       // use the outstanding merges as id
@@ -426,6 +434,8 @@ agd::Status Controller::Run(const Params& params,
         request_queue_->push(std::move(request));
         request.Clear();
       }
+      // set partial outstanding
+      outstanding_partial_ = true;
     }
     cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }

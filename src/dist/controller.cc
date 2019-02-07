@@ -151,10 +151,6 @@ agd::Status Controller::Run(const Params& params,
     return agd::errors::Internal("Could not create zmq PUSH socket ");
   }
 
-  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 1);
-  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  cout << "snd hwm value is " << val << " \n";
-
   try {
     zmq_recv_socket_->bind(response_queue_address.c_str());
   } catch (...) {
@@ -452,6 +448,9 @@ agd::Status Controller::Run(const Params& params,
   sets_to_merge_queue_->peek(final_set);
   cout << "final set size is " << final_set.clusters_size() << " clusters\n";
   cout << "partial merge map size is " << partial_merge_map_.size() << "\n";
+  cout << "sets to merge size is " << sets_to_merge_queue_->size() << "\n";
+  cout << "request queue size " << request_queue_->size() << "\n";
+  cout << "response queue size " << response_queue_->size() << "\n";
   auto t1 = std::chrono::high_resolution_clock::now();
 
   auto duration = t1 - t0;

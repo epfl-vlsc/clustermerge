@@ -2,7 +2,9 @@
 #pragma once
 
 #include <thread>
+#include <atomic>
 #include "absl/container/node_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/sequence.h"
 #include "src/common/params.h"
@@ -57,12 +59,81 @@ class Controller {
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
+  // indexed cluster and partial merge set to facilitate efficient 
+  // parallel merging of remotely executed partial merge items
+  class IndexedCluster {
+    public: 
+      IndexedCluster() = default;
+      IndexedCluster(const IndexedCluster& other) {
+        seq_indexes_ = other.seq_indexes_;
+        fully_merged_ = other.fully_merged_;
+      }
+      IndexedCluster& operator=(const IndexedCluster& other) {
+        seq_indexes_ = other.seq_indexes_;
+        fully_merged_ = other.fully_merged_;
+        return *this;
+      }
+      IndexedCluster(const cmproto::Cluster& c) {
+        for (auto& i : c.indexes()) {
+          seq_indexes_.insert(i);
+        }
+      }
+      void Insert(int seq_index) {
+        absl::MutexLock l(&mu_);
+        seq_indexes_.insert(seq_index);
+      }
+      void SetFullyMerged() { fully_merged_ = true; }
+      bool IsFullyMerged() { return fully_merged_; }
+      void PopulateCluster(cmproto::Cluster* cluster) const {
+        for (auto index : seq_indexes_) {
+          cluster->add_indexes(index);
+        }
+        cluster->set_fully_merged(fully_merged_);
+      }
+    private:
+      absl::flat_hash_set<int> seq_indexes_;
+      bool fully_merged_ = false;
+      // lock to insert new set indexes
+      absl::Mutex mu_;
+  };
+
+  class PartialMergeSet {
+    public:
+      PartialMergeSet& operator=(const PartialMergeSet& other) {
+        clusters_ = other.clusters_;
+        new_clusters_ = other.new_clusters_;
+        return *this; 
+      };
+      void MergeClusterSet(const cmproto::ClusterSet& set);
+      void BuildClusterSetProto(cmproto::ClusterSet* set);
+      void Init(const cmproto::ClusterSet& set);
+      void RemoveFullyMerged();
+    private:
+      std::vector<IndexedCluster> clusters_; // does not change after construction
+      std::vector<cmproto::Cluster> new_clusters_;
+      // lock to add new clusters
+      absl::Mutex mu_;
+  };
+
   // map structure to track incomplete partial merges
   struct PartialMergeItem {
-    cmproto::ClusterSet partial_set;
+    //cmproto::ClusterSet partial_set;
+    PartialMergeItem() = default;
+    PartialMergeItem(const PartialMergeItem& other) {
+      partial_set = other.partial_set;
+      num_expected = other.num_expected;
+      num_received.store(other.num_received.load());
+    }
+    PartialMergeItem& operator=(const PartialMergeItem& other) {
+      partial_set = other.partial_set;
+      num_expected = other.num_expected;
+      num_received.store(other.num_received.load());
+      return *this;
+    }
+    PartialMergeSet partial_set;
     uint32_t num_expected;
-    uint32_t num_received;
-    uint32_t original_size;
+    std::atomic_uint_fast32_t num_received;
+    //uint32_t original_size;
   };
 
   // we use a node map so that pointers remain stable, and we can reduce the

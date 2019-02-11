@@ -12,6 +12,70 @@ using std::cout;
 using std::string;
 using std::thread;
 
+/*class PartialMergeSet {
+  public:
+    void MergeClusterSet(const cmproto::ClusterSet& set);
+    void BuildClusterSetProto(cmproto::ClusterSet* set);
+  private:
+    std::vector<IndexedCluster> clusters_;
+    // lock to add new clusters
+    absl::Mutex mu_;
+};*/
+
+void Controller::PartialMergeSet::RemoveFullyMerged() {
+  auto cluster_it = clusters_.begin();
+  while (cluster_it != clusters_.end()) {
+    if (cluster_it->IsFullyMerged()) {
+      cluster_it = clusters_.erase(cluster_it);
+      continue;
+    }
+    cluster_it++;
+  }
+
+}
+
+void Controller::PartialMergeSet::Init(const cmproto::ClusterSet& set) {
+  for (const auto& c : set.clusters()) {
+    IndexedCluster ic(c);
+    clusters_.push_back(std::move(ic));
+  }
+}
+
+void Controller::PartialMergeSet::BuildClusterSetProto(cmproto::ClusterSet* set) {
+  for (const auto& c : clusters_) {
+    auto* c_proto = set->add_clusters();
+    c.PopulateCluster(c_proto);
+  }
+  for (const auto& c : new_clusters_) {
+    auto* c_proto = set->add_clusters();
+    c_proto->CopyFrom(c);
+  }
+}
+
+void Controller::PartialMergeSet::MergeClusterSet(const cmproto::ClusterSet& set) {
+  for (uint32_t i = 0; i < clusters_.size(); i++) {
+    auto cluster = set.clusters(i);
+
+    if (cluster.fully_merged()) {
+      clusters_[i].SetFullyMerged();
+    }
+    for (auto x : cluster.indexes()) {
+      clusters_[i].Insert(x);
+    }
+  }
+
+  // insert the new cluster, if there is one
+  if (set.clusters_size() > clusters_.size()) {
+    assert(clusters_.size() == set.clusters_size() - 1);
+    IndexedCluster c;
+    const auto& cluster = set.clusters(set.clusters_size() - 1);
+
+    absl::MutexLock l(&mu_);
+    new_clusters_.push_back(std::move(cluster));
+  }
+
+}
+
 void RemoveDuplicates(cmproto::ClusterSet& set) {
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
@@ -34,7 +98,7 @@ void RemoveDuplicates(cmproto::ClusterSet& set) {
 }
 
 // merge other into
-void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
+/*void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
                    uint32_t original_size) {
   // relies on clusters in the sets being in the same order
   // where any new cluster is the last element
@@ -44,11 +108,11 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
   for (uint32_t i = 0; i < original_size; i++) {
     auto* mut_cluster = set.mutable_clusters(i);
     auto& cluster = other.clusters(i);
-    /*string s;
-    google::protobuf::TextFormat::PrintToString(*mut_cluster, &s);
-    cout << "Merging partial: " << s << "\n";
-    google::protobuf::TextFormat::PrintToString(cluster, &s);
-    cout << "with " << s << "\n";*/
+    //string s;
+    //google::protobuf::TextFormat::PrintToString(*mut_cluster, &s);
+    //cout << "Merging partial: " << s << "\n";
+    //google::protobuf::TextFormat::PrintToString(cluster, &s);
+    //cout << "with " << s << "\n";
     if (cluster.fully_merged()) {
       mut_cluster->set_fully_merged(true);
     }
@@ -70,7 +134,7 @@ void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
     c->CopyFrom(other.clusters(other.clusters_size() - 1));
   }
   // cout << "done merging\n";
-}
+}*/
 
 agd::Status Controller::Run(const Params& params,
                             const Parameters& aligner_params,
@@ -271,35 +335,28 @@ agd::Status Controller::Run(const Params& params,
           // do assign
           partial_item = &partial_it->second;
         }
-        // cout << "preparing to merge partial result... \n";
-        // its part of a larger merger
-        // auto& partial_item = partial_it->second;
-        // merge response_set into partial_item.partial_set
-        MergePartials(partial_item->partial_set, response.set(),
-                      partial_item->original_size);
       }
 
+      /*MergePartials(partial_item->partial_set, response.set(),
+                    partial_item->original_size);*/
+
+      partial_item->partial_set.MergeClusterSet(response.set());
       // cout << "done\n";
       // check if this was the last one
       partial_item->num_received++;
       if (partial_item->num_expected == partial_item->num_received) {
-        // go through  and delete any fully merged clusters
-        auto cluster_it = partial_item->partial_set.mutable_clusters()->begin();
-        while (cluster_it !=
-               partial_item->partial_set.mutable_clusters()->end()) {
-          if (cluster_it->fully_merged()) {
-            cluster_it =
-                partial_item->partial_set.mutable_clusters()->erase(cluster_it);
-            continue;
-          }
-          cluster_it++;
-        }
+        // TODO are we sure that all other potential threads are finished
+        // merging their partials with this one?
 
-        if (partial_item->partial_set.clusters_size() >
+        // go through  and delete any fully merged clusters
+
+        cmproto::ClusterSet set;
+        partial_item->partial_set.BuildClusterSetProto(&set);
+        if (set.clusters_size() >
             params.dup_removal_thresh) {
-          RemoveDuplicates(partial_item->partial_set);
+          RemoveDuplicates(set);
         }
-        sets_to_merge_queue_->push(std::move(partial_item->partial_set));
+        sets_to_merge_queue_->push(std::move(set));
         // remove partial it, its done now
         cout << "partial id " << id << " is complete\n";
         {
@@ -410,8 +467,9 @@ agd::Status Controller::Run(const Params& params,
       // each work item does a partial merge of one cluster in sets[0] to
       // all clusters in sets[1]
       item.num_expected = sets[0].clusters_size();
-      item.partial_set.CopyFrom(sets[1]);
-      item.original_size = sets[1].clusters_size();
+      //item.partial_set.CopyFrom(sets[1]);
+      item.partial_set.Init(sets[1]);
+      //item.original_size = sets[1].clusters_size();
       {
         absl::MutexLock l(&mu_);
         partial_merge_map_.insert_or_assign(outstanding_merges_, item);

@@ -31,6 +31,15 @@ void Controller::PartialMergeSet::RemoveFullyMerged() {
     }
     cluster_it++;
   }
+  
+  auto new_cluster_it = new_clusters_.begin();
+  while (new_cluster_it != new_clusters_.end()) {
+    if (new_cluster_it->fully_merged()) {
+      new_cluster_it = new_clusters_.erase(new_cluster_it);
+      continue;
+    }
+    new_cluster_it++;
+  }
 
 }
 
@@ -349,6 +358,7 @@ agd::Status Controller::Run(const Params& params,
         // merging their partials with this one?
 
         // go through  and delete any fully merged clusters
+        partial_item->partial_set.RemoveFullyMerged();
 
         cmproto::ClusterSet set;
         partial_item->partial_set.BuildClusterSetProto(&set);

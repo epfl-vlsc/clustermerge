@@ -67,13 +67,16 @@ class Controller {
       IndexedCluster(const IndexedCluster& other) {
         seq_indexes_ = other.seq_indexes_;
         fully_merged_ = other.fully_merged_;
+        respresentative_idx_ = other.respresentative_idx_;
       }
       IndexedCluster& operator=(const IndexedCluster& other) {
         seq_indexes_ = other.seq_indexes_;
         fully_merged_ = other.fully_merged_;
+        respresentative_idx_ = other.respresentative_idx_;
         return *this;
       }
       IndexedCluster(const cmproto::Cluster& c) {
+        respresentative_idx_ = c.indexes(0);
         for (auto& i : c.indexes()) {
           seq_indexes_.insert(i);
         }
@@ -85,14 +88,19 @@ class Controller {
       void SetFullyMerged() { fully_merged_ = true; }
       bool IsFullyMerged() { return fully_merged_; }
       void PopulateCluster(cmproto::Cluster* cluster) const {
+        cluster->add_indexes(respresentative_idx_);
         for (auto index : seq_indexes_) {
-          cluster->add_indexes(index);
+          if (index != respresentative_idx_) {
+            cluster->add_indexes(index);
+          }
         }
         cluster->set_fully_merged(fully_merged_);
       }
     private:
       absl::flat_hash_set<int> seq_indexes_;
       bool fully_merged_ = false;
+      // track explicitly the rep because the set is not ordered
+      int respresentative_idx_ = 0;
       // lock to insert new set indexes
       absl::Mutex mu_;
   };

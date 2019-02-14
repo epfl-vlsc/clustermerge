@@ -51,4 +51,8 @@ class Worker {
   volatile bool run_ = true;
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
+
+  std::thread queue_measure_thread_;
+  std::vector<long int> timestamps_;
+  std::vector<size_t> queue_sizes_;
 };

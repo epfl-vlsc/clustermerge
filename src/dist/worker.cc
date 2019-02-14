@@ -223,13 +223,48 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Work queue thread ending.\n";
   });
 
-  cout << "Worker running, press ctrl-C to exit\n";
+  timestamps_.reserve(100000);
+  queue_sizes_.reserve(100000);
 
+  queue_measure_thread_ = std::thread([this](){
+      // get timestamp, queue size
+      //cout << "queue measure thread starting ...\n";
+      while(run_) {
+        time_t result = std::time(nullptr);
+        timestamps_.push_back(static_cast<long int>(result));
+        queue_sizes_.push_back(work_queue_->size());
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        if (queue_sizes_.size() >= 1000000) {
+          break;  // dont run forever ... 
+        }
+      }
+      //cout << "queue measure thread finished\n";
+    }
+  );
+
+  cout << "Worker running, press button to exit\n";
+  std::cin.get();
+
+  run_ = false;
   result_queue_thread_.join();
   work_queue_thread_.join();
+  queue_measure_thread_.join();
   for (auto& t : worker_threads_) {
     t.join();
   }
+  
+  // queue size stats
+  std::vector<std::pair<size_t, size_t>> values;
+  for (size_t i = 0; i < timestamps_.size(); i++) {
+    values.push_back(std::make_pair(timestamps_[i], queue_sizes_[i]));
+  }
+
+  nlohmann::json j(values);
+
+  std::cout << "dumping queue sizes ...\n";
+  std::ofstream o("queue.json");
+
+  o << std::setw(2) << j << std::endl;
 
   return agd::Status::OK();
 }

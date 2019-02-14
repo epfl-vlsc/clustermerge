@@ -50,7 +50,7 @@ class Controller {
   // in merge map), lookup and merge with partial_set, if partial set complete,
   //    push ready to merge sets to sets_to_merge_queue
   std::unique_ptr<ConcurrentQueue<cmproto::ClusterSet>> sets_to_merge_queue_;
-  std::thread worker_thread_;
+  std::vector<std::thread> worker_threads_;
 
   // thread reads from request queue and pushes to zmq
   std::unique_ptr<ConcurrentQueue<cmproto::MergeRequest>> request_queue_;

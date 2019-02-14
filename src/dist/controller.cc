@@ -170,6 +170,7 @@ agd::Status Controller::Run(const Params& params,
   outstanding_merges_ = total_merges;
   cout << "outstanding merges to complete: " << outstanding_merges_ << "\n";
   cout << "dup removal thresh is " << params.dup_removal_thresh << "\n";
+  cout << "Using " << params.num_threads << " threads to merge partials\n";
 
   // create envs, params
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");
@@ -309,7 +310,7 @@ agd::Status Controller::Run(const Params& params,
   // prevent bottlenecks. May be required to use a different structure for
   // tracking partial mergers rather than the current map, which needs to be
   // locked
-  worker_thread_ = thread([this, &params]() {
+  auto worker_func = [this, &params]() {
     // read from result queue
     // if is a batch result and is small enough, push to WorkManager
     // if is partial result (ID will be
@@ -331,7 +332,7 @@ agd::Status Controller::Run(const Params& params,
         auto partial_it = partial_merge_map_.find(id);
         if (partial_it == partial_merge_map_.end()) {
           if (id != -1) {
-            cout << "error thing in map was not -1\n";
+            cout << "error thing in map was not -1, was " << id << "\n";
             exit(0);
           }
           // cout << "pushing full result \n";
@@ -352,8 +353,8 @@ agd::Status Controller::Run(const Params& params,
       partial_item->partial_set.MergeClusterSet(response.set());
       // cout << "done\n";
       // check if this was the last one
-      partial_item->num_received++;
-      if (partial_item->num_expected == partial_item->num_received) {
+      auto val = partial_item->num_received++;
+      if (partial_item->num_expected - 1 == val) {
         // TODO are we sure that all other potential threads are finished
         // merging their partials with this one?
 
@@ -374,10 +375,15 @@ agd::Status Controller::Run(const Params& params,
           partial_merge_map_.erase(id);
         }
         // set partial not outstanding
-        outstanding_partial_ = false;
+        //outstanding_partial_ = false;
       }
     }
-  });
+  };
+
+  worker_threads_.reserve(params.num_threads);
+  for (int i = 0; i < params.num_threads; i++) {
+    worker_threads_.push_back(std::thread(worker_func));
+  }
 
   // dump all sequences in single cluster sets into the queue
   // for now assumes all of this will fit in memory
@@ -463,11 +469,12 @@ agd::Status Controller::Run(const Params& params,
       }*/
       // make a map entry for this multi-part request
 
-      cout << "waiting for outstanding partial\n";
+      cout << "pushing partial ...\n";
+      /*cout << "waiting for outstanding partial\n";
       while(outstanding_partial_) {
         ;;
       }
-      cout << "outstanding finished\n";
+      cout << "outstanding finished\n";*/
       PartialMergeItem item;
       item.num_received = 0;
       // use the outstanding merges as id
@@ -482,6 +489,7 @@ agd::Status Controller::Run(const Params& params,
       //item.original_size = sets[1].clusters_size();
       {
         absl::MutexLock l(&mu_);
+        cout << "pushing id " << outstanding_merges_ << " to map\n";
         partial_merge_map_.insert_or_assign(outstanding_merges_, item);
       }
 
@@ -500,7 +508,7 @@ agd::Status Controller::Run(const Params& params,
         request.Clear();
       }
       // set partial outstanding
-      outstanding_partial_ = true;
+      //outstanding_partial_ = true;
     }
     cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
@@ -539,7 +547,10 @@ agd::Status Controller::Run(const Params& params,
   response_queue_->unblock();
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
-  worker_thread_.join();
+  //worker_thread_.join();
+  for (auto& t : worker_threads_) {
+    t.join();
+  }
   request_queue_thread_.join();
   response_queue_thread_.join();
 

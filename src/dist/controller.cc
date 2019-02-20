@@ -245,6 +245,16 @@ agd::Status Controller::Run(const Params& params,
       new ConcurrentQueue<cmproto::Response>(params.queue_depth));
   sets_to_merge_queue_.reset(
       new ConcurrentQueue<cmproto::ClusterSet>(sequences_.size()));
+  
+  bool received = true;
+  cmproto::Response response;
+  zmq::message_t msg;
+  int num = 0;
+  while (received) {
+    received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+    num++;
+  }
+  cout << "drained " << num << " messages from queue\n";
 
   request_queue_thread_ = thread([this]() {
     // get msg from work queue (output)
@@ -275,6 +285,7 @@ agd::Status Controller::Run(const Params& params,
 
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
+
 
   response_queue_thread_ = thread([this]() {
     // get msg from work queue (output)

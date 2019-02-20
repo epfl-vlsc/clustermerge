@@ -243,7 +243,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   );
 
   cout << "Worker running, press button to exit\n";
-  std::cin.get();
+  //std::cin.get();
 
   run_ = false;
   result_queue_thread_.join();

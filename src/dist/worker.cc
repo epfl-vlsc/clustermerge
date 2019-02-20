@@ -112,7 +112,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cmproto::MergeRequest merge_request;
     while (run_) {
       zmq::message_t msg;
-      zmq_recv_socket_->recv(&msg);
+      bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+      if (!msg_received) {
+        continue;
+      }
 
       if (!merge_request.ParseFromArray(msg.data(), msg.size())) {
         cout << "Failed to parse merge request protobuf!!\n";
@@ -245,6 +248,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   cout << "Worker running, press button to exit\n";
   //std::cin.get();
 
+  cout << "joining threads ...\n";
   run_ = false;
   result_queue_thread_.join();
   work_queue_thread_.join();

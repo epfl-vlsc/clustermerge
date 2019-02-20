@@ -250,7 +250,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   //cout << "joining threads ...\n";
   //run_ = false;
+  //result_queue_->unblock();
   result_queue_thread_.join();
+
+  //work_queue_->unblock();
   work_queue_thread_.join();
   queue_measure_thread_.join();
   for (auto& t : worker_threads_) {

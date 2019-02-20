@@ -248,8 +248,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   cout << "Worker running, press button to exit\n";
   //std::cin.get();
 
-  cout << "joining threads ...\n";
-  run_ = false;
+  //cout << "joining threads ...\n";
+  //run_ = false;
   result_queue_thread_.join();
   work_queue_thread_.join();
   queue_measure_thread_.join();

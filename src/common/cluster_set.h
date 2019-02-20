@@ -53,6 +53,8 @@ class ClusterSet {
   void DebugDump() const;
   void DumpJson(const std::string& filename) const;
 
+  void MarshalToBuffer(agd::Buffer* buf);
+
   size_t Size() { return clusters_.size(); }
 
  private:

@@ -22,69 +22,6 @@ using std::thread;
     absl::Mutex mu_;
 };*/
 
-void Controller::PartialMergeSet::RemoveFullyMerged() {
-  auto cluster_it = clusters_.begin();
-  while (cluster_it != clusters_.end()) {
-    if (cluster_it->IsFullyMerged()) {
-      cluster_it = clusters_.erase(cluster_it);
-      continue;
-    }
-    cluster_it++;
-  }
-  
-  auto new_cluster_it = new_clusters_.begin();
-  while (new_cluster_it != new_clusters_.end()) {
-    if (new_cluster_it->fully_merged()) {
-      new_cluster_it = new_clusters_.erase(new_cluster_it);
-      continue;
-    }
-    new_cluster_it++;
-  }
-
-}
-
-void Controller::PartialMergeSet::Init(const cmproto::ClusterSet& set) {
-  for (const auto& c : set.clusters()) {
-    IndexedCluster ic(c);
-    clusters_.push_back(std::move(ic));
-  }
-}
-
-void Controller::PartialMergeSet::BuildClusterSetProto(cmproto::ClusterSet* set) {
-  for (const auto& c : clusters_) {
-    auto* c_proto = set->add_clusters();
-    c.PopulateCluster(c_proto);
-  }
-  for (const auto& c : new_clusters_) {
-    auto* c_proto = set->add_clusters();
-    c_proto->CopyFrom(c);
-  }
-}
-
-void Controller::PartialMergeSet::MergeClusterSet(const cmproto::ClusterSet& set) {
-  for (uint32_t i = 0; i < clusters_.size(); i++) {
-    auto cluster = set.clusters(i);
-
-    if (cluster.fully_merged()) {
-      clusters_[i].SetFullyMerged();
-    }
-    for (auto x : cluster.indexes()) {
-      clusters_[i].Insert(x);
-    }
-  }
-
-  // insert the new cluster, if there is one
-  if (set.clusters_size() > clusters_.size()) {
-    assert(clusters_.size() == set.clusters_size() - 1);
-    IndexedCluster c;
-    const auto& cluster = set.clusters(set.clusters_size() - 1);
-
-    absl::MutexLock l(&mu_);
-    new_clusters_.push_back(std::move(cluster));
-  }
-
-}
-
 void RemoveDuplicates(cmproto::ClusterSet& set) {
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
@@ -240,33 +177,35 @@ agd::Status Controller::Run(const Params& params,
   }
 
   request_queue_.reset(
-      new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
+      new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
   response_queue_.reset(
-      new ConcurrentQueue<cmproto::Response>(params.queue_depth));
+      new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
   sets_to_merge_queue_.reset(
-      new ConcurrentQueue<cmproto::ClusterSet>(sequences_.size()));
+      new ConcurrentQueue<MarshalledClusterSet>(sequences_.size()));
 
   request_queue_thread_ = thread([this]() {
     // get msg from work queue (output)
     // encode
     // put in work queue zmq
     // repeat
-    cmproto::MergeRequest merge_request;
+    MarshalledRequest merge_request;
     int total_sent = 0;
+    auto free_func = [](void* data, void* hint) {
+      delete data;
+    };
+
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
         continue;
       }
-      auto size = merge_request.ByteSizeLong();
-      zmq::message_t msg(size);
+      auto size = merge_request.buf.size();
+      // inline message_t(void *data_, size_t size_, free_fn *ffn_, void *hint_ = NULL)
+      // release the buf pointer directly to avoid an additional copy here
+      zmq::message_t msg(merge_request.buf.release_raw(), size, free_func, NULL);
       /*cout << "pushing request of size " << size << " of type "
            << (merge_request.has_batch() ? "batch " : "partial ") << "\n";*/
-      auto success = merge_request.SerializeToArray(msg.data(), size);
-      if (!success) {
-        cout << "Thread failed to serialize request protobuf!\n";
-      }
 
-      success = zmq_send_socket_->send(std::move(msg));
+      bool success = zmq_send_socket_->send(std::move(msg));
       if (!success) {
         cout << "Thread failed to send request over zmq!\n";
       }
@@ -281,11 +220,10 @@ agd::Status Controller::Run(const Params& params,
     // encode
     // put in work queue zmq
     // repeat
-    cmproto::Response response;
-    zmq::message_t msg;
     int total_received = 0;
     while (run_) {
-      bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+      MarshalledResponse response;
+      bool msg_received = zmq_recv_socket_->recv(&response.msg, ZMQ_NOBLOCK);
       // basically implements polling to avoid blocking recv calls
       // not ideal but whatever, this is a research project! :-D
       if (!msg_received) {
@@ -293,14 +231,10 @@ agd::Status Controller::Run(const Params& params,
       }
       total_received++;
 
-      if (!response.ParseFromArray(msg.data(), msg.size())) {
-        cout << "Failed to parse merge request protobuf!!\n";
-        return;
-      }
       /*cout << "parsed a zmq response with " << msg.size() << " bytes and "
            << response.set().clusters_size() << " clusters\n";*/
 
-      response_queue_->push(response);
+      response_queue_->push(std::move(response));
     }
 
     cout << "Work queue thread ending. Total received: " << total_received << "\n";
@@ -317,13 +251,13 @@ agd::Status Controller::Run(const Params& params,
     // in merge map), lookup and merge with partial_set, if partial set
     // complete,
     //    push to WorkManager
-    cmproto::Response response;
+    MarshalledResponse response;
     while (run_) {
       if (!response_queue_->pop(response)) {
         continue;
       }
 
-      auto id = response.id();
+      auto id = response.ID();
       // cout << "repsonse id is " << id << "\n";
       PartialMergeItem* partial_item;
 
@@ -336,10 +270,12 @@ agd::Status Controller::Run(const Params& params,
             exit(0);
           }
           // cout << "pushing full result \n";
-          if (response.set().clusters_size() > params.dup_removal_thresh) {
+          /*if (response.set().clusters_size() > params.dup_removal_thresh) {
             RemoveDuplicates(*response.mutable_set());
-          }
-          sets_to_merge_queue_->push(std::move(response.set()));
+          }*/
+          MarshalledClusterSet new_set(response);
+
+          sets_to_merge_queue_->push(std::move(new_set));
           continue;
         } else {
           // do assign
@@ -389,9 +325,10 @@ agd::Status Controller::Run(const Params& params,
   // for now assumes all of this will fit in memory
   // even a million sequences would just be a few MB
   for (const auto& s : sequences_) {
-    cmproto::ClusterSet set;
+    /*cmproto::ClusterSet set;
     auto* c = set.add_clusters();
-    c->add_indexes(s.ID());
+    c->add_indexes(s.ID());*/
+    ClusterSet set(s);
     sets_to_merge_queue_->push(std::move(set));
   }
 
@@ -399,8 +336,8 @@ agd::Status Controller::Run(const Params& params,
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
-  cmproto::MergeRequest request;
-  std::vector<cmproto::ClusterSet> sets;
+  MarshalledRequest request;
+  std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
   while (outstanding_merges_ > 0) {
     sets[0].Clear();
@@ -418,18 +355,16 @@ agd::Status Controller::Run(const Params& params,
          << ", set two size: " << sets[1].clusters_size() << "\n\n";*/
 
     // form request, push to queue
-    if (sets[0].clusters_size() < params.batch_size ||
-        sets[1].clusters_size() < params.batch_size) {
+    if (sets[0].NumClusters() < params.batch_size ||
+        sets[1].NumClusters() < params.batch_size) {
       // create a batch, they are small
       // cout << "two sets are small, batching ...\n";
-      cmproto::MergeBatch* batch = request.mutable_batch();
-      uint32_t total_clusters =
-          sets[0].clusters_size() + sets[1].clusters_size();
 
-      auto* c = batch->add_sets();
-      c->CopyFrom(sets[0]);
-      c = batch->add_sets();
-      c->CopyFrom(sets[1]);
+      uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
+      // marshal id, type, num sets
+      int id = -1; auto t = RequestType::Batch; int num_sets = 2;
+      // sets[1].MarshalToBuffer(request.buf)
+
       outstanding_merges_--;
       while (total_clusters < params.batch_size && outstanding_merges_ > 0) {
         // add more cluster sets to batch

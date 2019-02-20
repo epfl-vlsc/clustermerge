@@ -68,6 +68,10 @@ class Cluster {
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
 
+  void MarshalToBuffer(agd::Buffer* buf);
+  // marshalled cluster is [fully_merged, num_idx, (cluster indexes)]
+  uint32_t ByteSize() { return sizeof(bool) + sizeof(int) + sizeof(int)*seqs_.size(); }
+
  private:
   // representative is first seq
   // use a list so refs aren't invalidated

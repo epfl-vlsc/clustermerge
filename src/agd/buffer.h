@@ -43,6 +43,8 @@ class Buffer : public Data {
 
   char& operator[](std::size_t idx) const;
 
+  char* release_raw() { return buf_.release(); }
+
   void reset();
   virtual const char* data() const override;
   virtual std::size_t size() const override;

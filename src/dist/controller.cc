@@ -190,18 +190,18 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     MarshalledRequest merge_request;
     int total_sent = 0;
-    auto free_func = [](void* data, void* hint) {
-      delete data;
-    };
+    auto free_func = [](void* data, void* hint) { delete data; };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
         continue;
       }
       auto size = merge_request.buf.size();
-      // inline message_t(void *data_, size_t size_, free_fn *ffn_, void *hint_ = NULL)
-      // release the buf pointer directly to avoid an additional copy here
-      zmq::message_t msg(merge_request.buf.release_raw(), size, free_func, NULL);
+      // inline message_t(void *data_, size_t size_, free_fn *ffn_, void *hint_
+      // = NULL) release the buf pointer directly to avoid an additional copy
+      // here
+      zmq::message_t msg(merge_request.buf.release_raw(), size, free_func,
+                         NULL);
       /*cout << "pushing request of size " << size << " of type "
            << (merge_request.has_batch() ? "batch " : "partial ") << "\n";*/
 
@@ -237,7 +237,8 @@ agd::Status Controller::Run(const Params& params,
       response_queue_->push(std::move(response));
     }
 
-    cout << "Work queue thread ending. Total received: " << total_received << "\n";
+    cout << "Work queue thread ending. Total received: " << total_received
+         << "\n";
   });
 
   // partial mergers in this thread may need to be more fully parallelized to
@@ -296,7 +297,7 @@ agd::Status Controller::Run(const Params& params,
 
         // go through  and delete any fully merged clusters
         // do this when constructing the new full set
-        //partial_item->partial_set.RemoveFullyMerged();
+        // partial_item->partial_set.RemoveFullyMerged();
 
         MarshalledClusterSet set;
         partial_item->partial_set.BuildMarshalledSet(&set);
@@ -312,7 +313,7 @@ agd::Status Controller::Run(const Params& params,
           partial_merge_map_.erase(id);
         }
         // set partial not outstanding
-        //outstanding_partial_ = false;
+        // outstanding_partial_ = false;
       }
     }
   };
@@ -360,7 +361,7 @@ agd::Status Controller::Run(const Params& params,
 
       uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
       // marshal id, type, num sets
-      //int id = -1; auto t = RequestType::Batch; int num_sets = 2;
+      // int id = -1; auto t = RequestType::Batch; int num_sets = 2;
       // sets[1].MarshalToBuffer(request.buf)
       MarshalledRequest request;
       request.CreateBatchRequest(-1);
@@ -375,8 +376,8 @@ agd::Status Controller::Run(const Params& params,
               "ERROR: did not get set for second to merge with.");
         }
 
-        //c = batch->add_sets();
-        //c->CopyFrom(sets[0]);
+        // c = batch->add_sets();
+        // c->CopyFrom(sets[0]);
         total_clusters += sets[0].NumClusters();
         request.AddSetToBatch(sets[0]);
         outstanding_merges_--;
@@ -415,15 +416,15 @@ agd::Status Controller::Run(const Params& params,
       item.num_received = 0;
       // use the outstanding merges as id
       if (sets[0].NumClusters() < sets[1].NumClusters()) {
-        //sets[0].Swap(&sets[1]);
+        // sets[0].Swap(&sets[1]);
         std::swap(sets[0], sets[1]);
       }
       // each work item does a partial merge of one cluster in sets[0] to
       // all clusters in sets[1]
       item.num_expected = sets[0].NumClusters();
-      //item.partial_set.CopyFrom(sets[1]);
+      // item.partial_set.CopyFrom(sets[1]);
       item.partial_set.Init(sets[1]);
-      //item.original_size = sets[1].clusters_size();
+      // item.original_size = sets[1].clusters_size();
       {
         absl::MutexLock l(&mu_);
         cout << "pushing id " << outstanding_merges_ << " to map\n";
@@ -433,7 +434,7 @@ agd::Status Controller::Run(const Params& params,
       MarshalledClusterView cluster;
       cout << "pushing id " << outstanding_merges_ << "\n";
       while (sets[0].NextCluster(&cluster)) {
-      //for (const auto& c : sets[0].clusters()) {
+        // for (const auto& c : sets[0].clusters()) {
         MarshalledRequest request;
         request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
         // cout << "pushing partial request with " <<
@@ -442,7 +443,7 @@ agd::Status Controller::Run(const Params& params,
         request_queue_->push(std::move(request));
       }
       // set partial outstanding
-      //outstanding_partial_ = true;
+      // outstanding_partial_ = true;
     }
     cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
@@ -481,7 +482,7 @@ agd::Status Controller::Run(const Params& params,
   response_queue_->unblock();
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
-  //worker_thread_.join();
+  // worker_thread_.join();
   for (auto& t : worker_threads_) {
     t.join();
   }

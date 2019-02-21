@@ -286,7 +286,7 @@ agd::Status Controller::Run(const Params& params,
       /*MergePartials(partial_item->partial_set, response.set(),
                     partial_item->original_size);*/
 
-      partial_item->partial_set.MergeClusterSet(response.set());
+      partial_item->partial_set.MergeClusterSet(response.Set());
       // cout << "done\n";
       // check if this was the last one
       auto val = partial_item->num_received++;
@@ -295,14 +295,15 @@ agd::Status Controller::Run(const Params& params,
         // merging their partials with this one?
 
         // go through  and delete any fully merged clusters
-        partial_item->partial_set.RemoveFullyMerged();
+        // do this when constructing the new full set
+        //partial_item->partial_set.RemoveFullyMerged();
 
-        cmproto::ClusterSet set;
-        partial_item->partial_set.BuildClusterSetProto(&set);
-        if (set.clusters_size() >
+        MarshalledClusterSet set;
+        partial_item->partial_set.BuildMarshalledSet(&set);
+        /*if (set.clusters_size() >
             params.dup_removal_thresh) {
           RemoveDuplicates(set);
-        }
+        }*/
         sets_to_merge_queue_->push(std::move(set));
         // remove partial it, its done now
         cout << "partial id " << id << " is complete\n";
@@ -328,7 +329,7 @@ agd::Status Controller::Run(const Params& params,
     /*cmproto::ClusterSet set;
     auto* c = set.add_clusters();
     c->add_indexes(s.ID());*/
-    ClusterSet set(s);
+    MarshalledClusterSet set(s.ID());
     sets_to_merge_queue_->push(std::move(set));
   }
 
@@ -336,12 +337,9 @@ agd::Status Controller::Run(const Params& params,
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
-  MarshalledRequest request;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
   while (outstanding_merges_ > 0) {
-    sets[0].Clear();
-    sets[1].Clear();
     if (!sets_to_merge_queue_->pop(sets[0])) {
       continue;
     }
@@ -362,8 +360,12 @@ agd::Status Controller::Run(const Params& params,
 
       uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
       // marshal id, type, num sets
-      int id = -1; auto t = RequestType::Batch; int num_sets = 2;
+      //int id = -1; auto t = RequestType::Batch; int num_sets = 2;
       // sets[1].MarshalToBuffer(request.buf)
+      MarshalledRequest request;
+      request.CreateBatchRequest(-1);
+      request.AddSetToBatch(sets[0]);
+      request.AddSetToBatch(sets[1]);
 
       outstanding_merges_--;
       while (total_clusters < params.batch_size && outstanding_merges_ > 0) {
@@ -373,17 +375,16 @@ agd::Status Controller::Run(const Params& params,
               "ERROR: did not get set for second to merge with.");
         }
 
-        c = batch->add_sets();
-        c->CopyFrom(sets[0]);
+        //c = batch->add_sets();
+        //c->CopyFrom(sets[0]);
+        total_clusters += sets[0].NumClusters();
+        request.AddSetToBatch(sets[0]);
         outstanding_merges_--;
-        total_clusters += sets[0].clusters_size();
       }
       // cout << "batched " << batch->sets_size() << " sets\n";
-      request.set_id(-1);
       // if the queue uses copy semantics im not sure how protobufs
       // with submessages will behave
       request_queue_->push(std::move(request));
-      request.Clear();
 
     } else {
       // either set is large enough, split the computation into multiple
@@ -413,12 +414,13 @@ agd::Status Controller::Run(const Params& params,
       PartialMergeItem item;
       item.num_received = 0;
       // use the outstanding merges as id
-      if (sets[0].clusters_size() < sets[1].clusters_size()) {
-        sets[0].Swap(&sets[1]);
+      if (sets[0].NumClusters() < sets[1].NumClusters()) {
+        //sets[0].Swap(&sets[1]);
+        std::swap(sets[0], sets[1]);
       }
       // each work item does a partial merge of one cluster in sets[0] to
       // all clusters in sets[1]
-      item.num_expected = sets[0].clusters_size();
+      item.num_expected = sets[0].NumClusters();
       //item.partial_set.CopyFrom(sets[1]);
       item.partial_set.Init(sets[1]);
       //item.original_size = sets[1].clusters_size();
@@ -428,19 +430,16 @@ agd::Status Controller::Run(const Params& params,
         partial_merge_map_.insert_or_assign(outstanding_merges_, item);
       }
 
+      MarshalledClusterView cluster;
       cout << "pushing id " << outstanding_merges_ << "\n";
-      for (const auto& c : sets[0].clusters()) {
-        request.set_id(outstanding_merges_);
-        cmproto::MergePartial* partial_request = request.mutable_partial();
-        auto* cluster = partial_request->mutable_cluster();
-        cluster->CopyFrom(c);
-        auto* cluster_set = partial_request->mutable_set();
-        cluster_set->CopyFrom(sets[1]);
+      while (sets[0].NextCluster(&cluster)) {
+      //for (const auto& c : sets[0].clusters()) {
+        MarshalledRequest request;
+        request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
         // cout << "pushing partial request with " <<
         // partial_request->set().clusters_size() << " clusters in set and ID: "
         // << request.id() << "\n";
         request_queue_->push(std::move(request));
-        request.Clear();
       }
       // set partial outstanding
       //outstanding_partial_ = true;
@@ -455,9 +454,9 @@ agd::Status Controller::Run(const Params& params,
   // while (sets_to_merge_queue_->size() != 1);;
 
   cout << "scheduling final alignments on controller...\n";
-  cmproto::ClusterSet final_set;
+  MarshalledClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
-  cout << "final set size is " << final_set.clusters_size() << " clusters\n";
+  cout << "final set size is " << final_set.NumClusters() << " clusters\n";
   cout << "partial merge map size is " << partial_merge_map_.size() << "\n";
   cout << "sets to merge size is " << sets_to_merge_queue_->size() << "\n";
   cout << "request queue size " << request_queue_->size() << "\n";

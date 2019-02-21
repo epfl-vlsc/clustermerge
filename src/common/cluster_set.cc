@@ -14,17 +14,20 @@
 using std::make_tuple;
 using std::vector;
 
-ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
+ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
                        const std::vector<Sequence>& sequences) {
-  std::vector<Cluster> clusters(set_proto.clusters_size());
-  for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
-    const auto& cluster_proto = set_proto.clusters(cs_i);
+  std::vector<Cluster> clusters(marshalled_set.NumClusters());
+  MarshalledClusterView cluster;
+  while (marshalled_set.NextCluster(&cluster)) {
+  //for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
+    //const auto& cluster_proto = set_proto.clusters(cs_i);
     // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
-    Cluster c(sequences[cluster_proto.indexes(0)]);
-    for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
-      c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);
+    Cluster c(sequences[cluster.SeqIndex(0)]);
+    uint32_t num_seqs = cluster.NumSeqs();
+    for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
+      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
     }
-    if (cluster_proto.fully_merged()) {
+    if (cluster.IsFullyMerged()) {
       c.SetFullyMerged();
     }
     clusters_.push_back(std::move(c));

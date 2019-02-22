@@ -169,7 +169,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         sets_to_merge.clear();
 
       } else if (request.Type() == RequestType::Partial) {
-        cout << "has partial\n";
+        //cout << "has partial\n";
         //auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
@@ -178,13 +178,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         MarshalledClusterView cluster;
         request.ClusterAndSet(&set, &cluster);
 
-        cout << "set has " << set.NumClusters() << " clusters\n";
+        //cout << "set has " << set.NumClusters() << " clusters\n";
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
         auto new_cs = cs.MergeCluster(c, &aligner);
-        cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        //cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
         MarshalledResponse response;
         new_cs.BuildMarshalledResponse(request.ID(), &response);

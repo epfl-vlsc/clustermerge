@@ -34,6 +34,7 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     ClusterSetHeader h;
     h.num_clusters = 0;  // set after once we know the value
     set->buf.reset();
+    set->buf.reserve(512);
     set->buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
     uint32_t total_not_merged = 0;
@@ -53,6 +54,12 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
           set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(decltype(s)));
         }
       }
+    }
+
+    // dont forget the new clusters, they are already marshalled
+    for (auto& c : new_clusters_) {
+      set->buf.AppendBuffer(c.buf.data(), c.buf.size());
+      total_not_merged++;
     }
 
     char* data = set->buf.mutable_data();

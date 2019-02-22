@@ -231,8 +231,7 @@ agd::Status Controller::Run(const Params& params,
       }
       total_received++;
 
-      /*cout << "parsed a zmq response with " << msg.size() << " bytes and "
-           << response.set().clusters_size() << " clusters\n";*/
+      cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
 
       response_queue_->push(std::move(response));
     }

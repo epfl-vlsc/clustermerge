@@ -20,7 +20,7 @@ void free_func(void* data, void* hint) {
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   agd::Buffer buf;
-  buf.AppendBuffer(reinterpret_cast<char*>(id), sizeof(int));
+  buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
 
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value

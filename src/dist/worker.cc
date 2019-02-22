@@ -201,7 +201,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   }
 
   result_queue_thread_ = thread([this]() {
-    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
     while (run_) {
       MarshalledResponse response;
       if (!result_queue_->pop(response)) {

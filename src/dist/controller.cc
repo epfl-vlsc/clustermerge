@@ -245,7 +245,7 @@ agd::Status Controller::Run(const Params& params,
   // prevent bottlenecks. May be required to use a different structure for
   // tracking partial mergers rather than the current map, which needs to be
   // locked
-  auto worker_func = [this, &params]() {
+  auto worker_func = [this]() {
     // read from result queue
     // if is a batch result and is small enough, push to WorkManager
     // if is partial result (ID will be

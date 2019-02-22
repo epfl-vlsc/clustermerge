@@ -139,12 +139,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // encode result, put in queue
 
       if (request.Type() == RequestType::Batch) {
-        // cout << "its a batch\n";
+        cout << "its a batch, request ID is " << request.ID() << " \n";
         //auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto
           // TODO add ClusterSet constructor
+          cout << "marshalled cluster set has " << clusterset.NumClusters() << " clusters\n";
           ClusterSet cs(clusterset, sequences_);
           sets_to_merge.push_back(std::move(cs));
         }
@@ -160,12 +161,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         //final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
         final_set.BuildMarshalledResponse(request.ID(), &response);
+        MarshalledClusterSetView view;
+        view = response.Set();
+        cout << "final set has " << view.NumClusters() << " clusters.\n";
 
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
 
       } else if (request.Type() == RequestType::Partial) {
-        // cout << "has partial\n";
+        cout << "has partial\n";
         //auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so

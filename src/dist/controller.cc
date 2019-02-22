@@ -270,7 +270,7 @@ agd::Status Controller::Run(const Params& params,
             cout << "error thing in map was not -1, was " << id << "\n";
             exit(0);
           }
-          // cout << "pushing full result \n";
+          cout << "pushing full result \n";
           /*if (response.set().clusters_size() > params.dup_removal_thresh) {
             RemoveDuplicates(*response.mutable_set());
           }*/
@@ -357,9 +357,10 @@ agd::Status Controller::Run(const Params& params,
     if (sets[0].NumClusters() < params.batch_size ||
         sets[1].NumClusters() < params.batch_size) {
       // create a batch, they are small
-      // cout << "two sets are small, batching ...\n";
+      cout << "two sets are small, batching ...\n";
 
       uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
+      cout << "total clusters: " << total_clusters << "\n";
       // marshal id, type, num sets
       // int id = -1; auto t = RequestType::Batch; int num_sets = 2;
       // sets[1].MarshalToBuffer(request.buf)

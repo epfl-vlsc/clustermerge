@@ -59,7 +59,7 @@ struct MarshalledClusterSetView {
   MarshalledClusterSetView() = default;
   MarshalledClusterSetView(const char* d) : data(d) {}
   const char* data;
-  const char* cur_cluster_ptr;
+  const char* cur_cluster_ptr = nullptr;
   uint32_t cur_cluster_idx = 0;
 
   void Reset() { cur_cluster_ptr = nullptr; }
@@ -235,6 +235,7 @@ struct MarshalledRequestView {
     *cluster_set = MarshalledClusterSetView(cluster_set_ptr);
   }
 
+  // for batch
   bool NextClusterSet(MarshalledClusterSetView* cluster_set) {
     if (cur_clusterset_ptr == nullptr) {
       cur_clusterset_ptr = data + sizeof(BatchRequestHeader);

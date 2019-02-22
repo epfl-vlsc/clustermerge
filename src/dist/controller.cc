@@ -323,6 +323,7 @@ agd::Status Controller::Run(const Params& params,
     worker_threads_.push_back(std::thread(worker_func));
   }
 
+  cout << "loading to marshalled sets\n";
   // dump all sequences in single cluster sets into the queue
   // for now assumes all of this will fit in memory
   // even a million sequences would just be a few MB
@@ -333,6 +334,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledClusterSet set(s.ID());
     sets_to_merge_queue_->push(std::move(set));
   }
+  cout << "done\n";
 
   auto t0 = std::chrono::high_resolution_clock::now();
   // just use 'this' thread to schedule outgoing work
@@ -434,7 +436,10 @@ agd::Status Controller::Run(const Params& params,
 
       MarshalledClusterView cluster;
       cout << "pushing id " << outstanding_merges_ << "\n";
+      uint32_t total_cluster = sets[0].NumClusters();
+      uint32_t i = 0;
       while (sets[0].NextCluster(&cluster)) {
+        i++;
         // for (const auto& c : sets[0].clusters()) {
         MarshalledRequest request;
         request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
@@ -443,6 +448,7 @@ agd::Status Controller::Run(const Params& params,
         // << request.id() << "\n";
         request_queue_->push(std::move(request));
       }
+      assert(i == total_cluster);
       // set partial outstanding
       // outstanding_partial_ = true;
     }

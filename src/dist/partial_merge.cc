@@ -62,10 +62,12 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
 
 void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set) {
   MarshalledClusterView cluster;
+  assert(set.NumClusters() >= clusters_.size());
   for (int i = 0; i < clusters_.size(); i++) {
     //auto cluster = set.Cluster(i);
     if (!set.NextCluster(&cluster)) {
-      std::cout << "error next cluster returned false?\n";
+      std::cout << "error next cluster returned false? on index " << i << " with clusters size " << set.NumClusters() 
+        << " and orig clusters size " << clusters_.size() << "\n";
       exit(0);
     }
 
@@ -85,7 +87,7 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set) {
     IndexedCluster c;
     //const auto& cluster = set.Cluster(num_clusters - 1);
     if (!set.NextCluster(&cluster)) {
-      std::cout << "error next cluster returned false?\n";
+      std::cout << "error next cluster returned false? second\n";
       exit(0);
     }
     // copy out the marshalled cluster into the new clusters array

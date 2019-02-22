@@ -20,20 +20,16 @@ void free_func(void* data, void* hint) {
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   agd::Buffer buf;
+  buf.reserve(256);
   buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
 
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value
   buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
-  uint32_t total_not_merged = 0;
-  for (const auto& c : clusters_) {
-    if (c.IsFullyMerged()) {
-      continue;
-    }
-    total_not_merged++;
+  for (const auto& c : clusters_) { // keep the fully merged for controller to remove
     ClusterHeader ch;
-    ch.fully_merged = false;
+    ch.fully_merged = c.IsFullyMerged();
     ch.num_seqs = c.Sequences().size();
     buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     for (auto s : c.Sequences()) {
@@ -44,19 +40,20 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
 
   char* data = buf.mutable_data() + sizeof(int);
   ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
-  hp->num_clusters = total_not_merged;
+  hp->num_clusters = clusters_.size();
   // hand the buf pointer to the message
   response->msg = zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
 }
 
 ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
                        const std::vector<Sequence>& sequences) {
-  std::vector<Cluster> clusters(marshalled_set.NumClusters());
+  //std::vector<Cluster> clusters(marshalled_set.NumClusters());
   MarshalledClusterView cluster;
   while (marshalled_set.NextCluster(&cluster)) {
   //for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
     //const auto& cluster_proto = set_proto.clusters(cs_i);
     // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    //std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << " and num seqs = " << cluster.NumSeqs() << "\n";
     Cluster c(sequences[cluster.SeqIndex(0)]);
     uint32_t num_seqs = cluster.NumSeqs();
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
@@ -72,12 +69,13 @@ ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
 ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
                        const std::vector<Sequence>& sequences) {
   // yeah its copied from above idc
-  std::vector<Cluster> clusters(marshalled_set.NumClusters());
+  //std::vector<Cluster> clusters(marshalled_set.NumClusters());
   MarshalledClusterView cluster;
   while (marshalled_set.NextCluster(&cluster)) {
   //for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
     //const auto& cluster_proto = set_proto.clusters(cs_i);
     // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    //std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << " and num seqs = " << cluster.NumSeqs() << "\n";
     Cluster c(sequences[cluster.SeqIndex(0)]);
     uint32_t num_seqs = cluster.NumSeqs();
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {

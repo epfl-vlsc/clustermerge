@@ -145,7 +145,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto
           // TODO add ClusterSet constructor
-          cout << "marshalled cluster set has " << clusterset.NumClusters() << " clusters\n";
+          //cout << "marshalled cluster set has " << clusterset.NumClusters() << " clusters\n";
           ClusterSet cs(clusterset, sequences_);
           sets_to_merge.push_back(std::move(cs));
         }
@@ -156,14 +156,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // queue now has final set
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
-        // cout << "the merged set has " << final_set.Size() << " clusters\n";
+        //cout << "the merged set has " << final_set.Size() << " clusters\n";
 
         //final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
         final_set.BuildMarshalledResponse(request.ID(), &response);
         MarshalledClusterSetView view;
         view = response.Set();
-        cout << "final set has " << view.NumClusters() << " clusters.\n";
+        //cout << "final set has " << view.NumClusters() << " clusters.\n";
 
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
@@ -178,15 +178,17 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         MarshalledClusterView cluster;
         request.ClusterAndSet(&set, &cluster);
 
-        // cout << "set has " << partial.set().clusters_size() << " clusters\n";
+        cout << "set has " << set.NumClusters() << " clusters\n";
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
         auto new_cs = cs.MergeCluster(c, &aligner);
-        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        assert(set.NumClusters() <= new_cs.Size());
         MarshalledResponse response;
         new_cs.BuildMarshalledResponse(request.ID(), &response);
+        assert(response.Set().NumClusters() == new_cs.Size());
 
         result_queue_->push(std::move(response));
 

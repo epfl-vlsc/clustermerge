@@ -100,16 +100,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   }
 
   work_queue_.reset(
-      new ConcurrentQueue<cmproto::MergeRequest>(params.queue_depth));
+      new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(
-      new ConcurrentQueue<cmproto::Response>(params.queue_depth));
+      new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq
     // decode
     // put in work queue
     // repeat
-    cmproto::MergeRequest merge_request;
+    //cmproto::MergeRequest merge_request;
     while (run_) {
       zmq::message_t msg;
       bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
@@ -117,12 +117,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         continue;
       }
 
-      if (!merge_request.ParseFromArray(msg.data(), msg.size())) {
-        cout << "Failed to parse merge request protobuf!!\n";
-        return;
-      }
-
-      work_queue_->push(merge_request);
+      work_queue_->push(std::move(msg));
     }
 
     cout << "Work queue thread ending.\n";
@@ -131,25 +126,26 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   auto worker_func = [this, &envs, &aligner_params]() {
     ProteinAligner aligner(&envs, &aligner_params);
 
-    cmproto::MergeRequest request;
+    //cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
     while (run_) {
-      if (!work_queue_->pop(request)) {
+      zmq::message_t msg;
+      if (!work_queue_->pop(msg)) {
         continue;
       }
-
+      MarshalledRequestView request(reinterpret_cast<char*>(msg.data()), msg.size());
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
 
-      if (request.has_batch()) {
+      if (request.Type() == RequestType::Batch) {
         // cout << "its a batch\n";
-        auto& batch = request.batch();
-        for (size_t i = 0; i < batch.sets_size(); i++) {
-          auto& set_proto = batch.sets(i);
+        //auto& batch = request.batch();
+        MarshalledClusterSetView clusterset;
+        while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto
           // TODO add ClusterSet constructor
-          ClusterSet cs(set_proto, sequences_);
+          ClusterSet cs(clusterset, sequences_);
           sets_to_merge.push_back(std::move(cs));
         }
         // sets are constructed and in the queue, proceed to merge them
@@ -161,38 +157,38 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // encode to protobuf, push to queue
         // cout << "the merged set has " << final_set.Size() << " clusters\n";
 
-        cmproto::Response response;
-        auto* new_cs_proto = response.mutable_set();
-        final_set.ConstructProto(new_cs_proto);
+        //final_set.ConstructProto(new_cs_proto);
+        MarshalledResponse response;
+        final_set.BuildMarshalledResponse(request.ID(), &response);
 
-        response.set_id(request.id());
-        result_queue_->push(response);
+        result_queue_->push(std::move(response));
         sets_to_merge.clear();
 
-      } else if (request.has_partial()) {
+      } else if (request.Type() == RequestType::Partial) {
         // cout << "has partial\n";
-        auto& partial = request.partial();
+        //auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
         // the controller can merge other partial merge requests
+        MarshalledClusterSetView set;
+        MarshalledClusterView cluster;
+        request.ClusterAndSet(&set, &cluster);
 
         // cout << "set has " << partial.set().clusters_size() << " clusters\n";
-        ClusterSet cs(partial.set(), sequences_);
-        Cluster c(partial.cluster(), sequences_);
+        ClusterSet cs(set, sequences_);
+        Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
         auto new_cs = cs.MergeCluster(c, &aligner);
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        MarshalledResponse response;
+        new_cs.BuildMarshalledResponse(request.ID(), &response);
 
-        cmproto::Response response;
-        response.set_id(request.id());
-        auto* new_cs_proto = response.mutable_set();
-        new_cs.ConstructProto(new_cs_proto);
+        result_queue_->push(std::move(response));
 
-        result_queue_->push(response);
 
       } else {
-        cout << "request was empty!!\n";
+        cout << "request was not any type!!!!!!\n";
         return;
       }
     }
@@ -205,19 +201,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   }
 
   result_queue_thread_ = thread([this]() {
-    cmproto::Response response;
+    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
     while (run_) {
+      MarshalledResponse response;
       if (!result_queue_->pop(response)) {
         continue;
       }
-      auto size = response.ByteSizeLong();
-      zmq::message_t msg(size);
-      auto success = response.SerializeToArray(msg.data(), size);
-      if (!success) {
-        cout << "Thread failed to serialize response protobuf!\n";
-      }
 
-      success = zmq_send_socket_->send(std::move(msg));
+      bool success = zmq_send_socket_->send(std::move(response.msg));
       if (!success) {
         cout << "Thread failed to send response over zmq!\n";
       }

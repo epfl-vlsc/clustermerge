@@ -7,7 +7,7 @@
 #include "src/common/concurrent_queue.h"
 #include "src/common/sequence.h"
 #include "src/common/params.h"
-#include "src/dist/requests.h"
+#include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "src/dist/partial_merge.h"
 #include "zmq.hpp"
@@ -65,13 +65,14 @@ class Controller {
   struct PartialMergeItem {
     //cmproto::ClusterSet partial_set;
     PartialMergeItem() = default;
-    PartialMergeItem(const PartialMergeItem& other) {
-      partial_set = other.partial_set;
+    PartialMergeItem(const PartialMergeItem& other) = delete;
+    PartialMergeItem(PartialMergeItem&& other) {
+      partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
     }
-    PartialMergeItem& operator=(const PartialMergeItem& other) {
-      partial_set = other.partial_set;
+    PartialMergeItem& operator=(PartialMergeItem&& other) {
+      partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
       return *this;

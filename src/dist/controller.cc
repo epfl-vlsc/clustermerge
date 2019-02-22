@@ -1,6 +1,6 @@
 
 #include "controller.h"
-#include <google/protobuf/text_format.h>
+//#include <google/protobuf/text_format.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -22,7 +22,7 @@ using std::thread;
     absl::Mutex mu_;
 };*/
 
-void RemoveDuplicates(cmproto::ClusterSet& set) {
+/*void RemoveDuplicates(cmproto::ClusterSet& set) {
   absl::flat_hash_set<std::vector<size_t>> set_map;
 
   auto cluster_it = set.mutable_clusters()->begin();
@@ -41,7 +41,7 @@ void RemoveDuplicates(cmproto::ClusterSet& set) {
     }
     cluster_set.clear();
   }
-}
+}*/
 
 // merge other into
 /*void MergePartials(cmproto::ClusterSet& set, const cmproto::ClusterSet& other,
@@ -190,7 +190,7 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     MarshalledRequest merge_request;
     int total_sent = 0;
-    auto free_func = [](void* data, void* hint) { delete data; };
+    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
@@ -428,7 +428,7 @@ agd::Status Controller::Run(const Params& params,
       {
         absl::MutexLock l(&mu_);
         cout << "pushing id " << outstanding_merges_ << " to map\n";
-        partial_merge_map_.insert_or_assign(outstanding_merges_, item);
+        partial_merge_map_.insert_or_assign(outstanding_merges_, std::move(item));
       }
 
       MarshalledClusterView cluster;

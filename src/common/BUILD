@@ -41,16 +41,17 @@ cc_library(
     # bazel currently doesn't look in /usr/local for some reason
     # so we need to include it for ZMQ
     linkopts = ["-lpthread"],
-    copts = ["-std=c++14"],
+    copts = ["-std=c++14", "-I/usr/local/include", "-L/usr/local/lib"],
     visibility = ["//visibility:public"],
     deps = ["@com_google_absl//absl/strings",
             "@com_google_absl//absl/container:flat_hash_map",
             "@com_google_absl//absl/container:flat_hash_set",
             "@json//:json-cpp",
             "@args//:args",
-            "//src/proto:clustermerge_cc_proto",
+            #"//src/proto:clustermerge_cc_proto",
             "//src/agd:agd",
             "//src/dataset:dataset",
+            "//src/comms:comms",
             ":swps3_lib",
            ]
 )

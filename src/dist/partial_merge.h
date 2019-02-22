@@ -1,7 +1,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
-#include "src/dist/requests.h"
+#include "src/comms/requests.h"
 #include <iostream>
 
 class IndexedCluster {
@@ -46,15 +46,15 @@ class IndexedCluster {
 
 class PartialMergeSet {
  public:
-  PartialMergeSet& operator=(const PartialMergeSet& other) {
-    clusters_ = other.clusters_;
-    new_clusters_ = other.new_clusters_;
+  PartialMergeSet& operator=(PartialMergeSet&& other) {
+    clusters_ = std::move(other.clusters_);
+    new_clusters_ = std::move(other.new_clusters_);
     return *this;
   };
   void MergeClusterSet(MarshalledClusterSetView set);
   // build final set, not including fully merged clusters
   void BuildMarshalledSet(MarshalledClusterSet* set);
-  void Init(const MarshalledClusterSet& set);
+  void Init(MarshalledClusterSet& set);
   //void RemoveFullyMerged();
   const std::vector<IndexedCluster>& Clusters() const { return clusters_; }
 

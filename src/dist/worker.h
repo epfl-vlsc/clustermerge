@@ -7,8 +7,7 @@
 #include "src/common/sequence.h"
 #include "src/common/params.h"
 #include "src/dataset/dataset.h"
-#include "src/proto/requests.pb.h"
-#include "src/proto/responses.pb.h"
+#include "src/comms/requests.h"
 #include "zmq.hpp"
 
 // interface to manage local worker
@@ -38,14 +37,14 @@ class Worker {
   // local input buffer
   // one thread receives zmq messages, decodes, puts work in work queue
   // all other threads do work and push to output buffer
-  std::unique_ptr<ConcurrentQueue<cmproto::MergeRequest>> work_queue_;
+  std::unique_ptr<ConcurrentQueue<zmq::message_t>> work_queue_;
   std::thread work_queue_thread_;
 
   std::vector<std::thread> worker_threads_;
 
   // local output buffer
   // one thread encodes, sends results to controller
-  std::unique_ptr<ConcurrentQueue<cmproto::Response>> result_queue_;
+  std::unique_ptr<ConcurrentQueue<MarshalledResponse>> result_queue_;
   std::thread result_queue_thread_;
 
   volatile bool run_ = true;

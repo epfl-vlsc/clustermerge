@@ -17,7 +17,7 @@ class ConcurrentQueue {
   // return true if pushed, false otherwise
   // will block until pushed if block_ is true
   bool push(const T& item);
-  bool push(const T&& item);
+  bool push(T&& item);
   // return true if success and item is valid, false otherwise
   bool pop(T& item);
 
@@ -81,7 +81,7 @@ bool ConcurrentQueue<T>::peek(T& item) {
     }
 
     if (!queue_.empty()) {
-      item = queue_.front();
+      item = std::move(queue_.front());
       popped = true;
     }
   }
@@ -162,7 +162,7 @@ bool ConcurrentQueue<T>::push(const T& item) {
 }
 
 template <typename T>
-bool ConcurrentQueue<T>::push(const T&& item) {
+bool ConcurrentQueue<T>::push(T&& item) {
   bool pushed = false;
   {
     absl::MutexLock l(&mu_);

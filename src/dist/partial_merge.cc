@@ -22,11 +22,10 @@
 
 }*/
 
-void PartialMergeSet::Init(const MarshalledClusterSet& set) {
-  int num_clusters = set.NumClusters();
-  for (int i = 0; i < num_clusters; i++) {
-    auto c = set.Cluster(i);
-    IndexedCluster ic(c);
+void PartialMergeSet::Init(MarshalledClusterSet& set) {
+  MarshalledClusterView cluster;
+  while (set.NextCluster(&cluster)) {
+    IndexedCluster ic(cluster);
     clusters_.push_back(std::move(ic));
   }
 }

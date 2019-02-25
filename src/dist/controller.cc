@@ -231,7 +231,7 @@ agd::Status Controller::Run(const Params& params,
       }
       total_received++;
 
-      cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
+      //cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
 
       response_queue_->push(std::move(response));
     }
@@ -306,7 +306,7 @@ agd::Status Controller::Run(const Params& params,
         }*/
         sets_to_merge_queue_->push(std::move(set));
         // remove partial it, its done now
-        cout << "partial id " << id << " is complete\n";
+        //cout << "partial id " << id << " is complete, with " << set.NumClusters() << " clusters\n";
         {
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);

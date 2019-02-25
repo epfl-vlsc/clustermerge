@@ -1,13 +1,9 @@
 #pragma once
 
-#include "zmq.hpp"
 #include "src/agd/buffer.h"
+#include "zmq.hpp"
 
-enum RequestType {
-  Batch = 0,
-  Partial
-};
-
+enum RequestType { Batch = 0, Partial };
 
 struct __attribute__((packed)) BatchRequestHeader {
   int id;
@@ -41,11 +37,11 @@ struct MarshalledClusterView {
   }
   size_t TotalSize() const {
     uint32_t seqs = NumSeqs();
-    return sizeof(ClusterHeader) + sizeof(uint32_t)*seqs;
+    return sizeof(ClusterHeader) + sizeof(uint32_t) * seqs;
   }
   // get sequence index at idx
   uint32_t SeqIndex(uint32_t idx) const {
-    const char * p = data + sizeof(ClusterHeader) + sizeof(uint32_t)*idx;
+    const char* p = data + sizeof(ClusterHeader) + sizeof(uint32_t) * idx;
     return *reinterpret_cast<const uint32_t*>(p);
   }
   bool IsFullyMerged() const {
@@ -75,9 +71,10 @@ struct MarshalledClusterSetView {
       cur_cluster_idx = 0;
       return true;
     }
-    // advance to next cluster and return 
-    uint32_t cluster_size = reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
-    cur_cluster_ptr += sizeof(ClusterHeader) + sizeof(uint32_t)*cluster_size;
+    // advance to next cluster and return
+    uint32_t cluster_size =
+        reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
+    cur_cluster_ptr += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;
     cur_cluster_idx++;
     if (cur_cluster_idx >= NumClusters()) {
       return false;
@@ -95,22 +92,23 @@ struct MarshalledResponse {
   MarshalledResponse() = default;
   MarshalledResponse(MarshalledResponse&&) = default;
   MarshalledResponse& operator=(MarshalledResponse&&) = default;
-  int ID() { 
-    return *reinterpret_cast<int*>(msg.data());
-  }
-  MarshalledClusterSetView Set() { 
+  int ID() { return *reinterpret_cast<int*>(msg.data()); }
+  MarshalledClusterSetView Set() {
     const char* data = reinterpret_cast<const char*>(msg.data()) + sizeof(int);
     return MarshalledClusterSetView(data);
   }
 };
 
-
 struct MarshalledClusterSet {
-  MarshalledClusterSet() = default;
-  MarshalledClusterSet(uint32_t idx) {
-    //create from single sequence
-    size_t sz = sizeof(ClusterSetHeader) + sizeof(ClusterHeader) + sizeof(uint32_t);
-    buf.reserve(sz);
+  MarshalledClusterSet() : buf(agd::Buffer(256, 128)) {}
+  MarshalledClusterSet(uint32_t idx)
+      : buf(agd::Buffer(
+            sizeof(ClusterSetHeader) + sizeof(ClusterHeader) + sizeof(uint32_t),
+            512)) {  // create from single sequence
+
+    size_t sz =
+        sizeof(ClusterSetHeader) + sizeof(ClusterHeader) + sizeof(uint32_t);
+    // buf.reserve(sz);
     ClusterSetHeader h;
     h.num_clusters = 1;
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
@@ -123,12 +121,13 @@ struct MarshalledClusterSet {
     buf.AppendBuffer(reinterpret_cast<char*>(&idx), sizeof(uint32_t));
   }
 
-  MarshalledClusterSet(MarshalledResponse& response) {
+  MarshalledClusterSet(MarshalledResponse& response)
+      : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {
     // a response buffer is an int id and a marshalled clusterset
     char* data = reinterpret_cast<char*>(response.msg.data());
     data += sizeof(uint32_t);
     auto data_size = response.msg.size() - sizeof(uint32_t);
-    buf.reserve(data_size);
+    // buf.reserve(data_size);
     buf.AppendBuffer(data, data_size);
   }
 
@@ -144,9 +143,10 @@ struct MarshalledClusterSet {
       *cluster = MarshalledClusterView(cur_cluster_ptr);
       return true;
     }
-    // advance to next cluster and return 
-    uint32_t cluster_size = reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
-    cur_cluster_ptr += sizeof(ClusterHeader) + sizeof(uint32_t)*cluster_size;
+    // advance to next cluster and return
+    uint32_t cluster_size =
+        reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
+    cur_cluster_ptr += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;
     if (cur_cluster_ptr >= buf.data() + buf.size()) {
       return false;
     } else {
@@ -155,10 +155,8 @@ struct MarshalledClusterSet {
     }
   }
 
-  size_t TotalSize() const {
-    return buf.size();
-  }
-  
+  size_t TotalSize() const { return buf.size(); }
+
   void Reset() { cur_cluster_ptr = nullptr; }
 
   const char* cur_cluster_ptr = nullptr;
@@ -166,7 +164,8 @@ struct MarshalledClusterSet {
 };
 
 struct MarshalledCluster {
-  MarshalledCluster(const char* data, uint32_t size) {
+  MarshalledCluster(const char* data, uint32_t size)
+      : buf(agd::Buffer(size, 128)) {
     buf.AppendBuffer(data, size);
   }
   agd::Buffer buf;
@@ -174,7 +173,8 @@ struct MarshalledCluster {
 
 // for request queue
 struct MarshalledRequest {
-  MarshalledRequest() : buf(agd::Buffer(512)) {}
+  MarshalledRequest() : buf(agd::Buffer(256, 128)) {}
+
   void CreateBatchRequest(int id) {
     BatchRequestHeader h;
     h.id = id;
@@ -185,11 +185,13 @@ struct MarshalledRequest {
 
   void AddSetToBatch(const MarshalledClusterSet& set) {
     buf.AppendBuffer(set.buf.data(), set.buf.size());
-    BatchRequestHeader* h = reinterpret_cast<BatchRequestHeader*>(buf.mutable_data());
+    BatchRequestHeader* h =
+        reinterpret_cast<BatchRequestHeader*>(buf.mutable_data());
     h->num_cluster_sets++;
   }
 
-  void CreatePartialRequest(int id, MarshalledClusterView cluster, const MarshalledClusterSet& set) {
+  void CreatePartialRequest(int id, MarshalledClusterView cluster,
+                            const MarshalledClusterSet& set) {
     size_t total = cluster.TotalSize() + set.TotalSize();
     buf.reserve(total + sizeof(PartialRequestHeader));
     PartialRequestHeader h;
@@ -214,10 +216,8 @@ struct MarshalledRequestView {
   RequestType Type() {
     return reinterpret_cast<const PartialRequestHeader*>(data)->type;
   }
-  
-  int ID() {
-    return reinterpret_cast<const PartialRequestHeader*>(data)->id;
-  }
+
+  int ID() { return reinterpret_cast<const PartialRequestHeader*>(data)->id; }
 
   uint32_t NumClusterSets() {
     // relies on user to call Type and ensure this is correct
@@ -225,10 +225,12 @@ struct MarshalledRequestView {
   }
 
   // for partial requests
-  void ClusterAndSet(MarshalledClusterSetView* cluster_set, MarshalledClusterView* cluster) {
+  void ClusterAndSet(MarshalledClusterSetView* cluster_set,
+                     MarshalledClusterView* cluster) {
     const char* cluster_ptr = data + sizeof(PartialRequestHeader);
-    const ClusterHeader* h = reinterpret_cast<const ClusterHeader*>(cluster_ptr);
-    uint32_t sz = h->num_seqs*sizeof(uint32_t) + sizeof(ClusterHeader);
+    const ClusterHeader* h =
+        reinterpret_cast<const ClusterHeader*>(cluster_ptr);
+    uint32_t sz = h->num_seqs * sizeof(uint32_t) + sizeof(ClusterHeader);
     *cluster = MarshalledClusterView(cluster_ptr);
 
     const char* cluster_set_ptr = cluster_ptr + sz;
@@ -244,11 +246,12 @@ struct MarshalledRequestView {
     } else {
       // find the start of next cluster set
       const char* p = cur_clusterset_ptr;
-      uint32_t num_clusters = reinterpret_cast<const ClusterSetHeader*>(p)->num_clusters;
+      uint32_t num_clusters =
+          reinterpret_cast<const ClusterSetHeader*>(p)->num_clusters;
       p += sizeof(ClusterSetHeader);
       for (int i = 0; i < num_clusters; i++) {
         uint32_t num_seqs = reinterpret_cast<const ClusterHeader*>(p)->num_seqs;
-        p += sizeof(ClusterHeader) + num_seqs*sizeof(uint32_t);
+        p += sizeof(ClusterHeader) + num_seqs * sizeof(uint32_t);
       }
       if (p >= data + size) {
         return false;
@@ -258,8 +261,5 @@ struct MarshalledRequestView {
         return true;
       }
     }
-
   }
 };
-
- 

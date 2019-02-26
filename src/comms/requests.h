@@ -249,7 +249,7 @@ struct MarshalledRequestView {
       uint32_t num_clusters =
           reinterpret_cast<const ClusterSetHeader*>(p)->num_clusters;
       p += sizeof(ClusterSetHeader);
-      for (int i = 0; i < num_clusters; i++) {
+      for (uint32_t i = 0; i < num_clusters; i++) {
         uint32_t num_seqs = reinterpret_cast<const ClusterHeader*>(p)->num_seqs;
         p += sizeof(ClusterHeader) + num_seqs * sizeof(uint32_t);
       }

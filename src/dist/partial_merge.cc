@@ -38,6 +38,7 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     set->buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
     uint32_t total_not_merged = 0;
+    absl::flat_hash_set<uint32_t> seq_set;
     for (const auto& c : clusters_) {
       if (c.IsFullyMerged()) {
         continue;
@@ -49,7 +50,13 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
       set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
       auto r = c.Representative();
       set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
+      // remove duplicates in new seqs using the set
+      seq_set.clear();
       for (auto s : c.SeqIndexes()) {
+        seq_set.insert(s);
+      }
+      c.AddNewSeqs(&seq_set);
+      for (auto s : seq_set) {
         if (s != r) {
           set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(decltype(s)));
         }
@@ -83,7 +90,11 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set) {
     }
     auto num_seqs = cluster.NumSeqs();
     // only do new seqs, orig seqs are already present and can be skipped
-    auto orig_seqs = clusters_[i].OrigNumSeqs();
+    auto orig_seqs = clusters_[i].NumOrigSeqs();
+    if (orig_seqs > num_seqs) { 
+      std::cout << "error num seqs " << num_seqs << " < " << orig_seqs << " orig seqs, cluster " << i << "\n"; 
+      exit(0); 
+    }
     for (auto x = orig_seqs; x < num_seqs; x++) {
       clusters_[i].Insert(cluster.SeqIndex(x));
     }

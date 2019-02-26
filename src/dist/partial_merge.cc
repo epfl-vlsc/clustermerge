@@ -44,21 +44,23 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
         continue;
       }
       total_not_merged++;
-      ClusterHeader ch;
-      ch.fully_merged = false;
-      ch.num_seqs = c.SeqIndexes().size();
-      set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
-      auto r = c.Representative();
-      set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
-      // remove duplicates in new seqs using the set
+      
       seq_set.clear();
       for (auto s : c.SeqIndexes()) {
         seq_set.insert(s);
       }
       c.AddNewSeqs(&seq_set);
+
+      ClusterHeader ch;
+      ch.fully_merged = false;
+      ch.num_seqs = seq_set.size();
+      set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
+      auto r = c.Representative();
+      set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
+      // remove duplicates in new seqs using the set
       for (auto s : seq_set) {
         if (s != r) {
-          set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(decltype(s)));
+          set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
         }
       }
     }

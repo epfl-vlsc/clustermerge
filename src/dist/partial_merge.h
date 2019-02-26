@@ -96,10 +96,13 @@ class IndexedCluster {
   // add new seqs to set to facilitate duplicate removal
   void AddNewSeqs(absl::flat_hash_set<uint32_t>* set) const {
     const auto* head = new_seqs_.Head();
+    int i = 0;
     while (head != nullptr) {
+      i++;
       set->insert(head->t);
       head = head->next;
     }
+    assert(i == new_seqs_.Size());
   }
 
  private:

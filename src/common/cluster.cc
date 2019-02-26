@@ -42,7 +42,19 @@ void Cluster::AddSequence(const Sequence& seq) {
 
 void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
+  //seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
+  bool found = false;
+  for (const auto& s : seqs_) {
+    if (s.ID() == other_seqs.front().ID()) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
+  } else {
+    std::cout << "FOUND REP WAS ALREADY THERE\n";
+  }
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
@@ -75,7 +87,18 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
 
 void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
   const auto& other_seqs = other->Sequences();
-  seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
+  bool found = false;
+  for (const auto& s : seqs_) {
+    if (s.ID() == other_seqs.front().ID()) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
+  } else {
+    std::cout << "FOUND REP WAS ALREADY THERE";
+  }
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {

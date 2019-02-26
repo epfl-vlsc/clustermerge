@@ -11,11 +11,13 @@ class IndexedCluster {
     seq_indexes_ = other.seq_indexes_;
     fully_merged_ = other.fully_merged_;
     respresentative_idx_ = other.respresentative_idx_;
+    orig_seqs_ = other.orig_seqs_;
   }
   IndexedCluster& operator=(const IndexedCluster& other) {
     seq_indexes_ = other.seq_indexes_;
     fully_merged_ = other.fully_merged_;
     respresentative_idx_ = other.respresentative_idx_;
+    orig_seqs_ = other.orig_seqs_;
     return *this;
   }
   IndexedCluster(const MarshalledClusterView& c) {
@@ -23,6 +25,10 @@ class IndexedCluster {
     uint32_t num_seqs = c.NumSeqs();
     for (uint32_t i = 0; i < num_seqs; i++) {
       seq_indexes_.insert(c.SeqIndex(i));
+    }
+    orig_seqs_ = num_seqs;
+    if (num_seqs != seq_indexes_.size()) {
+      std::cout <<  "there were dups!!!!!!!!!!!!!\n";
     }
   }
   void Insert(uint32_t seq_index) {
@@ -34,12 +40,14 @@ class IndexedCluster {
 
   const absl::flat_hash_set<uint32_t>& SeqIndexes() const { return seq_indexes_; }
   uint32_t Representative() const { return respresentative_idx_; }
+  uint32_t NumOrigSeqs() const { return orig_seqs_; }
 
  private:
   absl::flat_hash_set<uint32_t> seq_indexes_;
   bool fully_merged_ = false;
   // track explicitly the rep because the set is not ordered
   uint32_t respresentative_idx_ = 0;
+  uint32_t orig_seqs_;
   // lock to insert new set indexes
   absl::Mutex mu_;
 };

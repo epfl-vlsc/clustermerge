@@ -52,9 +52,7 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
   }
   if (!found) {
     seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
-  } else {
-    std::cout << "FOUND REP WAS ALREADY THERE\n";
-  }
+  } 
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {
@@ -96,9 +94,7 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
   }
   if (!found) {
     seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
-  } else {
-    std::cout << "FOUND REP WAS ALREADY THERE";
-  }
+  } 
 
   bool first = true;  // to skip first
   for (const auto& seq : other_seqs) {

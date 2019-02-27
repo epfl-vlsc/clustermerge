@@ -17,7 +17,7 @@ with open("queue.json") as f:
 
 first_time = int(queue_data[0][0])
 if (args.start_time):
-  first_time = args.start_time
+  first_time = int(args.start_time)
 
 print("first time is {}".format(first_time))
 

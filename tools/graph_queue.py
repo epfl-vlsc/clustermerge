@@ -8,8 +8,11 @@ lines = []
 with open("queue.json") as f:
     queue_data = json.load(f)
 
+first_time = int(queue_data[0][0])
+print("first time is {}".format(first_time))
+
 q_times = []
-q_times.append(int(lines[0][0]))
+q_times.append(first_time)
 q_values = []
 q_values.append(0)
 

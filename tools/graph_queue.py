@@ -2,6 +2,13 @@
 import plotly
 import plotly.graph_objs as go
 import json
+import argparse
+  
+
+parser = argparse.ArgumentParser(description="graph queue json")
+parser.add_argument("--start_time", help="start time")
+
+args = parser.parse_args()
 
 lines = []
 
@@ -9,6 +16,9 @@ with open("queue.json") as f:
     queue_data = json.load(f)
 
 first_time = int(queue_data[0][0])
+if (args.start_time):
+  first_time = args.start_time
+
 print("first time is {}".format(first_time))
 
 q_times = []

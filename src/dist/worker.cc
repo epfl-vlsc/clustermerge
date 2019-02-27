@@ -245,7 +245,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   std::cin.get();
 
   cout << "joining threads ...\n";
-  run_ = false;
+  //run_ = false;
   //work_queue_->unblock();
   //result_queue_->unblock();
   result_queue_thread_.join();

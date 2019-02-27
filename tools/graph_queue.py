@@ -3,6 +3,8 @@ import plotly
 import plotly.graph_objs as go
 import json
 
+lines = []
+
 with open("queue.json") as f:
     queue_data = json.load(f)
 

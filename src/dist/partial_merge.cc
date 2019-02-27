@@ -58,11 +58,14 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
       auto r = c.Representative();
       set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
       // remove duplicates in new seqs using the set
+      int i = 1;
       for (auto s : seq_set) {
         if (s != r) {
+          i++;
           set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
         }
       }
+      assert(i == seq_set.size());
     }
 
     // dont forget the new clusters, they are already marshalled

@@ -99,6 +99,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                  response_queue_address);
   }
 
+  zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
+  int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  cout << "snd hwm value is " << val << " \n";
+
   work_queue_.reset(
       new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(

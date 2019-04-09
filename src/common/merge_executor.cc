@@ -33,7 +33,7 @@ MergeExecutor::~MergeExecutor() {
 }
 
 void MergeExecutor::EnqueueMerge(const WorkItem& item) {
-  if (!work_queue_->push(item)) {
+  if (!work_queue_->push(std::move(item))) {
     cout << "failed to push work item to queue.\n";
   }
 }

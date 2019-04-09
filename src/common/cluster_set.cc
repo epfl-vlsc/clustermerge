@@ -14,24 +14,81 @@
 using std::make_tuple;
 using std::vector;
 
-ClusterSet::ClusterSet(const cmproto::ClusterSet& set_proto,
-                       const std::vector<Sequence>& sequences) {
-  std::vector<Cluster> clusters(set_proto.clusters_size());
-  for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
-    const auto& cluster_proto = set_proto.clusters(cs_i);
-    // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
-    Cluster c(sequences[cluster_proto.indexes(0)]);
-    for (size_t seq_i = 1; seq_i < cluster_proto.indexes_size(); seq_i++) {
-      c.AddSequence(sequences[cluster_proto.indexes(seq_i)]);
+void free_func(void* data, void* hint) {
+  delete reinterpret_cast<char*>(data);
+}
+
+void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
+  agd::Buffer buf;
+  buf.reserve(256);
+  buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
+
+  ClusterSetHeader h;
+  h.num_clusters = 0;  // set after once we know the value
+  buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
+
+  for (const auto& c : clusters_) { // keep the fully merged for controller to remove
+    ClusterHeader ch;
+    ch.fully_merged = c.IsFullyMerged();
+    ch.num_seqs = c.Sequences().size();
+    buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
+    for (auto s : c.Sequences()) {
+      uint32_t i = s.ID();
+      buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
     }
-    if (cluster_proto.fully_merged()) {
+  }
+
+  char* data = buf.mutable_data() + sizeof(int);
+  ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
+  hp->num_clusters = clusters_.size();
+  // hand the buf pointer to the message
+  response->msg = zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
+}
+
+ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
+                       const std::vector<Sequence>& sequences) {
+  //std::vector<Cluster> clusters(marshalled_set.NumClusters());
+  MarshalledClusterView cluster;
+  while (marshalled_set.NextCluster(&cluster)) {
+  //for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
+    //const auto& cluster_proto = set_proto.clusters(cs_i);
+    // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    //std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << " and num seqs = " << cluster.NumSeqs() << "\n";
+    Cluster c(sequences[cluster.SeqIndex(0)]);
+    uint32_t num_seqs = cluster.NumSeqs();
+    for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
+      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+    }
+    if (cluster.IsFullyMerged()) {
       c.SetFullyMerged();
     }
     clusters_.push_back(std::move(c));
   }
 }
 
-void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
+ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
+                       const std::vector<Sequence>& sequences) {
+  // yeah its copied from above idc
+  //std::vector<Cluster> clusters(marshalled_set.NumClusters());
+  MarshalledClusterView cluster;
+  while (marshalled_set.NextCluster(&cluster)) {
+  //for (size_t cs_i = 0; cs_i < set_proto.clusters_size(); cs_i++) {
+    //const auto& cluster_proto = set_proto.clusters(cs_i);
+    // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
+    //std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << " and num seqs = " << cluster.NumSeqs() << "\n";
+    Cluster c(sequences[cluster.SeqIndex(0)]);
+    uint32_t num_seqs = cluster.NumSeqs();
+    for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
+      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+    }
+    if (cluster.IsFullyMerged()) {
+      c.SetFullyMerged();
+    }
+    clusters_.push_back(std::move(c));
+  }
+}
+
+/*void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
   for (const auto& c : clusters_) {
     auto* c_proto = set_proto->add_clusters();
     for (const auto& s : c.Sequences()) {
@@ -39,7 +96,7 @@ void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
     }
     c_proto->set_fully_merged(c.IsFullyMerged());
   }
-}
+}*/
 
 ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
                                              MergeExecutor* executor) {

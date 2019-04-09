@@ -4,13 +4,12 @@
 #include <thread>
 #include <atomic>
 #include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/sequence.h"
 #include "src/common/params.h"
+#include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
-#include "src/proto/requests.pb.h"
-#include "src/proto/responses.pb.h"
+#include "src/dist/partial_merge.h"
 #include "zmq.hpp"
 
 // one exists in a cluster
@@ -28,6 +27,8 @@ class Controller {
     absl::string_view data_dir_path;
     uint32_t batch_size;
     uint32_t dup_removal_thresh;
+    bool exclude_allall;
+    int dataset_limit;
   };
 
   agd::Status Run(const Params& params, const Parameters& aligner_params,
@@ -40,7 +41,7 @@ class Controller {
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
 
   // thread reads from zmq and puts into response queue
-  std::unique_ptr<ConcurrentQueue<cmproto::Response>> response_queue_;
+  std::unique_ptr<ConcurrentQueue<MarshalledResponse>> response_queue_;
   std::thread response_queue_thread_;
 
   // controller work threads
@@ -49,11 +50,11 @@ class Controller {
   // if is partial result (ID will be
   // in merge map), lookup and merge with partial_set, if partial set complete,
   //    push ready to merge sets to sets_to_merge_queue
-  std::unique_ptr<ConcurrentQueue<cmproto::ClusterSet>> sets_to_merge_queue_;
+  std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>> sets_to_merge_queue_;
   std::vector<std::thread> worker_threads_;
 
   // thread reads from request queue and pushes to zmq
-  std::unique_ptr<ConcurrentQueue<cmproto::MergeRequest>> request_queue_;
+  std::unique_ptr<ConcurrentQueue<MarshalledRequest>> request_queue_;
   // may need more than one thread .... we'll see
   std::thread request_queue_thread_;
 
@@ -61,79 +62,19 @@ class Controller {
 
   // indexed cluster and partial merge set to facilitate efficient 
   // parallel merging of remotely executed partial merge items
-  class IndexedCluster {
-    public: 
-      IndexedCluster() = default;
-      IndexedCluster(const IndexedCluster& other) {
-        seq_indexes_ = other.seq_indexes_;
-        fully_merged_ = other.fully_merged_;
-        respresentative_idx_ = other.respresentative_idx_;
-      }
-      IndexedCluster& operator=(const IndexedCluster& other) {
-        seq_indexes_ = other.seq_indexes_;
-        fully_merged_ = other.fully_merged_;
-        respresentative_idx_ = other.respresentative_idx_;
-        return *this;
-      }
-      IndexedCluster(const cmproto::Cluster& c) {
-        respresentative_idx_ = c.indexes(0);
-        for (auto& i : c.indexes()) {
-          seq_indexes_.insert(i);
-        }
-      }
-      void Insert(int seq_index) {
-        absl::MutexLock l(&mu_);
-        seq_indexes_.insert(seq_index);
-      }
-      void SetFullyMerged() { fully_merged_ = true; }
-      bool IsFullyMerged() { return fully_merged_; }
-      void PopulateCluster(cmproto::Cluster* cluster) const {
-        cluster->add_indexes(respresentative_idx_);
-        for (auto index : seq_indexes_) {
-          if (index != respresentative_idx_) {
-            cluster->add_indexes(index);
-          }
-        }
-        cluster->set_fully_merged(fully_merged_);
-      }
-    private:
-      absl::flat_hash_set<int> seq_indexes_;
-      bool fully_merged_ = false;
-      // track explicitly the rep because the set is not ordered
-      int respresentative_idx_ = 0;
-      // lock to insert new set indexes
-      absl::Mutex mu_;
-  };
-
-  class PartialMergeSet {
-    public:
-      PartialMergeSet& operator=(const PartialMergeSet& other) {
-        clusters_ = other.clusters_;
-        new_clusters_ = other.new_clusters_;
-        return *this; 
-      };
-      void MergeClusterSet(const cmproto::ClusterSet& set);
-      void BuildClusterSetProto(cmproto::ClusterSet* set);
-      void Init(const cmproto::ClusterSet& set);
-      void RemoveFullyMerged();
-    private:
-      std::vector<IndexedCluster> clusters_; // does not change after construction
-      std::vector<cmproto::Cluster> new_clusters_;
-      // lock to add new clusters
-      absl::Mutex mu_;
-  };
 
   // map structure to track incomplete partial merges
   struct PartialMergeItem {
     //cmproto::ClusterSet partial_set;
     PartialMergeItem() = default;
-    PartialMergeItem(const PartialMergeItem& other) {
-      partial_set = other.partial_set;
+    PartialMergeItem(const PartialMergeItem& other) = delete;
+    PartialMergeItem(PartialMergeItem&& other) {
+      partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
     }
-    PartialMergeItem& operator=(const PartialMergeItem& other) {
-      partial_set = other.partial_set;
+    PartialMergeItem& operator=(PartialMergeItem&& other) {
+      partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
       return *this;

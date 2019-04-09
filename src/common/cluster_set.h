@@ -4,7 +4,7 @@
 #include <vector>
 #include "all_all_executor.h"
 #include "cluster.h"
-#include "src/proto/cluster.pb.h"
+#include "src/comms/requests.h"
 
 class MergeExecutor;
 
@@ -21,10 +21,15 @@ class ClusterSet {
   ClusterSet(size_t num) { clusters_.reserve(num); }
 
   // construct from protobuf (for dist version)
-  ClusterSet(const cmproto::ClusterSet& set_proto,
+  ClusterSet(MarshalledClusterSet& marshalled_set,
+             const std::vector<Sequence>& sequences);
+  
+  ClusterSet(MarshalledClusterSetView& marshalled_set,
              const std::vector<Sequence>& sequences);
 
-  void ConstructProto(cmproto::ClusterSet* set_proto);
+  void BuildMarshalledResponse(int id, MarshalledResponse* response);
+
+  //void ConstructProto(cmproto::ClusterSet* set_proto);
 
   void Swap(ClusterSet* other) { clusters_.swap(other->clusters_); }
 
@@ -52,6 +57,8 @@ class ClusterSet {
 
   void DebugDump() const;
   void DumpJson(const std::string& filename) const;
+
+  void MarshalToBuffer(agd::Buffer* buf);
 
   size_t Size() { return clusters_.size(); }
 

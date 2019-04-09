@@ -61,6 +61,10 @@ int main(int argc, char* argv[]) {
       parser, "batch size",
       "How many small clusters should be batched together.",
       {'b', "batch_size"});
+  args::ValueFlag<unsigned int> dataset_limit_arg(
+      parser, "dataset limit",
+      "Cluster only this many sequences",
+      {'D', "dataset_limit"});
   args::ValueFlag<unsigned int> dup_removal_threshold_arg(
       parser, "duplicate removal threshold",
       "How big a set of clusters should be before duplicates are filtered out "
@@ -83,6 +87,10 @@ int main(int argc, char* argv[]) {
           "JSON file containing the cluster server configuration, example: \n",
           cluster_format),
       {'s', "server_config"});
+  args::Flag exclude_allall(
+      parser, "exclude_allall",
+      "Don't perform intra-cluster all-all alignment, just do the clustering.",
+      {'x', "exclude_allall"});
   args::PositionalList<std::string> datasets_opts(
       parser, "datasets",
       "AGD Protein datasets to cluster. If present, will override `input_list` "
@@ -274,6 +282,13 @@ int main(int argc, char* argv[]) {
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
     params.dup_removal_thresh = dup_removal_threshold;
+    params.exclude_allall = exclude_allall;
+    if (dataset_limit_arg) {
+      params.dataset_limit = args::get(dataset_limit_arg);
+    } else {
+      params.dataset_limit = -1;
+    }
+    cout << "dataset limit is " << params.dataset_limit << "\n";
     Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";

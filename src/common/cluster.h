@@ -5,7 +5,7 @@
 #include "aligner.h"
 #include "sequence.h"
 #include "absl/synchronization/mutex.h"
-#include "src/proto/cluster.pb.h"
+#include "src/comms/requests.h"
 
 class Cluster {
  public:
@@ -29,12 +29,13 @@ class Cluster {
     return *this;
   }
 
-  Cluster(const cmproto::Cluster& cluster_proto, const std::vector<Sequence>& sequences) {
+  Cluster(const MarshalledClusterView& cluster, const std::vector<Sequence>& sequences) {
     // construct a cluster object from a protobuf representation
-    for (size_t seq_i = 0; seq_i < cluster_proto.indexes_size(); seq_i++) {
-      AddSequence(sequences[cluster_proto.indexes(seq_i)]);
+    uint32_t num_seqs = cluster.NumSeqs();
+    for (size_t seq_i = 0; seq_i < num_seqs; seq_i++) {
+      AddSequence(sequences[cluster.SeqIndex(seq_i)]);
     }
-    fully_merged_ = cluster_proto.fully_merged();
+    fully_merged_ = cluster.IsFullyMerged();
   }
 
   void Merge(Cluster* other, ProteinAligner* aligner);
@@ -67,6 +68,10 @@ class Cluster {
 
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
+
+  void MarshalToBuffer(agd::Buffer* buf);
+  // marshalled cluster is [fully_merged, num_idx, (cluster indexes)]
+  uint32_t ByteSize() { return sizeof(bool) + sizeof(int) + sizeof(int)*seqs_.size(); }
 
  private:
   // representative is first seq

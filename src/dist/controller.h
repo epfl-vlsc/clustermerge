@@ -27,6 +27,8 @@ class Controller {
     absl::string_view data_dir_path;
     uint32_t batch_size;
     uint32_t dup_removal_thresh;
+    bool exclude_allall;
+    int dataset_limit;
   };
 
   agd::Status Run(const Params& params, const Parameters& aligner_params,

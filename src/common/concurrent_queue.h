@@ -38,6 +38,11 @@ class ConcurrentQueue {
   uint64_t num_push_waits();
   uint64_t num_peek_waits();
 
+  // these are for iterating the queue to do the checkpointing
+  // these are not threadsafe
+  const std::deque<T>::iterator begin() { return queue_.begin(); }
+  cosnt std::deque<T>::iterator end() { return queue_.end(); }
+
  private:
   // mutex to protect the queue
   mutable absl::Mutex mu_;
@@ -52,6 +57,7 @@ class ConcurrentQueue {
   uint64_t num_push_waits_ = 0;
   uint64_t num_peek_waits_ = 0;
   uint64_t num_push_ = 0;
+
 };
 
 template <typename T>

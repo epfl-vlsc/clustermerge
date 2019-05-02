@@ -62,8 +62,7 @@ int main(int argc, char* argv[]) {
       "How many small clusters should be batched together.",
       {'b', "batch_size"});
   args::ValueFlag<unsigned int> dataset_limit_arg(
-      parser, "dataset limit",
-      "Cluster only this many sequences",
+      parser, "dataset limit", "Cluster only this many sequences",
       {'D', "dataset_limit"});
   args::ValueFlag<unsigned int> dup_removal_threshold_arg(
       parser, "duplicate removal threshold",
@@ -74,7 +73,8 @@ int main(int argc, char* argv[]) {
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
   args::ValueFlag<std::string> aligner_params_arg(
-      parser, "aligner parameters", "JSON containing alignment and clustering parameters.",
+      parser, "aligner parameters",
+      "JSON containing alignment and clustering parameters.",
       {'a', "aligner_params"});
   args::ValueFlag<std::string> output_dir(
       parser, "output dir",
@@ -98,6 +98,17 @@ int main(int argc, char* argv[]) {
   args::Flag controller(parser, "controller",
                         "Designate this process as the cluster controller.",
                         {'C', "controller"});
+  args::ValueFlag<unsigned int> checkpoint_interval_arg(
+      parser, "checkpoint interval",
+      "how long to wait in seconds between checkpointing current computation. "
+      "Recommended value 900s"
+      " [0 (off)]",
+      {'c', "checkpoint_interval"});
+
+  long int checkpoint_interval = 0;
+  if (checkpoint_interval_arg) {
+    checkpoint_interval = args::get(checkpoint_interval_arg);
+  }
 
   try {
     parser.ParseCLI(argc, argv);
@@ -258,17 +269,18 @@ int main(int argc, char* argv[]) {
     if (min_score_it != aligner_params_json.end()) {
       aligner_params.min_score = *min_score_it;
     }
-    
+
     auto max_aa_uncovered_it = aligner_params_json.find("max_aa_uncovered");
     if (max_aa_uncovered_it != aligner_params_json.end()) {
       aligner_params.max_n_aa_not_covered = *max_aa_uncovered_it;
     }
 
-    auto min_full_merge_score_it = aligner_params_json.find("min_full_merge_score");
+    auto min_full_merge_score_it =
+        aligner_params_json.find("min_full_merge_score");
     if (min_full_merge_score_it != aligner_params_json.end()) {
       aligner_params.min_full_merge_score = *min_full_merge_score_it;
     }
-  } // if not present, aligner params defaults used
+  }  // if not present, aligner params defaults used
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
@@ -283,6 +295,7 @@ int main(int argc, char* argv[]) {
     params.response_queue_port = response_queue_port;
     params.dup_removal_thresh = dup_removal_threshold;
     params.exclude_allall = exclude_allall;
+    params.checkpoint_interval = checkpoint_interval;
     if (dataset_limit_arg) {
       params.dataset_limit = args::get(dataset_limit_arg);
     } else {

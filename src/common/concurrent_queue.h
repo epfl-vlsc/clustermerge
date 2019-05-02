@@ -44,7 +44,7 @@ class ConcurrentQueue {
   // cond vars for block/wait/notify on queue push/pop
   mutable absl::CondVar queue_pop_cv_;
   mutable absl::CondVar queue_push_cv_;
-  std::queue<T> queue_;
+  std::deque<T> queue_;
   size_t capacity_;
   // block on calls to push, pop
   bool block_ = true;
@@ -95,7 +95,7 @@ bool ConcurrentQueue<T>::drop_if_equal(T& item) {
   {
     absl::MutexLock l(&mu_);
     if (!queue_.empty() && queue_.front() == item) {
-      queue_.pop();
+      queue_.pop_front();
       ret = true;
     }
   }
@@ -118,7 +118,7 @@ bool ConcurrentQueue<T>::pop(T& item) {
 
     if (!queue_.empty()) {
       item = std::move(queue_.front());
-      queue_.pop();
+      queue_.pop_front();
       popped = true;
     }
   }
@@ -145,7 +145,7 @@ bool ConcurrentQueue<T>::push(const T& item) {
     }
 
     if (queue_.size() < capacity_) {
-      queue_.push(item);
+      queue_.push_back(item);
       pushed = true;
     }
   }
@@ -176,7 +176,7 @@ bool ConcurrentQueue<T>::push(T&& item) {
     }
 
     if (queue_.size() < capacity_) {
-      queue_.push(std::move(item));
+      queue_.push_back(std::move(item));
       pushed = true;
     }
   }

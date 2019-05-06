@@ -8,6 +8,8 @@
 #include "src/agd/errors.h"
 #include "src/common/all_all_executor.h"
 #include "src/common/cluster_set.h"
+#include "src/dist/checkpoint.h"
+#include "absl/strings/str_join.h"
 
 using std::cout;
 using std::string;
@@ -17,6 +19,23 @@ long int timestamp() {
   time_t t = std::time(0);
   long int now = static_cast<long int>(t);
   return now;
+}
+
+// https://stackoverflow.com/questions/2209135/safely-prompt-for-yes-no-with-cin
+bool PromptForChar(const string& prompt, char& readch) {
+  std::string tmp;
+  std::cout << prompt << std::endl;
+  if (std::getline(std::cin, tmp)) {
+    // Only accept single character input
+    if (tmp.length() == 1) {
+      readch = tmp[0];
+    } else {
+      // For most input, char zero is an appropriate sentinel
+      readch = '\0';
+    }
+    return true;
+  }
+  return false;
 }
 
 agd::Status Controller::Run(const Params& params,
@@ -277,21 +296,36 @@ agd::Status Controller::Run(const Params& params,
   // dump all sequences in single cluster sets into the queue
   // for now assumes all of this will fit in memory
   // even a million sequences would just be a few MB
-  int i = 0;
 
   // here is where we load in checkpointed state
   // if checkpoint dir detected, ask if user wants to load
   // else, is there a set of clusters to add more data to,
   // load here (as last thing in sets to merge queue)
-  for (const auto& s : sequences_) {
-    if (params.dataset_limit > 0) {
-      if (i == params.dataset_limit) break;
+  char response = 'n';
+  if (params.checkpoint_interval && CheckpointFileExists(params.checkpoint_dir)) {
+    cout << "Checkpoint found at " << params.checkpoint_dir << ". Do you want to load it? (Y/n):";
+    auto prompt = absl::StrJoin("Checkpoint found at ", params.checkpoint_dir, ". Do you want to load it? (y/n):");
+    while (PromptForChar(prompt, response)) {
+      if (response == 'y' | response == 'n') {
+        break;
+      }
     }
-    MarshalledClusterSet set(s.ID());
-    sets_to_merge_queue_->push(std::move(set));
-    i++;
   }
 
+  if (response == 'n') {
+    int i = 0;
+    for (const auto& s : sequences_) {
+      if (params.dataset_limit > 0) {
+        if (i == params.dataset_limit) break;
+      }
+      MarshalledClusterSet set(s.ID());
+      sets_to_merge_queue_->push(std::move(set));
+      i++;
+    }
+  } else {
+    // load the checkpoint
+    LoadCheckpoinFile(params.checkpoint_dir, sets_to_merge_queue_);
+  }
   cout << "done\n";
 
   auto t0 = std::chrono::high_resolution_clock::now();
@@ -307,8 +341,12 @@ agd::Status Controller::Run(const Params& params,
     // then dump sets to merge state to checkpoint file
     if (params.checkpoint_interval > 0 &&
         timestamp() - checkpoint_timer_ > params.checkpoint_interval) {
+      cout << "Checkpointing, waiting for outstanding requests...\n";
       // while (outstanding_requests);;
+      cout << "Writing checkpoint ...\n";
       // write sets to merge queue
+      WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
+      cout << "Checkpoint complete\n";
     }
 
     if (!sets_to_merge_queue_->pop(sets[0])) {

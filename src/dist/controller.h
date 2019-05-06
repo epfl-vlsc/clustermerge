@@ -30,6 +30,7 @@ class Controller {
     bool exclude_allall;
     int dataset_limit;
     long int checkpoint_interval;
+    absl::string_view checkpoint_dir;
   };
 
   agd::Status Run(const Params& params, const Parameters& aligner_params,

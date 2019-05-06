@@ -284,6 +284,7 @@ int main(int argc, char* argv[]) {
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
+    string checkpoint_dir("./");
     Controller controller;
     Controller::Params params;
     params.batch_size = batch_size;
@@ -296,6 +297,7 @@ int main(int argc, char* argv[]) {
     params.dup_removal_thresh = dup_removal_threshold;
     params.exclude_allall = exclude_allall;
     params.checkpoint_interval = checkpoint_interval;
+    params.checkpoint_dir = absl::string_view(checkpoint_dir);
     if (dataset_limit_arg) {
       params.dataset_limit = args::get(dataset_limit_arg);
     } else {

@@ -324,7 +324,11 @@ agd::Status Controller::Run(const Params& params,
     }
   } else {
     // load the checkpoint
-    LoadCheckpoinFile(params.checkpoint_dir, sets_to_merge_queue_);
+    agd::Status stat = LoadCheckpoinFile(params.checkpoint_dir, sets_to_merge_queue_);
+    if (!stat.ok()) {
+      return stat;
+    }
+    cout << "Loaded checkpoint.\n";
   }
   cout << "done\n";
 
@@ -345,7 +349,10 @@ agd::Status Controller::Run(const Params& params,
       // while (outstanding_requests);;
       cout << "Writing checkpoint ...\n";
       // write sets to merge queue
-      WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
+      agd::Status stat = WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
+      if (!stat.ok()) {
+        return stat;
+      }
       cout << "Checkpoint complete\n";
     }
 

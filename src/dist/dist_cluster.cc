@@ -303,7 +303,6 @@ int main(int argc, char* argv[]) {
     } else {
       params.dataset_limit = -1;
     }
-    cout << "dataset limit is " << params.dataset_limit << "\n";
     Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";

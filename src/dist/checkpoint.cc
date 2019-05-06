@@ -9,7 +9,8 @@ using namespace std;
 
 bool CheckpointFileExists(const absl::string_view path) {
   struct stat st;
-  if (stat("checkpoint", &st) == 0) {
+  std::string checkpoint_path = absl::StrJoin(path, "checkpoint/");
+  if (stat(checkpoint_path.c_str(), &st) == 0) {
     if (st.st_mode & S_IFDIR == 0) {
       return false;
     }

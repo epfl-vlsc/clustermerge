@@ -1,7 +1,7 @@
 
 #include "src/dist/checkpoint.h"
 #include <fstream>
-#include "absl/strings/str_join.h"
+#include "absl/strings/str_cat.h"
 #include "src/agd/errors.h"
 #include <sys/stat.h>
 
@@ -9,15 +9,15 @@ using namespace std;
 
 bool CheckpointFileExists(const absl::string_view path) {
   struct stat st;
-  std::string checkpoint_path = absl::StrJoin(path, "checkpoint/");
+  std::string checkpoint_path = absl::StrCat(path, "checkpoint/");
   if (stat(checkpoint_path.c_str(), &st) == 0) {
-    if (st.st_mode & S_IFDIR == 0) {
+    if ((st.st_mode & S_IFDIR) == 0) {
       return false;
     }
   } else {
     return false;
   }
-  std::string checkpoint_file = absl::StrJoin(path, "checkpoint/checkpoint.blob");
+  std::string checkpoint_file = absl::StrCat(path, "checkpoint/checkpoint.blob");
   std::ifstream checkp_stream(checkpoint_file);
   return checkp_stream.good();
 }
@@ -27,11 +27,11 @@ agd::Status WriteCheckpointFile(
     const absl::string_view path,
     const std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue) {
 
-  std::string checkpoint_tmp_dir = absl::StrJoin(path, "checkpoint_tmp/");
+  std::string checkpoint_tmp_dir = absl::StrCat(path, "checkpoint_tmp/");
   mkdir(checkpoint_tmp_dir.c_str(), DEFFILEMODE);
 
-  std::string checkpoint_file = absl::StrJoin(checkpoint_tmp_dir, "checkpoint.blob");
-  std::string checkpoint_index = absl::StrJoin(checkpoint_tmp_dir, "checkpoint.index");
+  std::string checkpoint_file = absl::StrCat(checkpoint_tmp_dir, "checkpoint.blob");
+  std::string checkpoint_index = absl::StrCat(checkpoint_tmp_dir, "checkpoint.index");
   std::ofstream checkp_stream(checkpoint_file);
   std::ofstream index_stream(checkpoint_index);
   std::vector<size_t> index;
@@ -50,7 +50,7 @@ agd::Status WriteCheckpointFile(
   index_stream.close();
 
   // atomically overwrite the old checkpoint
-  std::string checkpoint_dir = absl::StrJoin(path, "checkpoint/");
+  std::string checkpoint_dir = absl::StrCat(path, "checkpoint/");
   int e = rename(checkpoint_tmp_dir.c_str(), checkpoint_dir.c_str());
   if (e != 0) {
     return agd::errors::Internal("failed to overwrite checkpoint, returned ", e);
@@ -65,8 +65,8 @@ agd::Status LoadCheckpoinFile(const absl::string_view path,
   while (!queue->empty()) {  // empty the queue
     queue->pop(dummy);
   }
-  std::string checkpoint_file = absl::StrJoin(path, "checkpoint/checkpoint.blob");
-  std::string checkpoint_index = absl::StrJoin(path, "checkpoint/checkpoint.index");
+  std::string checkpoint_file = absl::StrCat(path, "checkpoint/checkpoint.blob");
+  std::string checkpoint_index = absl::StrCat(path, "checkpoint/checkpoint.index");
   std::ifstream checkp_stream(checkpoint_file, ios::binary);
 
   if (!checkp_stream.good()) {
@@ -81,7 +81,7 @@ agd::Status LoadCheckpoinFile(const absl::string_view path,
 
   std::vector<size_t> index;
 
-  if (index_stream.tellg % 4 != 0) {
+  if (index_stream.tellg() % 4 != 0) {
     return agd::errors::Internal(
         "checkpoint index file is not multiple of 4 bytes.");
   }
@@ -94,7 +94,7 @@ agd::Status LoadCheckpoinFile(const absl::string_view path,
     MarshalledClusterSet new_set;
     new_set.buf.resize(sz);
     checkp_stream.read(new_set.buf.mutable_data(), sz);
-    queue->push(new_set);
+    queue->push(std::move(new_set));
   }
 
   return agd::Status::OK();

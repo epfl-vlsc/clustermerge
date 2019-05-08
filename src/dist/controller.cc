@@ -9,7 +9,7 @@
 #include "src/common/all_all_executor.h"
 #include "src/common/cluster_set.h"
 #include "src/dist/checkpoint.h"
-#include "absl/strings/str_join.h"
+#include "absl/strings/str_cat.h"
 
 using std::cout;
 using std::string;
@@ -304,7 +304,7 @@ agd::Status Controller::Run(const Params& params,
   char response = 'n';
   if (params.checkpoint_interval && CheckpointFileExists(params.checkpoint_dir)) {
     cout << "Checkpoint found at " << params.checkpoint_dir << ". Do you want to load it? (Y/n):";
-    auto prompt = absl::StrJoin("Checkpoint found at ", params.checkpoint_dir, ". Do you want to load it? (y/n):");
+    auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir, ". Do you want to load it? (y/n):");
     while (PromptForChar(prompt, response)) {
       if (response == 'y' | response == 'n') {
         break;

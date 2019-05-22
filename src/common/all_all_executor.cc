@@ -142,7 +142,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
     std::ofstream& of = of_kv.second;
     long pos = of.tellp();
     of.seekp(pos - 2);
-    of << " ):";
+    of << " ]):";
   }
   cout << "Total matches: " << total_candidates << "\n";
   cout << "Total All-All full alignments: " << num_full_alignments_.load()

@@ -64,7 +64,7 @@ def darwin_intervall_to_list(intervall):
 def candidate_pair_from_string(string):
     # Extracts the needed data of a pair from a string (from the AllAll output)
     astring = string
-    #print("string is {}".format(string))
+    print("string is {}".format(string))
     string = string.translate(None, "[]")
     entries = string.split(",")
     #if not len(entries) == 7:

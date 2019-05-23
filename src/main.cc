@@ -124,70 +124,6 @@ int main(int argc, char** argv) {
   }
   cout << "Using " << dir << " for output.\n";
 
-  // load alignment envs and initialize (this is for SWPS3)
-  string json_dir_path = "data/matrices/json/";
-  if (json_data_dir) {
-    json_dir_path = args::get(json_data_dir);
-    // OSX  STILL  doesn't have experimental/filesystem so this isn't portable
-    if (json_dir_path.back() != '/') {
-      json_dir_path += '/';
-    }
-  }
-  string logpam_json_file = json_dir_path + "logPAM1.json";
-  string all_matrices_json_file = json_dir_path + "all_matrices.json";
-
-  std::ifstream logpam_stream(logpam_json_file);
-  std::ifstream allmat_stream(all_matrices_json_file);
-
-  if (!logpam_stream.good()) {
-    std::cerr << "File " << logpam_json_file << " not found.\n";
-    return 1;
-  }
-
-  if (!allmat_stream.good()) {
-    std::cerr << "File " << all_matrices_json_file << " not found.\n";
-    return 1;
-  }
-
-  json logpam_json;
-  logpam_stream >> logpam_json;
-
-  json all_matrices_json;
-  allmat_stream >> all_matrices_json;
-
-  AlignmentEnvironments envs;
-
-  // initializing envs is expensive, so don't copy this
-  cout << "Initializing alignment environments from " << json_dir_path << "\n";
-  envs.InitFromJSON(logpam_json, all_matrices_json);
-  cout << "Done.\n";
-
-  // done init envs
-
-  std::vector<unique_ptr<Dataset>> datasets;
-  agd::Status s;
-
-  if (datasets_opts) {
-    // load and parse protein datasets
-    // cluster merge sequences are simply string_views over this data
-    // so these structures must live until computations complete
-    if (input_file_list) {
-      cout << "WARNING: ignoring input file list and using positionals!\n";
-    }
-    s = LoadDatasetsPositional(datasets_opts, &datasets);
-  } else if (input_file_list) {
-    s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
-  } else {
-    cout << "No datasets provided. See usage: \n";
-    std::cerr << parser;
-    exit(0);
-  }
-
-  if (!s.ok()) {
-    cout << s.ToString() << "\n";
-    return 0;
-  }
-
   json aligner_params_json;
   if (aligner_params_arg) {
     string aligner_params_file = args::get(aligner_params_arg);
@@ -228,6 +164,91 @@ int main(int argc, char** argv) {
       aligner_params_json.find("min_full_merge_score");
   if (min_full_merge_score_it != aligner_params_json.end()) {
     aligner_params.min_full_merge_score = *min_full_merge_score_it;
+  }
+
+  auto blosum_it = aligner_params_json.find("blosum");
+  if (blosum_it != aligner_params_json.end()) {
+    aligner_params.use_blosum = *blosum_it;
+  }
+
+  // load alignment envs and initialize (this is for SWPS3)
+  string json_dir_path = "data/matrices/json/";
+  if (json_data_dir) {
+    json_dir_path = args::get(json_data_dir);
+    // OSX  STILL  doesn't have experimental/filesystem so this isn't portable
+    if (json_dir_path.back() != '/') {
+      json_dir_path += '/';
+    }
+  }
+
+  string logpam_json_file = json_dir_path + "logPAM1.json";
+  string blosum_json_file = json_dir_path + "BLOSUM62.json";
+  string all_matrices_json_file = json_dir_path + "all_matrices.json";
+
+  std::ifstream logpam_stream(logpam_json_file);
+  std::ifstream blosum_stream(blosum_json_file);
+  std::ifstream allmat_stream(all_matrices_json_file);
+
+  if (!logpam_stream.good()) {
+    std::cerr << "File " << logpam_json_file << " not found.\n";
+    return 1;
+  }
+
+  if (!blosum_stream.good()) {
+    std::cerr << "File " << blosum_json_file << " not found.\n";
+    return 1;
+  }
+
+  if (!allmat_stream.good()) {
+    std::cerr << "File " << all_matrices_json_file << " not found.\n";
+    return 1;
+  }
+
+  json logpam_json;
+  logpam_stream >> logpam_json;
+
+  json blosum_json;
+  blosum_stream >> blosum_json;
+
+  json all_matrices_json;
+  allmat_stream >> all_matrices_json;
+
+  AlignmentEnvironments envs;
+
+  // initializing envs is expensive, so don't copy this
+
+  cout << "Initializing alignment environments from " << json_dir_path << "\n";
+  envs.InitFromJSON(logpam_json, all_matrices_json, aligner_params.min_score);
+  if (aligner_params.use_blosum) {
+    cout << "using blosum62 matrix ...\n";
+    envs.UseBlosum(blosum_json, aligner_params.min_score);
+  }
+  cout << "Done.\n";
+
+  // done init envs
+
+  std::vector<unique_ptr<Dataset>> datasets;
+  agd::Status s;
+
+  if (datasets_opts) {
+    // load and parse protein datasets
+    // cluster merge sequences are simply string_views over this data
+    // so these structures must live until computations complete
+    if (input_file_list) {
+      cout << "WARNING: ignoring input file list and using positionals!\n";
+    }
+    s = LoadDatasetsPositional(datasets_opts, &datasets);
+  } else if (input_file_list) {
+    s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
+  } else {
+    cout << "No datasets provided. See usage: \n";
+    std::cerr << parser;
+    exit(0);
+  }
+
+  if (!s.ok()) {
+    cout << s.ToString() << "\n";
+    return 0;
   }
 
   // init aligner object

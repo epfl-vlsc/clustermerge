@@ -5,13 +5,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <chrono>
-#include <iomanip>
-#include <fstream>
-#include <iostream>
 #include <ctime>
-#include "json.hpp"
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include "absl/strings/str_cat.h"
 #include "aligner.h"
+#include "json.hpp"
 
 using std::cout;
 using std::get;
@@ -29,9 +29,9 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
   cout << "waiting for work queue to empty\n";
   while (!work_queue_->empty()) {
     std::this_thread::sleep_for(1s);
-    //cout << "work queue has " << work_queue_->size() << " entries left\n";
+    // cout << "work queue has " << work_queue_->size() << " entries left\n";
   }
-  //cout << "Queue emptied, unblocking...\n";
+  // cout << "Queue emptied, unblocking...\n";
   run_ = false;
   work_queue_->unblock();
   for (auto& f : threads_) {
@@ -79,7 +79,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         struct stat info;
         if (stat(path.c_str(), &info) != 0) {
           // doesnt exist, create
-          //cout << "creating dir " << path << "\n";
+          // cout << "creating dir " << path << "\n";
           int e = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
           if (e != 0) {
             cout << "could not create output dir " << path << ", exiting ...\n";
@@ -92,7 +92,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         }  // else, dir exists,
 
         absl::StrAppend(&path, "/", genome_pair.second);
-        //cout << "opening file " << path << "\n";
+        // cout << "opening file " << path << "\n";
         file_map[genome_pair] = std::ofstream(path);
 
         string line = absl::StrCat("# AllAll of ", genome_pair.first, " vs ",
@@ -125,8 +125,7 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
         ss << ", " << the_match.seq1_min + 1 << ".." << the_match.seq1_max + 1
            << ", " << the_match.seq2_min + 1 << ".." << the_match.seq2_max + 1
            << ", " << round(the_match.variance * 100000000.0f) / 100000000.0f
-           << ", " << the_match.cluster_size
-           << "],\n";
+           << ", " << the_match.cluster_size << "],\n";
 
         /*if (std::distance(it, candidate_map.end()) == 1)
           ss << "] ):";
@@ -157,15 +156,15 @@ void AllAllExecutor::FinishAndOutput(const string& output_dir) {
 
   nlohmann::json j(values);
 
-  //std::cout << "dumping queue sizes ...\n";
+  // std::cout << "dumping queue sizes ...\n";
   std::ofstream o("queue.json");
 
   o << std::setw(2) << j << std::endl;
-
 }
 
 AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
-                               AlignmentEnvironments* envs, const Parameters* params)
+                               AlignmentEnvironments* envs,
+                               const Parameters* params)
     : envs_(envs), params_(params), num_threads_(num_threads) {
   work_queue_.reset(new ConcurrentQueue<WorkItem>(capacity));
   matches_per_thread_.resize(num_threads);
@@ -176,19 +175,17 @@ AllAllExecutor::AllAllExecutor(size_t num_threads, size_t capacity,
   timestamps_.reserve(100000);
   queue_sizes_.reserve(100000);
 
-  queue_measure_thread_ = std::thread([this](){
-      // get timestamp, queue size
-      //cout << "queue measure thread starting ...\n";
-      while(run_) {
-        time_t result = std::time(nullptr);
-        timestamps_.push_back(static_cast<long int>(result));
-        queue_sizes_.push_back(work_queue_->size());
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-      }
-      //cout << "queue measure thread finished\n";
+  queue_measure_thread_ = std::thread([this]() {
+    // get timestamp, queue size
+    // cout << "queue measure thread starting ...\n";
+    while (run_) {
+      time_t result = std::time(nullptr);
+      timestamps_.push_back(static_cast<long int>(result));
+      queue_sizes_.push_back(work_queue_->size());
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-  );
-
+    // cout << "queue measure thread finished\n";
+  });
 }
 
 void AllAllExecutor::Initialize() {

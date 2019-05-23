@@ -9,4 +9,5 @@ struct Parameters {
   size_t max_n_aa_not_covered = 15;
   // min score for full merge
   float min_full_merge_score = 250.0f;
+  bool use_blosum = false;
 };

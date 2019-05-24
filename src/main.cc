@@ -66,6 +66,11 @@ int main(int argc, char** argv) {
       "Don't perform intra-cluster all-all alignment, just do the clustering.",
       {'x', "exclude_allall"});
 
+  args::ValueFlag<std::string> file_name(
+      parser, "file",
+      "Adds clustering data from an already clustered json file and merges with clusters from current dataset",
+      {'f', "file"});
+  
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -79,6 +84,13 @@ int main(int argc, char** argv) {
     std::cerr << e.what() << std::endl;
     std::cerr << parser;
     return 1;
+  }
+
+
+
+  if (file_name) {
+  	std::cout<<file_name<<std::endl;
+	std::cout<<args::get(file_name)<<std::endl;
   }
 
   unsigned int threads = std::thread::hardware_concurrency();

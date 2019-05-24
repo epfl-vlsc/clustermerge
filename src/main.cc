@@ -71,6 +71,11 @@ int main(int argc, char** argv) {
       "Adds clustering data from an already clustered json file and merges with clusters from current dataset",
       {'f', "file"});
   
+  args::ValueFlag<std::string> load_file_name(
+      parser, "load_file",
+      "If f[file] option is being used, this needs to be provided to derive data from already clustered sets",
+      {'l', "load_file"});
+  
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -89,8 +94,15 @@ int main(int argc, char** argv) {
 
 
   if (file_name) {
-  	std::cout<<file_name<<std::endl;
+  	
+	if(!load_file_name){
+	   std::cerr << "load_file must be provided as well with -f enabled\n";
+     	   return 1;	
+	}
+
+	std::cout<<file_name<<std::endl;
 	std::cout<<args::get(file_name)<<std::endl;
+	std::cout<<args::get(load_file_name)<<std::endl;
   }
 
   unsigned int threads = std::thread::hardware_concurrency();

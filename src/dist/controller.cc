@@ -346,7 +346,7 @@ agd::Status Controller::Run(const Params& params,
     if (params.checkpoint_interval > 0 &&
         timestamp() - checkpoint_timer_ > params.checkpoint_interval) {
       cout << "Checkpointing, waiting for outstanding requests...\n";
-      // while (outstanding_requests);;
+      while (outstanding_requests.load() > 0);;
       cout << "Writing checkpoint ...\n";
       // write sets to merge queue
       agd::Status stat = WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);

@@ -39,6 +39,7 @@ class AlignmentEnvironments {
   const AlignmentEnvironment& FindNearest(double pam) const;
   const AlignmentEnvironment& LogPamEnv() const;
   const AlignmentEnvironment& JustScoreEnv() const;
+  const AlignmentEnvironment& LogPamJustScoreEnv() const;
 
   void InitFromJSON(const json& logpam_json, const json& matrices_json,
                     double threshold);
@@ -56,4 +57,5 @@ class AlignmentEnvironments {
   // double* logpam1_matrix_;
   AlignmentEnvironment logpam_env_;
   AlignmentEnvironment just_score_env_;
+  AlignmentEnvironment logpam_just_score_;
 };

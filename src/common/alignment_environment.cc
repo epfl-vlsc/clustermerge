@@ -84,6 +84,10 @@ const AlignmentEnvironment& AlignmentEnvironments::JustScoreEnv() const {
   return just_score_env_;
 }
 
+const AlignmentEnvironment& AlignmentEnvironments::LogPamJustScoreEnv() const {
+  return logpam_just_score_;
+}
+
 void AlignmentEnvironments::CreateDayMatrices(vector<double>& gap_open,
                                               vector<double>& gap_ext,
                                               vector<double>& pam_dist,
@@ -145,10 +149,17 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
   just_score_env_.gap_extend = -1.3961;
   just_score_env_.pam_distance = 224;
   just_score_env_.threshold = threshold * 0.75f;
+  
+  logpam_just_score_.gap_open = -37.64 + 7.434 * log10(224);
+  logpam_just_score_.gap_extend = -1.3961;
+  logpam_just_score_.pam_distance = 224;
+  logpam_just_score_.threshold = threshold * 0.75f;
   // cout << "just score threshold is " << just_score_env_.threshold << "\n";
 
   just_score_env_.matrix = new double[MDIM];
+  logpam_just_score_.matrix = new double[MDIM];
   CreateOrigDayMatrix(logpam_env_.matrix, 224, just_score_env_.matrix);
+  CreateOrigDayMatrix(logpam_env_.matrix, 224, logpam_just_score_.matrix);
   just_score_env_.matrix_int8 =
       CreateScaled(just_score_env_.matrix, just_score_env_.threshold,
                    just_score_env_.gap_open, just_score_env_.gap_extend,
@@ -157,6 +168,14 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
       just_score_env_.matrix, just_score_env_.threshold,
       just_score_env_.gap_open, just_score_env_.gap_extend,
       just_score_env_.gap_open_int16, just_score_env_.gap_ext_int16);
+  logpam_just_score_.matrix_int8 =
+      CreateScaled(logpam_just_score_.matrix, logpam_just_score_.threshold,
+                   logpam_just_score_.gap_open, logpam_just_score_.gap_extend,
+                   logpam_just_score_.gap_open_int8, logpam_just_score_.gap_ext_int8);
+  logpam_just_score_.matrix_int16 = CreateScaled(
+      logpam_just_score_.matrix, logpam_just_score_.threshold,
+      logpam_just_score_.gap_open, logpam_just_score_.gap_extend,
+      logpam_just_score_.gap_open_int16, logpam_just_score_.gap_ext_int16);
 
   /*cout << "just score int 16\n";
   for (size_t i = 0; i < DIMSIZE; i++) {

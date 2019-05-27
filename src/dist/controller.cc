@@ -101,7 +101,7 @@ agd::Status Controller::Run(const Params& params,
   // initializing envs is expensive, so don't copy this
   cout << "Worker initializing environments from " << params.data_dir_path
        << "\n";
-  envs.InitFromJSON(logpam_json, all_matrices_json);
+  envs.InitFromJSON(logpam_json, all_matrices_json, aligner_params.min_score);
   cout << "Done.\n";
 
   // done init envs

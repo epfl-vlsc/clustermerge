@@ -280,7 +280,13 @@ int main(int argc, char* argv[]) {
     if (min_full_merge_score_it != aligner_params_json.end()) {
       aligner_params.min_full_merge_score = *min_full_merge_score_it;
     }
-  }  // if not present, aligner params defaults used
+
+    auto blosum_it = aligner_params_json.find("blosum");
+    bool use_blosum = false;
+    if (blosum_it != aligner_params_json.end()) {
+      aligner_params.use_blosum = *blosum_it;
+    }
+  } // if not present, aligner params defaults used
 
   if (is_controller) {
     // launch controller(push_port, pull_port)

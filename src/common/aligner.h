@@ -48,6 +48,9 @@ class ProteinAligner {
   bool PassesThreshold(const char* seq1, const char* seq2, int seq1_len,
                        int seq2_len);
 
+  bool LogPamPassesThreshold(const char* seq1, const char* seq2, int seq1_len,
+                       int seq2_len);
+
   // with full range calc
   agd::Status AlignDouble(const char* seq1, const char* seq2, int seq1_len,
                           int seq2_len, bool stop_at_threshold,

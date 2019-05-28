@@ -38,7 +38,9 @@ BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
 }
 
 //Add by akash
-BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
+BottomUpMerge::BottomUpMerge(nlohmann::json dataset_json_obj, 
+			     std::vector<std::unique_ptr<Dataset>>& datasets_old,
+			     std::vector<std::unique_ptr<Dataset>>& datasets,
                              ProteinAligner* aligner) {
   
   // Add by akash : create a map from the of dataset and use that to store into old cluster set data structure
@@ -80,8 +82,12 @@ BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets_old
   std::map <std::string,std::vector<Sequence> >:: iterator it;
 
   //debugging
-  //for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++) std::cout<<it->first<<std::endl;
-
+  for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++) std::cout<<it->first<<std::endl;
+  
+  
+  //Create old cluster set, by traversing through json obj
+  long long int counter = 0;
+  std::cout<<dataset_json_obj["clusters"][0].size()<<std::endl;
 
 
   aligner_ = aligner;

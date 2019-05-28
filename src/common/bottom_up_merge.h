@@ -18,7 +18,7 @@ class BottomUpMerge {
  
   // Add by akash 
   // Bottom up merge to be used when two files are to be merged 
-  BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
+  BottomUpMerge(nlohmann::json dataset_json_obj, std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
                 ProteinAligner* aligner);
 
 
@@ -36,7 +36,7 @@ class BottomUpMerge {
 
  private:
   std::deque<ClusterSet> sets_;
-  std::deque<ClusterSet> old_sets_;
+  ClusterSet old_set_;
 
   // threads to run cluster mergers in parallel
   std::vector<std::thread> threads_;

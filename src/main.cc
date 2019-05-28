@@ -92,6 +92,7 @@ int main(int argc, char** argv) {
   // Add by akash
   std::string input_file_name_temp = args::get(input_file_list);
   std::vector<unique_ptr<Dataset>> datasets_old;
+  json dataset_json_obj;
   
   if (file_name) {
   	
@@ -109,7 +110,6 @@ int main(int argc, char** argv) {
         }
 
 
-        json dataset_json_obj;
         dataset_stream >> dataset_json_obj;
 	
 	s_old = LoadDatasetsJSON(dataset_json_obj["datasets"], &datasets_old);
@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
   //Add by akash
   if(file_name)
   {
-      BottomUpMerge merger(datasets_old, datasets, &aligner);
+      BottomUpMerge merger(dataset_json_obj, datasets_old, datasets, &aligner);
       return 0;
       
       AllAllExecutor executor(threads, 1000, &envs, &aligner_params);

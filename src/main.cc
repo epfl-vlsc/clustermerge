@@ -71,11 +71,12 @@ int main(int argc, char** argv) {
       "Adds clustering data from an already clustered json file and merges with clusters from current dataset",
       {'f', "file"});
   
-  args::ValueFlag<std::string> load_file_name(
+  /*args::ValueFlag<std::string> load_file_name(
       parser, "load_file",
       "If f[file] option is being used, this needs to be provided to derive data from already clustered sets",
       {'l', "load_file"});
-  
+  */
+
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -96,16 +97,39 @@ int main(int argc, char** argv) {
 
   // Add by akash
   std::string input_file_name_temp = args::get(input_file_list);
+  std::vector<unique_ptr<Dataset>> datasets_old;
+  
   if (file_name) {
   	
+	/*  
 	if(!load_file_name){
 	   std::cerr << "load_file must be provided as well with -f enabled\n";
      	   return 1;	
-	}
+	}*/
 
-	std::cout<<file_name<<std::endl;
-	std::cout<<args::get(file_name)<<std::endl;
-	std::cout<<args::get(load_file_name)<<std::endl;
+        agd::Status s_old;
+
+        std::ifstream dataset_stream(args::get(file_name));
+
+        if (!dataset_stream.good()) {
+          s_old =  agd::errors::NotFound("No such file: ", args::get(file_name));
+        }
+
+        if (!s_old.ok()) {
+          cout << s_old.ToString() << "\n";
+          return 0;
+        }
+
+
+        json dataset_json_obj;
+        dataset_stream >> dataset_json_obj;
+	
+	s_old = LoadDatasetsJSON(dataset_json_obj["datasets"], &datasets_old);
+
+        if (!s_old.ok()) {
+          cout << s_old.ToString() << "\n";
+          return 0;
+        }
   }
 
   unsigned int threads = std::thread::hardware_concurrency();

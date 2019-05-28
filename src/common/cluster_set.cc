@@ -448,17 +448,8 @@ void ClusterSet::DumpJson(const std::string& filename, std::string& datasetsFile
   nlohmann::json j;
   long long int counter=0;
 
-  std::ifstream dataset_stream(datasetsFileName);
 
-
-  /*
-  if (!dataset_stream.good()) {
-    return agd::errors::NotFound("No such file: ", dataset_file);
-  }*/
-
-  json dataset_json_obj;
-  dataset_stream >> dataset_json_obj;
-  j["datasets"] = dataset_json_obj;
+  j["datasets"] = datasetsFileName;
   j["clusters"] = json::array();
 
   for (const auto& c : clusters_) {

@@ -48,7 +48,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
                                     size_t dup_removal_threshold,
                                     AllAllExecutor* executor,
                                     MergeExecutor* merge_executor,
-                                    bool do_allall) {
+                                    bool do_allall,std::string& datasetsFileName) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
@@ -173,7 +173,10 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   // now we are all finished clustering
   auto& final_set = sets_[0];
 
-  final_set.DumpJson("clusters.json");
+
+
+  //Add by akash
+  final_set.DumpJson("clusters.json", datasetsFileName);
   cout << "Total clusters: " << final_set.Size()
        << ", dumped to clusters.json.\n";
 
@@ -189,8 +192,10 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
   return agd::Status::OK();
 }
 
+
+//Add by akash
 agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
-                               size_t dup_removal_threshold, bool do_allall) {
+                               size_t dup_removal_threshold, bool do_allall, std::string& datasetsFileName) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets
@@ -224,7 +229,8 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
 
   auto& final_set = sets_[0];
 
-  final_set.DumpJson("clusters.json");
+  // Add by akash
+  final_set.DumpJson("clusters.json", datasetsFileName);
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {

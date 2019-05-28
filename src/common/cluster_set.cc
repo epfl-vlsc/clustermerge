@@ -440,15 +440,31 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
-void ClusterSet::DumpJson(const std::string& filename) const {
+
+
+//Add by akash
+void ClusterSet::DumpJson(const std::string& filename, std::string& datasetsFileName) const {
   
-  nlohmann::json j = json::array();
+  nlohmann::json j;
   long long int counter=0;
-  	
+
+  std::ifstream dataset_stream(datasetsFileName);
+
+
+  /*
+  if (!dataset_stream.good()) {
+    return agd::errors::NotFound("No such file: ", dataset_file);
+  }*/
+
+  json dataset_json_obj;
+  dataset_stream >> dataset_json_obj;
+  j["datasets"] = dataset_json_obj;
+  j["clusters"] = json::array();
+
   for (const auto& c : clusters_) {
 
 
-    j.push_back(json::array());
+    j["clusters"].push_back(json::array());
     
     for (const auto& s : c.Sequences()) {
 
@@ -456,7 +472,7 @@ void ClusterSet::DumpJson(const std::string& filename) const {
       j_temp["Genome"] = s.Genome();
       j_temp["Index"] = s.GenomeIndex();
       j_temp["AbsoluteIndex"] = s.ID(); 
-      j[counter].push_back(j_temp);
+      j["clusters"][counter].push_back(j_temp);
     }
 
     counter++;

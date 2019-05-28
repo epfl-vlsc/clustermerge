@@ -93,6 +93,9 @@ int main(int argc, char** argv) {
 
 
 
+
+  // Add by akash
+  std::string input_file_name_temp = args::get(input_file_list);
   if (file_name) {
   	
 	if(!load_file_name){
@@ -269,8 +272,11 @@ int main(int argc, char** argv) {
 
   auto t0 = std::chrono::high_resolution_clock::now();
   MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
+  
+  
+  //Add by akash
   merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                  &merge_executor, !exclude_allall);
+                  &merge_executor, !exclude_allall, input_file_name_temp);
 
   // merger.DebugDump();
   // wait and finish call on executor

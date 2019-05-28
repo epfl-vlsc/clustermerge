@@ -37,6 +37,85 @@ BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
   }
 }
 
+//Add by akash
+BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
+                             ProteinAligner* aligner) {
+  
+  // Add by akash : create a map from the of dataset and use that to store into old cluster set data structure
+  const char* data_old;
+  size_t size_old;
+  uint32_t id_old = 0;
+
+
+  //Create a map
+  std::map <std::string,std::vector<Sequence> > dataset_old_map;
+
+  for (auto& dataset_old : datasets_old) {
+    cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
+
+    auto s_old = dataset_old->GetNextRecord(&data_old, &size_old);
+    uint32_t genome_index_old = 0;
+    while (s_old.ok()) {
+      // coverages_.push_back(string());
+      // coverages_.back().resize(size);
+
+      // cout << "Adding sequence id " << id << "\n";
+      if (size_old > 60000) {
+        cout << "over size " << size_old << "\n";
+        exit(0);
+      }
+
+      Sequence seq(absl::string_view(data_old, size_old),  // coverages_.back(),
+                   dataset_old->Name(), dataset_old->Size(), genome_index_old++, id_old++);
+
+      //ClusterSet cs(seq);
+
+      //sets_.push_back(std::move(cs));
+      dataset_old_map[dataset_old->Name()].push_back(seq);
+      s_old = dataset_old->GetNextRecord(&data_old, &size_old);
+    }
+  }
+
+
+  std::map <std::string,std::vector<Sequence> >:: iterator it;
+
+  //debugging
+  //for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++) std::cout<<it->first<<std::endl;
+
+
+
+  aligner_ = aligner;
+
+  const char* data;
+  size_t size;
+  uint32_t id = 0;
+  for (auto& dataset : datasets) {
+    cout << "Parsing dataset " << dataset->Name() << " ...\n";
+
+    auto s = dataset->GetNextRecord(&data, &size);
+    uint32_t genome_index = 0;
+    while (s.ok()) {
+      // coverages_.push_back(string());
+      // coverages_.back().resize(size);
+
+      // cout << "Adding sequence id " << id << "\n";
+      if (size > 60000) {
+        cout << "over size " << size << "\n";
+        exit(0);
+      }
+      Sequence seq(absl::string_view(data, size),  // coverages_.back(),
+                   dataset->Name(), dataset->Size(), genome_index++, id++);
+
+      ClusterSet cs(seq);
+
+      sets_.push_back(std::move(cs));
+      s = dataset->GetNextRecord(&data, &size);
+    }
+  }
+}
+
+
+
 void BottomUpMerge::DebugDump() {
   cout << "Dumping merger ... \n";
   for (const auto& cs : sets_) {

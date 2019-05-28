@@ -14,6 +14,13 @@ class BottomUpMerge {
   // build one sequence, put in one cluster, put cluster in one set
   BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
                 ProteinAligner* aligner);
+  
+ 
+  // Add by akash 
+  // Bottom up merge to be used when two files are to be merged 
+  BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
+                ProteinAligner* aligner);
+
 
   // single threaded mode
   // without mutltithread sync overhead
@@ -29,6 +36,7 @@ class BottomUpMerge {
 
  private:
   std::deque<ClusterSet> sets_;
+  std::deque<ClusterSet> old_sets_;
 
   // threads to run cluster mergers in parallel
   std::vector<std::thread> threads_;

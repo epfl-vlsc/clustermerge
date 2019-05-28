@@ -282,7 +282,6 @@ int main(int argc, char* argv[]) {
     }
 
     auto blosum_it = aligner_params_json.find("blosum");
-    bool use_blosum = false;
     if (blosum_it != aligner_params_json.end()) {
       aligner_params.use_blosum = *blosum_it;
     }
@@ -312,6 +311,7 @@ int main(int argc, char* argv[]) {
     Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
+      return -1;
     }
   } else {
     // load datasets, launch worker
@@ -327,6 +327,7 @@ int main(int argc, char* argv[]) {
     Status stat = worker.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
+      return -1;
     }
   }
 

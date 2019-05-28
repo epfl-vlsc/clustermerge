@@ -17,6 +17,10 @@ class ClusterSet {
     Cluster c(seed);
     clusters_.push_back(std::move(c));
   }
+  ClusterSet(Cluster& c) {
+    // construct from a single sequence
+    clusters_.push_back(std::move(c));
+  }
 
   ClusterSet(size_t num) { clusters_.reserve(num); }
 

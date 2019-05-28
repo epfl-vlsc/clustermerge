@@ -25,8 +25,8 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   h.num_clusters = 0;  // set after once we know the value
   buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
-  for (const auto& c :
-       clusters_) {  // keep the fully merged for controller to remove
+  for (const auto& c : clusters_) {
+    // keep the fully merged for controller to remove
     ClusterHeader ch;
     ch.fully_merged = c.IsFullyMerged();
     ch.num_seqs = c.Sequences().size();

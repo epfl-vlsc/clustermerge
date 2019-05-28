@@ -1,94 +1,87 @@
 
 #include "src/dist/checkpoint.h"
+#include <sys/stat.h>
 #include <fstream>
+#include <iostream>
 #include "absl/strings/str_cat.h"
 #include "src/agd/errors.h"
-#include <sys/stat.h>
 
 using namespace std;
 
+// checkpoint file is an indexed binary structure
+// [4B uint index size | index (4B uints) | ClusterSets as per index]
+
 bool CheckpointFileExists(const absl::string_view path) {
-  struct stat st;
-  std::string checkpoint_path = absl::StrCat(path, "checkpoint/");
-  if (stat(checkpoint_path.c_str(), &st) == 0) {
-    if ((st.st_mode & S_IFDIR) == 0) {
-      return false;
-    }
-  } else {
-    return false;
-  }
-  std::string checkpoint_file = absl::StrCat(path, "checkpoint/checkpoint.blob");
+  std::string checkpoint_file = absl::StrCat(path, "checkpoint.blob");
   std::ifstream checkp_stream(checkpoint_file);
   return checkp_stream.good();
 }
 
-// path should have a colon on the end
+// path should have a slash on the end
 agd::Status WriteCheckpointFile(
     const absl::string_view path,
     const std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue) {
+  std::string tmp_checkpoint_file = absl::StrCat(path, "tmp_checkpoint.blob");
 
-  std::string checkpoint_tmp_dir = absl::StrCat(path, "checkpoint_tmp/");
-  mkdir(checkpoint_tmp_dir.c_str(), DEFFILEMODE);
-
-  std::string checkpoint_file = absl::StrCat(checkpoint_tmp_dir, "checkpoint.blob");
-  std::string checkpoint_index = absl::StrCat(checkpoint_tmp_dir, "checkpoint.index");
-  std::ofstream checkp_stream(checkpoint_file);
-  std::ofstream index_stream(checkpoint_index);
-  std::vector<size_t> index;
+  std::ofstream checkp_stream(tmp_checkpoint_file);
+  if (!checkp_stream.good()) {
+    return agd::errors::Internal("Failed to create checkpoint file ",
+                                 tmp_checkpoint_file,
+                                 ", reason: ", strerror(errno));
+  }
+  std::vector<uint32_t> index;
   index.reserve(queue->size());
+  agd::Buffer buf;
 
-  const auto& set_iter = queue->begin();
+  auto set_iter = queue->begin();
   while (set_iter != queue->end()) {
-    checkp_stream.write(set_iter->buf.data(), set_iter->buf.size());
+    buf.AppendBuffer(set_iter->buf.data(), set_iter->buf.size());
     index.push_back(set_iter->TotalSize());
+    set_iter++;
   }
 
-  index_stream.write(reinterpret_cast<char*>(&index[0]),
-                     sizeof(size_t) * index.size());
+  uint32_t sz = index.size();
+  checkp_stream.write(reinterpret_cast<char*>(&sz), sizeof(uint32_t));
+  checkp_stream.write(reinterpret_cast<char*>(&index[0]),
+                      sizeof(uint32_t) * sz);
+  checkp_stream.write(buf.data(), buf.size());
 
   checkp_stream.close();
-  index_stream.close();
 
   // atomically overwrite the old checkpoint
-  std::string checkpoint_dir = absl::StrCat(path, "checkpoint/");
-  int e = rename(checkpoint_tmp_dir.c_str(), checkpoint_dir.c_str());
+  std::string checkpoint_file = absl::StrCat(path, "checkpoint.blob");
+  int e = rename(tmp_checkpoint_file.c_str(), checkpoint_file.c_str());
   if (e != 0) {
-    return agd::errors::Internal("failed to overwrite checkpoint, returned ", e);
+    return agd::errors::Internal("failed to overwrite checkpoint, returned ", e,
+                                 ", reason: ", strerror(errno));
   }
 
   return agd::Status::OK();
 }
 
-agd::Status LoadCheckpoinFile(const absl::string_view path,
-                              std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue) {
+agd::Status LoadCheckpointFile(
+    const absl::string_view path,
+    std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue) {
   MarshalledClusterSet dummy;
   while (!queue->empty()) {  // empty the queue
     queue->pop(dummy);
   }
-  std::string checkpoint_file = absl::StrCat(path, "checkpoint/checkpoint.blob");
-  std::string checkpoint_index = absl::StrCat(path, "checkpoint/checkpoint.index");
-  std::ifstream checkp_stream(checkpoint_file, ios::binary);
+  std::string checkpoint_file = absl::StrCat(path, "checkpoint.blob");
 
+  std::ifstream checkp_stream(checkpoint_file, ios::binary);
   if (!checkp_stream.good()) {
     return agd::errors::Internal("unable to open file stream for ",
-                                 checkpoint_file);
-  }
-  std::ifstream index_stream(checkpoint_index, ios::binary | ios::ate);
-  if (!index_stream.good()) {
-    return agd::errors::Internal("unable to open file stream for index ",
-                                 checkpoint_index);
+                                 checkpoint_file, " reason: ", strerror(errno));
   }
 
-  std::vector<size_t> index;
+  std::vector<uint32_t> index;
 
-  if (index_stream.tellg() % 4 != 0) {
-    return agd::errors::Internal(
-        "checkpoint index file is not multiple of 4 bytes.");
-  }
+  uint32_t index_size;
+  checkp_stream.read(reinterpret_cast<char*>(&index_size), sizeof(uint32_t));
+  index.resize(index_size);
 
-  index.resize(index_stream.tellg() / sizeof(size_t));
-
-  index_stream.read(reinterpret_cast<char*>(&index[0]), index_stream.tellg());
+  checkp_stream.read(reinterpret_cast<char*>(&index[0]),
+                     index_size * sizeof(uint32_t));
 
   for (auto sz : index) {
     MarshalledClusterSet new_set;

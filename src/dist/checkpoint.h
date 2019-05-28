@@ -12,7 +12,7 @@
 agd::Status WriteCheckpointFile(const absl::string_view path,
     const std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue);
 
-agd::Status LoadCheckpoinFile(const absl::string_view path,
+agd::Status LoadCheckpointFile(const absl::string_view path,
     std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue);
 
 bool CheckpointFileExists(const absl::string_view path);

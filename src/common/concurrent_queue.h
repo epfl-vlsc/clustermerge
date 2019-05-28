@@ -40,8 +40,8 @@ class ConcurrentQueue {
 
   // these are for iterating the queue to do the checkpointing
   // these are not threadsafe
-  const typename std::deque<T>::const_iterator begin() const { return queue_.begin(); }
-  const typename std::deque<T>::const_iterator end() const { return queue_.end(); }
+  typename std::deque<T>::const_iterator begin() const { return queue_.begin(); }
+  typename std::deque<T>::const_iterator end() const { return queue_.end(); }
 
  private:
   // mutex to protect the queue

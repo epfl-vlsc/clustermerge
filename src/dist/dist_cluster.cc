@@ -39,6 +39,7 @@ constexpr char cluster_config_default[] = "data/default_cluster.json";
 #define DEFAULT_QUEUE_DEPTH 5
 #define DEFAULT_RESPONSE_QUEUE_PORT 5556
 #define DEFAULT_REQUEST_QUEUE_PORT 5555
+#define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 5557
 
 int main(int argc, char* argv[]) {
   args::ArgumentParser parser("ClusterMerge",
@@ -136,6 +137,7 @@ int main(int argc, char* argv[]) {
   string controller_ip;
   int request_queue_port;
   int response_queue_port;
+  int incomplete_request_queue_port;
   if (server_config_file) {
     string server_config_path = args::get(server_config_file);
     std::ifstream server_config_stream(server_config_path);
@@ -183,6 +185,13 @@ int main(int argc, char* argv[]) {
     response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT;  // default
   } else {
     response_queue_port = *response_queue_port_it;
+  }
+
+  auto incomplete_request_queue_port_it = server_config_json.find("incomplete_request_queue_port");
+  if (incomplete_request_queue_port_it == server_config_json.end())  {
+    incomplete_request_queue_port = DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT; //default
+  } else {
+    incomplete_request_queue_port = *incomplete_request_queue_port_it;
   }
 
   unsigned int threads = std::thread::hardware_concurrency();
@@ -281,6 +290,7 @@ int main(int argc, char* argv[]) {
     params.queue_depth = queue_depth;
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
+    params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.dup_removal_thresh = dup_removal_threshold;
     params.exclude_allall = exclude_allall;
     if (dataset_limit_arg) {
@@ -304,6 +314,7 @@ int main(int argc, char* argv[]) {
     params.queue_depth = queue_depth;
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
+    params.incomplete_request_queue_port = incomplete_request_queue_port;
     Status stat = worker.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";

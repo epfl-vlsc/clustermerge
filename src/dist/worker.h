@@ -21,6 +21,7 @@ class Worker {
     absl::string_view controller_ip;
     int request_queue_port;
     int response_queue_port;
+    int incomplete_request_queue_port;
     absl::string_view data_dir_path;
   };
 
@@ -34,6 +35,7 @@ class Worker {
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_incomp_req_socket_;
   // local input buffer
   // one thread receives zmq messages, decodes, puts work in work queue
   // all other threads do work and push to output buffer
@@ -46,6 +48,11 @@ class Worker {
   // one thread encodes, sends results to controller
   std::unique_ptr<ConcurrentQueue<MarshalledResponse>> result_queue_;
   std::thread result_queue_thread_;
+
+  //local output buffer for incomplete requests
+  //one thread which encodes and sends to the controller
+  std::unique_ptr<ConcurrentQueue<MarshalledRequest>> incomplete_request_queue_;
+  std::thread incomplete_request_queue_thread_;
 
   volatile bool run_ = true;
 

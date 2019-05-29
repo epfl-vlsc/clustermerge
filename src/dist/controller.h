@@ -24,6 +24,7 @@ class Controller {
     absl::string_view controller_ip;
     int request_queue_port;
     int response_queue_port;
+    int incomplete_request_queue_port;
     absl::string_view data_dir_path;
     uint32_t batch_size;
     uint32_t dup_removal_thresh;
@@ -39,6 +40,7 @@ class Controller {
   zmq::context_t context_sink_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_incomp_req_socket_;
 
   // thread reads from zmq and puts into response queue
   std::unique_ptr<ConcurrentQueue<MarshalledResponse>> response_queue_;
@@ -57,6 +59,10 @@ class Controller {
   std::unique_ptr<ConcurrentQueue<MarshalledRequest>> request_queue_;
   // may need more than one thread .... we'll see
   std::thread request_queue_thread_;
+
+  // controller reads incomplete requests into this queue
+  std::unique_ptr<ConcurrentQueue<MarshalledRequest>> incomplete_request_queue_;
+  std::thread incomplete_request_queue_thread_;
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
 

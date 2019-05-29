@@ -71,6 +71,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   auto response_queue_address =
       absl::StrCat(address, params.response_queue_port);
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
+  auto incomplete_request_queue_address = 
+      absl::StrCat(address, params.incomplete_request_queue_port);
+  //update params to have an incomplete request queue address
 
   context_ = zmq::context_t(1);
   try {
@@ -83,6 +86,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
+  }
+
+  try {
+    zmq_incomp_req_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
+  } catch (...) {
+    return agd::errors::Internal("Could not create zmq INCOMPLETE REQ socket ");
   }
 
   try {
@@ -99,6 +108,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                  response_queue_address);
   }
 
+  try {
+    zmq_incomp_req_socket_->connect(incomplete_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors:: Internal("Could not connect to zmq at ",
+                                  incomplete_request_queue_address);
+  }
+
   zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
   int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";
@@ -107,6 +123,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
+  incomplete_request_queue_.reset(
+      new ConcurrentQueue<MarshalledRequest>(params.queue_depth));    
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq
@@ -127,7 +145,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Work queue thread ending.\n";
   });
 
-  auto worker_func = [this, &envs, &aligner_params]() {
+  int nPartial = 0;
+  auto worker_func = [this, &envs, &aligner_params, &nPartial]() {
     ProteinAligner aligner(&envs, &aligner_params);
 
     //cmproto::MergeRequest request;
@@ -173,6 +192,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         sets_to_merge.clear();
 
       } else if (request.Type() == RequestType::Partial) {
+        nPartial++;
         //cout << "has partial\n";
         //auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
@@ -186,16 +206,23 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
 
-        // cout << "merging cluster set with cluster\n";
-        auto new_cs = cs.MergeCluster(c, &aligner);
-        //cout << "cluster set now has " << new_cs.Size() << " clusters\n";
-        assert(set.NumClusters() <= new_cs.Size());
-        MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
-        assert(response.Set().NumClusters() == new_cs.Size());
+        if(nPartial % 5000 == 0)  {
+          //push into incomplete request queue
+          MarshalledRequest rq;
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
+          incomplete_request_queue_->push(std::move(rq));
+          std :: cout << "Pushing into incomplete queue with ID: " << request.ID() << std::endl; 
 
-        result_queue_->push(std::move(response));
-
+        } else {
+          // cout << "merging cluster set with cluster\n";
+          auto new_cs = cs.MergeCluster(c, &aligner);
+          //cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+          assert(set.NumClusters() <= new_cs.Size());
+          MarshalledResponse response;
+          new_cs.BuildMarshalledResponse(request.ID(), &response);
+          assert(response.Set().NumClusters() == new_cs.Size());
+          result_queue_->push(std::move(response));
+        }
 
       } else {
         cout << "request was not any type!!!!!!\n";
@@ -226,6 +253,25 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Work queue thread ending.\n";
   });
 
+
+  incomplete_request_queue_thread_ = thread([this]()  {
+    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
+    while(run_) {
+      MarshalledRequest request;
+      if(!incomplete_request_queue_->pop(request))  {
+        continue;
+      }
+      auto size = request.buf.size();
+      zmq::message_t msg(request.buf.release_raw(), size, free_func, NULL);
+      bool success = zmq_incomp_req_socket_->send(std::move(msg));
+      if (!success) {
+        cout << "INCOMP REQ Thread failed to send response over zmq!\n";
+      }
+    }
+
+    cout << "Incomplete request queue thread ending.\n";
+  });
+
   timestamps_.reserve(100000);
   queue_sizes_.reserve(100000);
 
@@ -245,6 +291,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     }
   );
 
+  std::thread partial_measure_thread_ = std::thread([this, &nPartial]()  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(7*60*1000));
+    std::cout << "Number of partial merges: " << nPartial << std::endl;
+  });
+
   cout << "Worker running, press button to exit\n";
   //std::cin.get();
 
@@ -252,6 +303,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   //run_ = false;
   //work_queue_->unblock();
   //result_queue_->unblock();
+  partial_measure_thread_.join();
+  incomplete_request_queue_thread_.join();
   result_queue_thread_.join();
 
   //work_queue_->unblock();

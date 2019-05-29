@@ -82,7 +82,7 @@ BottomUpMerge::BottomUpMerge(nlohmann::json dataset_json_obj,
   std::map <std::string,std::vector<Sequence> >:: iterator it;
 
   //debugging
-  for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++) std::cout<<it->first<<std::endl;
+  //for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++) std::cout<<it->first<<std::endl;
   
   
   //Create old cluster set, by traversing through json obj
@@ -148,7 +148,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
                                     size_t dup_removal_threshold,
                                     AllAllExecutor* executor,
                                     MergeExecutor* merge_executor,
-                                    bool do_allall,std::string& datasetsFileName) {
+                                    bool do_allall,std::vector <std::string>& datasetsFileName) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
@@ -308,7 +308,7 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
 //Add by akash
 agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
-                               size_t dup_removal_threshold, bool do_allall, std::string& datasetsFileName) {
+                               size_t dup_removal_threshold, bool do_allall, std::vector <std::string>& datasetsFileName) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets

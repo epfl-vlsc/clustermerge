@@ -443,13 +443,16 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
 
 
 //Add by akash
-void ClusterSet::DumpJson(const std::string& filename, std::string& datasetsFileName) const {
+void ClusterSet::DumpJson(const std::string& filename, std::vector <std::string> & datasetsFileName) const {
   
   nlohmann::json j;
   long long int counter=0;
 
-
-  j["datasets"] = datasetsFileName;
+  j["datasets"] = json::array();
+  for(long long int c = 0; c < datasetsFileName.size(); c++){
+      j["datasets"].push_back(datasetsFileName[c]);  
+  }
+ 
   j["clusters"] = json::array();
 
   for (const auto& c : clusters_) {

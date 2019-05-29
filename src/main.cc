@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
 
   // Add by akash
   std::string input_file_name_temp = args::get(input_file_list);
+  std::vector <std::string> datasetsFileName;
   std::vector<unique_ptr<Dataset>> datasets_old;
   json dataset_json_obj;
   
@@ -111,15 +112,30 @@ int main(int argc, char** argv) {
 
 
         dataset_stream >> dataset_json_obj;
-	
-	s_old = LoadDatasetsJSON(dataset_json_obj["datasets"], &datasets_old);
 
-        if (!s_old.ok()) {
-          cout << s_old.ToString() << "\n";
-          return 0;
-        }
+	std::vector<unique_ptr<Dataset>> datasets_temp;
+	for(long long int c = 0; c < dataset_json_obj["datasets"].size();c++){
+	
+	    s_old = LoadDatasetsJSON(dataset_json_obj["datasets"][c], &datasets_temp);
+	    datasetsFileName.push_back(dataset_json_obj["datasets"][c]);
+
+            if (!s_old.ok()) {
+              cout << s_old.ToString() << "\n";
+              return 0;
+            }
+
+	    long long int size = datasets_temp.size();
+	    for(long long int c = 0; c < size; c++){
+	    	datasets_old.push_back(std::move(datasets_temp[c]));
+	    }
+	    datasets_temp.clear();
+		
+	}
   }
 
+  datasetsFileName.push_back(input_file_name_temp);
+  
+  
   unsigned int threads = std::thread::hardware_concurrency();
   if (threads_arg) {
     threads = args::get(threads_arg);
@@ -296,7 +312,7 @@ int main(int argc, char** argv) {
       
       //Add by akash
       merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                      &merge_executor, !exclude_allall, input_file_name_temp);
+                      &merge_executor, !exclude_allall, datasetsFileName);
       
       //Call recombine and execute RunMulti again
       
@@ -326,7 +342,7 @@ int main(int argc, char** argv) {
       
       //Add by akash
       merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                      &merge_executor, !exclude_allall, input_file_name_temp);
+                      &merge_executor, !exclude_allall, datasetsFileName);
 
       // merger.DebugDump();
       // wait and finish call on executor

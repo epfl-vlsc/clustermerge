@@ -25,12 +25,12 @@ class BottomUpMerge {
   // single threaded mode
   // without mutltithread sync overhead
   agd::Status Run(AllAllExecutor* executor, size_t dup_removal_threshold,
-                  bool do_allall, std::string& datasetsFileName);
+                  bool do_allall, std::vector <std::string>& datasetsFileName);
 
   // use multiple threads to merge clusters in parallel
   agd::Status RunMulti(size_t num_threads, size_t dup_removal_threshold,
                        AllAllExecutor* executor, MergeExecutor* merge_executor,
-                       bool do_allall,std::string& datasetsFileName);
+                       bool do_allall,std::vector <std::string>& datasetsFileName);
 
   void DebugDump();
 

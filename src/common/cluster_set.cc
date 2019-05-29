@@ -460,11 +460,7 @@ void ClusterSet::DumpJson(const std::string& filename, std::vector <std::string>
 
   for (const auto& c : clusters_) {
 
-
     j["clusters"].push_back(json::array());
-    
-    for (const auto& s : c.Sequences()) {
-
 
     for (const auto& s : c.Sequences()) {
       nlohmann::json j_temp = json::object();

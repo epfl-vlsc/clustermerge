@@ -87,14 +87,29 @@ BottomUpMerge::BottomUpMerge(nlohmann::json dataset_json_obj,
   
   //Create old cluster set, by traversing through json obj
   long long int counter = 0;
-  std::cout<<dataset_json_obj["clusters"][0].size()<<std::endl;
+  long long int clusters_size = dataset_json_obj["clusters"].size();
+  
+  for(;counter<clusters_size;counter++)
+  {
+     Cluster c;
+     long long int seq_num = dataset_json_obj["clusters"][counter].size();
+     for(long long int seq_ind = 0; seq_ind < seq_num; seq_ind++)
+     {
+	     std::string genome_name = dataset_json_obj["clusters"][counter][seq_ind]["Genome"];
+	     long long int genome_index = dataset_json_obj["clusters"][counter][seq_ind]["Index"]; 
+	     c.AddSequence(dataset_old_map[genome_name][genome_index]);
+	     std::cout<<"Add genome: "<<genome_name<<" with index: "<<genome_index<<std::endl;
+     }
+
+     old_set_.AddCluster(c);   
+  }
 
 
   aligner_ = aligner;
 
   const char* data;
   size_t size;
-  uint32_t id = 0;
+  uint32_t id = id_old;
   for (auto& dataset : datasets) {
     cout << "Parsing dataset " << dataset->Name() << " ...\n";
 

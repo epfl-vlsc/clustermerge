@@ -38,6 +38,7 @@ class Cluster {
     fully_merged_ = cluster.IsFullyMerged();
   }
 
+
   void Merge(Cluster* other, ProteinAligner* aligner);
   void MergeOther(Cluster* other, ProteinAligner* aligner);
 

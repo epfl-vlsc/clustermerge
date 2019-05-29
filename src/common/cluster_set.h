@@ -46,6 +46,9 @@ class ClusterSet {
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);
 
+  //Add by akash
+  void AddCluster(Cluster& c) { clusters_.push_back(std::move(c)); }
+
   // merge `this` with `cluster`, called from parallel merge executor
   void MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner);
 

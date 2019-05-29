@@ -141,7 +141,7 @@ class AllAllExecutor {
                                         absl::string_view(seq2->Genome()));
       auto seq_pair = std::make_pair(seq1->GenomeIndex(), seq2->GenomeIndex());
       num_pass_threshold_++;
-      if (aligner.PassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
+      if (aligner.LogPamPassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
                                   seq1->Seq().size(), seq2->Seq().size())) {
         // auto t0 = std::chrono::high_resolution_clock::now();
         agd::Status s = aligner.AlignLocal(

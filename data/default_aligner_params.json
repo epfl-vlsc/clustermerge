@@ -1,5 +1,6 @@
 {
-  "min_score":181,
+  "min_score":117.85,
   "max_aa_uncovered":15,
-  "min_full_merge_score":250.0
+  "min_full_merge_score":200.0,
+  "blosum": true
 }

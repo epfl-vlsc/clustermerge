@@ -98,7 +98,7 @@ BottomUpMerge::BottomUpMerge(nlohmann::json dataset_json_obj,
 	     std::string genome_name = dataset_json_obj["clusters"][counter][seq_ind]["Genome"];
 	     long long int genome_index = dataset_json_obj["clusters"][counter][seq_ind]["Index"]; 
 	     c.AddSequence(dataset_old_map[genome_name][genome_index]);
-	     std::cout<<"Add genome: "<<genome_name<<" with index: "<<genome_index<<std::endl;
+	     //std::cout<<"Add genome: "<<genome_name<<" with index: "<<genome_index<<std::endl;
      }
 
      old_set_.AddCluster(c);   
@@ -261,6 +261,19 @@ agd::Status BottomUpMerge::RunMulti(size_t num_threads,
 
   for (auto& t : threads_) {
     t.join();
+  }
+
+
+
+  if (old_set_.Size() >= 1){
+  
+    std::cout<<"Merging data of older set with the new result\n";
+    auto s1 = std::move(sets_.front());
+    sets_.pop_front();
+    auto s2 = std::move(old_set_);
+    auto merged_set = s1.MergeClustersParallel(s2, merge_executor);
+    sets_.push_back(std::move(merged_set));
+
   }
 
   auto t1 = std::chrono::high_resolution_clock::now();

@@ -286,7 +286,6 @@ int main(int argc, char** argv) {
   if(file_name)
   {
       BottomUpMerge merger(dataset_json_obj, datasets_old, datasets, &aligner);
-      return 0;
       
       AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
       executor.Initialize();

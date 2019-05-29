@@ -289,6 +289,7 @@ int main(int argc, char* argv[]) {
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
+    // TODO put checkpoint dir in params file and ensure exists
     string checkpoint_dir("./");
     Controller controller;
     Controller::Params params;

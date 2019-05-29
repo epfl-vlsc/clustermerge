@@ -8,11 +8,14 @@
 
 using namespace std;
 
+const char* CheckpointFilename = "checkpoint.blob";
+const char* TmpCheckpointFilename = "tmp_checkpoint.blob";
+
 // checkpoint file is an indexed binary structure
 // [4B uint index size | index (4B uints) | ClusterSets as per index]
 
 bool CheckpointFileExists(const absl::string_view path) {
-  std::string checkpoint_file = absl::StrCat(path, "checkpoint.blob");
+  std::string checkpoint_file = absl::StrCat(path, CheckpointFilename);
   std::ifstream checkp_stream(checkpoint_file);
   return checkp_stream.good();
 }
@@ -21,7 +24,7 @@ bool CheckpointFileExists(const absl::string_view path) {
 agd::Status WriteCheckpointFile(
     const absl::string_view path,
     const std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue) {
-  std::string tmp_checkpoint_file = absl::StrCat(path, "tmp_checkpoint.blob");
+  std::string tmp_checkpoint_file = absl::StrCat(path, TmpCheckpointFilename);
 
   std::ofstream checkp_stream(tmp_checkpoint_file);
   if (!checkp_stream.good()) {
@@ -49,7 +52,7 @@ agd::Status WriteCheckpointFile(
   checkp_stream.close();
 
   // atomically overwrite the old checkpoint
-  std::string checkpoint_file = absl::StrCat(path, "checkpoint.blob");
+  std::string checkpoint_file = absl::StrCat(path, CheckpointFilename);
   int e = rename(tmp_checkpoint_file.c_str(), checkpoint_file.c_str());
   if (e != 0) {
     return agd::errors::Internal("failed to overwrite checkpoint, returned ", e,

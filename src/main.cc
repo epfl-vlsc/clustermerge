@@ -87,9 +87,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Add by akash
   std::string input_file_name_temp = args::get(input_file_list);
-  std::vector<std::string> datasetsFileName;
+  std::vector<std::string> dataset_file_names;
   std::vector<unique_ptr<Dataset>> datasets_old;
   json dataset_json_obj;
 
@@ -109,25 +108,18 @@ int main(int argc, char** argv) {
 
     dataset_stream >> dataset_json_obj;
 
-    std::vector<unique_ptr<Dataset>> datasets_temp;
-    for (size_t c = 0; c < dataset_json_obj["datasets"].size(); c++) {
-      s_old = LoadDatasetsJSON(dataset_json_obj["datasets"][c], &datasets_temp);
-      datasetsFileName.push_back(dataset_json_obj["datasets"][c]);
+    for (const auto& old_dataset : dataset_json_obj["datasets"]) {
+      s_old = LoadDatasetsJSON(old_dataset, &datasets_old);
+      dataset_file_names.push_back(old_dataset);
 
       if (!s_old.ok()) {
         cout << s_old.ToString() << "\n";
         return 0;
       }
-
-      size_t size = datasets_temp.size();
-      for (size_t c = 0; c < size; c++) {
-        datasets_old.push_back(std::move(datasets_temp[c]));
-      }
-      datasets_temp.clear();
     }
   }
 
-  datasetsFileName.push_back(input_file_name_temp);
+  dataset_file_names.push_back(input_file_name_temp);
 
   unsigned int threads = std::thread::hardware_concurrency();
   if (threads_arg) {
@@ -321,7 +313,7 @@ int main(int argc, char** argv) {
 
     // Add by akash
     merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                    &merge_executor, !exclude_allall, datasetsFileName);
+                    &merge_executor, !exclude_allall, dataset_file_names);
 
     // Call recombine and execute RunMulti again
 
@@ -347,7 +339,7 @@ int main(int argc, char** argv) {
 
     // Add by akash
     merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                    &merge_executor, !exclude_allall, datasetsFileName);
+                    &merge_executor, !exclude_allall, dataset_file_names);
 
     // merger.DebugDump();
     // wait and finish call on executor

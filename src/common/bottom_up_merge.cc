@@ -18,10 +18,6 @@ BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
     auto s = dataset->GetNextRecord(&data, &size);
     uint32_t genome_index = 0;
     while (s.ok()) {
-      // coverages_.push_back(string());
-      // coverages_.back().resize(size);
-
-      // cout << "Adding sequence id " << id << "\n";
       if (size > 60000) {
         cout << "over size " << size << "\n";
         exit(0);
@@ -42,14 +38,13 @@ BottomUpMerge::BottomUpMerge(
     nlohmann::json dataset_json_obj,
     std::vector<std::unique_ptr<Dataset>>& datasets_old,
     std::vector<std::unique_ptr<Dataset>>& datasets, ProteinAligner* aligner) {
-  // Add by akash : create a map from the of dataset and use that to store into
-  // old cluster set data structure
+  // create a vector of sequences from the of dataset and use that to store into
+  // old cluster set data structure, using AbsoluteIndex json values to
+  // reference the correct sequences
   const char* data_old;
   size_t size_old;
   uint32_t id_old = 0;
 
-  // Create a map
-  //std::map<std::string, std::vector<Sequence>> dataset_old_map;
   std::vector<Sequence> old_sequences;
 
   for (auto& dataset_old : datasets_old) {
@@ -58,37 +53,19 @@ BottomUpMerge::BottomUpMerge(
     auto s_old = dataset_old->GetNextRecord(&data_old, &size_old);
     uint32_t genome_index_old = 0;
     while (s_old.ok()) {
-      // coverages_.push_back(string());
-      // coverages_.back().resize(size);
-
       // cout << "Adding sequence id " << id << "\n";
       if (size_old > 60000) {
         cout << "over size " << size_old << "\n";
         exit(0);
       }
 
-      Sequence seq(absl::string_view(data_old, size_old),  // coverages_.back(),
-                   dataset_old->Name(), dataset_old->Size(), genome_index_old++,
-                   id_old++);
+      Sequence seq(absl::string_view(data_old, size_old), dataset_old->Name(),
+                   dataset_old->Size(), genome_index_old++, id_old++);
 
-      // ClusterSet cs(seq);
-
-      // sets_.push_back(std::move(cs));
-      //dataset_old_map[dataset_old->Name()].push_back(seq);
       old_sequences.push_back(std::move(seq));
       s_old = dataset_old->GetNextRecord(&data_old, &size_old);
     }
   }
-
-  //std::map<std::string, std::vector<Sequence>>::iterator it;
-
-  // debugging
-  // for(it=dataset_old_map.begin();it!=dataset_old_map.end();it++)
-  // std::cout<<it->first<<std::endl;
-
-  // Create old cluster set, by traversing through json obj
-  long long int counter = 0;
-  long long int clusters_size = dataset_json_obj["clusters"].size();
 
   for (const auto& cluster : dataset_json_obj["clusters"]) {
     Cluster c;
@@ -99,23 +76,7 @@ BottomUpMerge::BottomUpMerge(
     old_set_.AddCluster(c);
   }
 
-  /*for (; counter < clusters_size; counter++) {
-    Cluster c;
-    long long int seq_num = dataset_json_obj["clusters"][counter].size();
-    for (long long int seq_ind = 0; seq_ind < seq_num; seq_ind++) {
-      int abs_index = dataset_json_obj["clusters"][counter][seq_ind]["AbsoluteIndex"];
-      //std::string genome_name =
-      //    dataset_json_obj["clusters"][counter][seq_ind]["Genome"];
-      //long long int genome_index =
-       //   dataset_json_obj["clusters"][counter][seq_ind]["Index"];
-      //c.AddSequence(dataset_old_map[genome_name][genome_index]);
-      c.AddSequence(old_sequences[abs_index]);
-      // std::cout<<"Add genome: "<<genome_name<<" with index:
-      // "<<genome_index<<std::endl;
-    }
-
-    old_set_.AddCluster(c);
-  }*/
+  cout << "Existing clusters: " << old_set_.Size() << "\n";
 
   aligner_ = aligner;
 
@@ -157,7 +118,7 @@ void BottomUpMerge::DebugDump() {
 agd::Status BottomUpMerge::RunMulti(
     size_t num_threads, size_t dup_removal_threshold, AllAllExecutor* executor,
     MergeExecutor* merge_executor, bool do_allall,
-    std::vector<std::string>& datasetsFileName) {
+    std::vector<std::string>& dataset_file_names) {
   cluster_sets_left_ = sets_.size();
 
   // launch threads, join threads
@@ -273,10 +234,9 @@ agd::Status BottomUpMerge::RunMulti(
   }
 
   if (old_set_.Size() >= 1) {
-    std::cout << "Merging data of older set with the new result\n";
+    std::cout << "Merging data of older set with the new result ...\n";
     auto s1 = std::move(sets_.front());
     sets_.pop_front();
-    //auto s2 = std::move(old_set_);
     auto merged_set = s1.MergeClustersParallel(old_set_, merge_executor);
     sets_.push_back(std::move(merged_set));
   }
@@ -291,8 +251,7 @@ agd::Status BottomUpMerge::RunMulti(
   // now we are all finished clustering
   auto& final_set = sets_[0];
 
-  // Add by akash
-  final_set.DumpJson("clusters.json", datasetsFileName);
+  final_set.DumpJson("clusters.json", dataset_file_names);
   cout << "Total clusters: " << final_set.Size()
        << ", dumped to clusters.json.\n";
 
@@ -308,10 +267,9 @@ agd::Status BottomUpMerge::RunMulti(
   return agd::Status::OK();
 }
 
-// Add by akash
 agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
                                size_t dup_removal_threshold, bool do_allall,
-                               std::vector<std::string>& datasetsFileName) {
+                               std::vector<std::string>& dataset_file_names) {
   auto t0 = std::chrono::high_resolution_clock::now();
   while (sets_.size() > 1) {
     // dequeue 2 sets
@@ -345,8 +303,7 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
 
   auto& final_set = sets_[0];
 
-  // Add by akash
-  final_set.DumpJson("clusters.json", datasetsFileName);
+  final_set.DumpJson("clusters.json", dataset_file_names);
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {

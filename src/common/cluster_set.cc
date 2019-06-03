@@ -442,33 +442,27 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
-
-
-
-//Add by akash
-void ClusterSet::DumpJson(const std::string& filename, std::vector <std::string> & datasetsFileName) const {
-  
+void ClusterSet::DumpJson(const std::string& filename,
+                          std::vector<std::string>& dataset_file_names) const {
   nlohmann::json j;
-  long long int counter=0;
+  size_t counter = 0;
 
   j["datasets"] = json::array();
-  for(long long int c = 0; c < datasetsFileName.size(); c++){
-      j["datasets"].push_back(datasetsFileName[c]);  
+  for (const auto& name : dataset_file_names) {
+    j["datasets"].push_back(name);
   }
- 
+
   j["clusters"] = json::array();
 
   for (const auto& c : clusters_) {
-
     j["clusters"].push_back(json::array());
 
     for (const auto& s : c.Sequences()) {
       nlohmann::json j_temp = json::object();
       j_temp["Genome"] = s.Genome();
       j_temp["Index"] = s.GenomeIndex();
-      j_temp["AbsoluteIndex"] = s.ID(); 
+      j_temp["AbsoluteIndex"] = s.ID();
       j["clusters"][counter].push_back(j_temp);
-
     }
 
     counter++;

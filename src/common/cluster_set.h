@@ -59,7 +59,7 @@ class ClusterSet {
   void RemoveDuplicates();
 
   void DebugDump() const;
-  void DumpJson(const std::string& filename, std::vector <std::string>& datasetsFileName) const;
+  void DumpJson(const std::string& filename, std::vector <std::string>& dataset_file_names) const;
 
   void MarshalToBuffer(agd::Buffer* buf);
 

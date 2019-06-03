@@ -68,9 +68,10 @@ int main(int argc, char** argv) {
 
   args::ValueFlag<std::string> file_name(
       parser, "file",
-      "Adds clustering data from an already clustered json file and merges with clusters from current dataset",
+      "Adds clustering data from an already clustered json file and merges "
+      "with clusters from current dataset",
       {'f', "file"});
-  
+
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -86,56 +87,48 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-
-
-
   // Add by akash
   std::string input_file_name_temp = args::get(input_file_list);
-  std::vector <std::string> datasetsFileName;
+  std::vector<std::string> datasetsFileName;
   std::vector<unique_ptr<Dataset>> datasets_old;
   json dataset_json_obj;
-  
+
   if (file_name) {
-  	
-        agd::Status s_old;
+    agd::Status s_old;
 
-        std::ifstream dataset_stream(args::get(file_name));
+    std::ifstream dataset_stream(args::get(file_name));
 
-        if (!dataset_stream.good()) {
-          s_old =  agd::errors::NotFound("No such file: ", args::get(file_name));
-        }
+    if (!dataset_stream.good()) {
+      s_old = agd::errors::NotFound("No such file: ", args::get(file_name));
+    }
 
-        if (!s_old.ok()) {
-          cout << s_old.ToString() << "\n";
-          return 0;
-        }
+    if (!s_old.ok()) {
+      cout << s_old.ToString() << "\n";
+      return 0;
+    }
 
+    dataset_stream >> dataset_json_obj;
 
-        dataset_stream >> dataset_json_obj;
+    std::vector<unique_ptr<Dataset>> datasets_temp;
+    for (size_t c = 0; c < dataset_json_obj["datasets"].size(); c++) {
+      s_old = LoadDatasetsJSON(dataset_json_obj["datasets"][c], &datasets_temp);
+      datasetsFileName.push_back(dataset_json_obj["datasets"][c]);
 
-	std::vector<unique_ptr<Dataset>> datasets_temp;
-	for(long long int c = 0; c < dataset_json_obj["datasets"].size();c++){
-	
-	    s_old = LoadDatasetsJSON(dataset_json_obj["datasets"][c], &datasets_temp);
-	    datasetsFileName.push_back(dataset_json_obj["datasets"][c]);
+      if (!s_old.ok()) {
+        cout << s_old.ToString() << "\n";
+        return 0;
+      }
 
-            if (!s_old.ok()) {
-              cout << s_old.ToString() << "\n";
-              return 0;
-            }
-
-	    long long int size = datasets_temp.size();
-	    for(long long int c = 0; c < size; c++){
-	    	datasets_old.push_back(std::move(datasets_temp[c]));
-	    }
-	    datasets_temp.clear();
-		
-	}
+      size_t size = datasets_temp.size();
+      for (size_t c = 0; c < size; c++) {
+        datasets_old.push_back(std::move(datasets_temp[c]));
+      }
+      datasets_temp.clear();
+    }
   }
 
   datasetsFileName.push_back(input_file_name_temp);
-  
-  
+
   unsigned int threads = std::thread::hardware_concurrency();
   if (threads_arg) {
     threads = args::get(threads_arg);
@@ -314,68 +307,58 @@ int main(int argc, char** argv) {
   // then, we bottom-up merge them
 
   cout << "Datasets loaded ...\n";
-  
-  
-  
-  
-  
-  //Add by akash
-  if(file_name)
-  {
-      BottomUpMerge merger(dataset_json_obj, datasets_old, datasets, &aligner);
-      
-      AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
-      executor.Initialize();
 
-      auto t0 = std::chrono::high_resolution_clock::now();
-      MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
-      
-      
-      //Add by akash
-      merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                      &merge_executor, !exclude_allall, datasetsFileName);
-      
-      //Call recombine and execute RunMulti again
-      
+  // Add by akash
+  // TODO deduplicate this code
+  if (file_name) {
+    BottomUpMerge merger(dataset_json_obj, datasets_old, datasets, &aligner);
 
-      // merger.DebugDump();
-      // wait and finish call on executor
-      // which dumps final results to disk
-      executor.FinishAndOutput(dir);
-      auto t1 = std::chrono::high_resolution_clock::now();
+    AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
+    executor.Initialize();
 
-      auto duration = t1 - t0;
-      auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+    auto t0 = std::chrono::high_resolution_clock::now();
+    MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
 
-      cout << "Execution time: " << sec.count() << " seconds.\n";
+    // Add by akash
+    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                    &merge_executor, !exclude_allall, datasetsFileName);
 
-  }
-  else
-  {
-      BottomUpMerge merger(datasets, &aligner);
+    // Call recombine and execute RunMulti again
 
-      AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
-      executor.Initialize();
+    // merger.DebugDump();
+    // wait and finish call on executor
+    // which dumps final results to disk
+    executor.FinishAndOutput(dir);
+    auto t1 = std::chrono::high_resolution_clock::now();
 
-      auto t0 = std::chrono::high_resolution_clock::now();
-      MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
-      
-      
-      //Add by akash
-      merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                      &merge_executor, !exclude_allall, datasetsFileName);
+    auto duration = t1 - t0;
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
 
-      // merger.DebugDump();
-      // wait and finish call on executor
-      // which dumps final results to disk
-      executor.FinishAndOutput(dir);
-      auto t1 = std::chrono::high_resolution_clock::now();
+    cout << "Execution time: " << sec.count() << " seconds.\n";
 
-      auto duration = t1 - t0;
-      auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  } else {
+    BottomUpMerge merger(datasets, &aligner);
 
-      cout << "Execution time: " << sec.count() << " seconds.\n";
+    AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
+    executor.Initialize();
 
+    auto t0 = std::chrono::high_resolution_clock::now();
+    MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
+
+    // Add by akash
+    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                    &merge_executor, !exclude_allall, datasetsFileName);
+
+    // merger.DebugDump();
+    // wait and finish call on executor
+    // which dumps final results to disk
+    executor.FinishAndOutput(dir);
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    auto duration = t1 - t0;
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+    cout << "Execution time: " << sec.count() << " seconds.\n";
   }
   return (0);
 }

@@ -14,23 +14,24 @@ class BottomUpMerge {
   // build one sequence, put in one cluster, put cluster in one set
   BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
                 ProteinAligner* aligner);
-  
- 
-  // Add by akash 
-  // Bottom up merge to be used when two files are to be merged 
-  BottomUpMerge(nlohmann::json dataset_json_obj, std::vector<std::unique_ptr<Dataset>>& datasets_old,std::vector<std::unique_ptr<Dataset>>& datasets,
-                ProteinAligner* aligner);
 
+  // Add by akash
+  // Bottom up merge to be used when two files are to be merged
+  BottomUpMerge(nlohmann::json dataset_json_obj,
+                std::vector<std::unique_ptr<Dataset>>& datasets_old,
+                std::vector<std::unique_ptr<Dataset>>& datasets,
+                ProteinAligner* aligner);
 
   // single threaded mode
   // without mutltithread sync overhead
   agd::Status Run(AllAllExecutor* executor, size_t dup_removal_threshold,
-                  bool do_allall, std::vector <std::string>& datasetsFileName);
+                  bool do_allall, std::vector<std::string>& datasetsFileName);
 
   // use multiple threads to merge clusters in parallel
   agd::Status RunMulti(size_t num_threads, size_t dup_removal_threshold,
                        AllAllExecutor* executor, MergeExecutor* merge_executor,
-                       bool do_allall,std::vector <std::string>& datasetsFileName);
+                       bool do_allall,
+                       std::vector<std::string>& datasetsFileName);
 
   void DebugDump();
 

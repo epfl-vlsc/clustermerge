@@ -198,7 +198,7 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     MarshalledRequest merge_request;
     int total_sent = 0;
-    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
+    auto free_func = [](void* data, void* hint) { delete [] reinterpret_cast<char*>(data); };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {

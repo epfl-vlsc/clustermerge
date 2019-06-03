@@ -8,7 +8,7 @@ namespace agd {
 
 class Buffer : public Data {
  private:
-  std::unique_ptr<char[]> buf_{nullptr};
+  std::unique_ptr<char[], std::default_delete<char[]>> buf_{nullptr};
   std::size_t size_ = 0, allocation_ = 0, extend_extra_ = 0;
 
  public:

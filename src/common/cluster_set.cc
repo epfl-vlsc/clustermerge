@@ -14,7 +14,7 @@
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) { delete reinterpret_cast<char*>(data); }
+void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   agd::Buffer buf;

@@ -66,6 +66,12 @@ int main(int argc, char** argv) {
       "Don't perform intra-cluster all-all alignment, just do the clustering.",
       {'x', "exclude_allall"});
 
+  args::ValueFlag<std::string> file_name(
+      parser, "file",
+      "Adds clustering data from an already clustered json file and merges "
+      "with clusters from current dataset",
+      {'f', "file"});
+
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -80,6 +86,40 @@ int main(int argc, char** argv) {
     std::cerr << parser;
     return 1;
   }
+
+  std::string input_file_name_temp = args::get(input_file_list);
+  std::vector<std::string> dataset_file_names;
+  std::vector<unique_ptr<Dataset>> datasets_old;
+  json dataset_json_obj;
+
+  if (file_name) {
+    agd::Status s_old;
+
+    std::ifstream dataset_stream(args::get(file_name));
+
+    if (!dataset_stream.good()) {
+      s_old = agd::errors::NotFound("No such file: ", args::get(file_name));
+    }
+
+    if (!s_old.ok()) {
+      cout << s_old.ToString() << "\n";
+      return 0;
+    }
+
+    dataset_stream >> dataset_json_obj;
+
+    for (const auto& old_dataset : dataset_json_obj["datasets"]) {
+      s_old = LoadDatasetsJSON(old_dataset, &datasets_old);
+      dataset_file_names.push_back(old_dataset);
+
+      if (!s_old.ok()) {
+        cout << s_old.ToString() << "\n";
+        return 0;
+      }
+    }
+  }
+
+  dataset_file_names.push_back(input_file_name_temp);
 
   unsigned int threads = std::thread::hardware_concurrency();
   if (threads_arg) {
@@ -259,27 +299,58 @@ int main(int argc, char** argv) {
   // then, we bottom-up merge them
 
   cout << "Datasets loaded ...\n";
-  BottomUpMerge merger(datasets, &aligner);
 
-  AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
-  executor.Initialize();
+  // Add by akash
+  // TODO deduplicate this code
+  if (file_name) {
+    BottomUpMerge merger(dataset_json_obj, datasets_old, datasets, &aligner);
 
-  auto t0 = std::chrono::high_resolution_clock::now();
-  MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
-  merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
-                  &merge_executor, !exclude_allall);
+    AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
+    executor.Initialize();
 
-  // merger.DebugDump();
-  // wait and finish call on executor
-  // which dumps final results to disk
-  executor.FinishAndOutput(dir);
+    auto t0 = std::chrono::high_resolution_clock::now();
+    MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
 
-  auto t1 = std::chrono::high_resolution_clock::now();
+    // Add by akash
+    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                    &merge_executor, !exclude_allall, dataset_file_names);
 
-  auto duration = t1 - t0;
-  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+    // Call recombine and execute RunMulti again
 
-  cout << "Execution time: " << sec.count() << " seconds.\n";
+    // merger.DebugDump();
+    // wait and finish call on executor
+    // which dumps final results to disk
+    executor.FinishAndOutput(dir);
+    auto t1 = std::chrono::high_resolution_clock::now();
 
+    auto duration = t1 - t0;
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+    cout << "Execution time: " << sec.count() << " seconds.\n";
+
+  } else {
+    BottomUpMerge merger(datasets, &aligner);
+
+    AllAllExecutor executor(threads, 1000, &envs, &aligner_params);
+    executor.Initialize();
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+    MergeExecutor merge_executor(merge_threads, 200, &envs, &aligner_params);
+
+    // Add by akash
+    merger.RunMulti(cluster_threads, dup_removal_threshold, &executor,
+                    &merge_executor, !exclude_allall, dataset_file_names);
+
+    // merger.DebugDump();
+    // wait and finish call on executor
+    // which dumps final results to disk
+    executor.FinishAndOutput(dir);
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    auto duration = t1 - t0;
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+    cout << "Execution time: " << sec.count() << " seconds.\n";
+  }
   return (0);
 }

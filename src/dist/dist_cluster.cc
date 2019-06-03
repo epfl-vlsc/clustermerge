@@ -270,7 +270,6 @@ int main(int argc, char* argv[]) {
     }
 
     auto blosum_it = aligner_params_json.find("blosum");
-    bool use_blosum = false;
     if (blosum_it != aligner_params_json.end()) {
       aligner_params.use_blosum = *blosum_it;
     }

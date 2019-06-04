@@ -1,15 +1,14 @@
 
 #include "controller.h"
-//#include <google/protobuf/text_format.h>
 #include <unistd.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include "absl/strings/str_cat.h"
 #include "src/agd/errors.h"
 #include "src/common/all_all_executor.h"
 #include "src/common/cluster_set.h"
 #include "src/dist/checkpoint.h"
-#include "absl/strings/str_cat.h"
 
 using std::cout;
 using std::string;
@@ -159,7 +158,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledRequest merge_request;
     int total_sent = 0;
     auto free_func = [](void* data, void* hint) {
-      delete reinterpret_cast<char*>(data);
+      delete[] reinterpret_cast<char*>(data);
     };
 
     while (run_) {
@@ -302,9 +301,12 @@ agd::Status Controller::Run(const Params& params,
   // else, is there a set of clusters to add more data to,
   // load here (as last thing in sets to merge queue)
   char response = 'n';
-  if (params.checkpoint_interval && CheckpointFileExists(params.checkpoint_dir)) {
-    cout << "Checkpoint found at " << params.checkpoint_dir << ". Do you want to load it? (Y/n):";
-    auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir, ". Do you want to load it? (y/n):");
+  if (params.checkpoint_interval &&
+      CheckpointFileExists(params.checkpoint_dir)) {
+    cout << "Checkpoint found at " << params.checkpoint_dir
+         << ". Do you want to load it? (Y/n):";
+    auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
+                               ". Do you want to load it? (y/n):");
     while (PromptForChar(prompt, response)) {
       if ((response == 'y') | (response == 'n')) {
         break;
@@ -324,7 +326,8 @@ agd::Status Controller::Run(const Params& params,
     }
   } else {
     // load the checkpoint
-    agd::Status stat = LoadCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
+    agd::Status stat =
+        LoadCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
     if (!stat.ok()) {
       return stat;
     }
@@ -348,10 +351,13 @@ agd::Status Controller::Run(const Params& params,
       cout << "Checkpointing, waiting for outstanding requests...\n";
       checkpoint_timer_ = timestamp();
 
-      while (outstanding_requests.load() > 0);;
+      while (outstanding_requests.load() > 0)
+        ;
+      ;
       cout << "Writing checkpoint ...\n";
       // write sets to merge queue
-      agd::Status stat = WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
+      agd::Status stat =
+          WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
       if (!stat.ok()) {
         return stat;
       }
@@ -466,7 +472,8 @@ agd::Status Controller::Run(const Params& params,
   timing_file << sec.count() << "\n";
 
   ClusterSet set(final_set, sequences_);
-  set.DumpJson("dist_clusters.json");
+  std::vector<string> placeholder = {"test"};
+  set.DumpJson("dist_clusters.json", placeholder);
 
   if (!params.exclude_allall) {
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,

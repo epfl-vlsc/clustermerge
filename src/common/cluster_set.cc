@@ -14,7 +14,7 @@
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) { delete reinterpret_cast<char*>(data); }
+void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   agd::Buffer buf;
@@ -442,19 +442,27 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
-void ClusterSet::DumpJson(const std::string& filename) const {
-  nlohmann::json j = json::array();
-  long long int counter = 0;
+void ClusterSet::DumpJson(const std::string& filename,
+                          std::vector<std::string>& dataset_file_names) const {
+  nlohmann::json j;
+  size_t counter = 0;
+
+  j["datasets"] = json::array();
+  for (const auto& name : dataset_file_names) {
+    j["datasets"].push_back(name);
+  }
+
+  j["clusters"] = json::array();
 
   for (const auto& c : clusters_) {
-    j.push_back(json::array());
+    j["clusters"].push_back(json::array());
 
     for (const auto& s : c.Sequences()) {
       nlohmann::json j_temp = json::object();
       j_temp["Genome"] = s.Genome();
       j_temp["Index"] = s.GenomeIndex();
       j_temp["AbsoluteIndex"] = s.ID();
-      j[counter].push_back(j_temp);
+      j["clusters"][counter].push_back(j_temp);
     }
 
     counter++;

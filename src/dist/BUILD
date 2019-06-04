@@ -3,7 +3,7 @@ cc_library(
   name = "dist_lib",
   srcs = glob(["*.cc", "*.h"], exclude=["dist_cluster.cc"]),
   linkopts = ["-L/usr/local/lib", "-L/cluster/apps/zmq/4.3.1/x86_64/lib", "-lzmq"],
-  copts = ["-I/usr/local/include", "-L/usr/local/lib", "-L/cluster/apps/zmq/4.3.1/x86_64/lib"],
+  copts = ["-std=c++14", "-I/usr/local/include", "-L/usr/local/lib", "-L/cluster/apps/zmq/4.3.1/x86_64/lib"],
   deps = [
           "@com_google_absl//absl/container:node_hash_map",
           "@com_google_absl//absl/container:flat_hash_set",

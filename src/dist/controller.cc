@@ -4,6 +4,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include "absl/strings/str_cat.h"
 #include "src/agd/errors.h"
 #include "src/common/all_all_executor.h"
@@ -13,6 +14,7 @@
 using std::cout;
 using std::string;
 using std::thread;
+using namespace std::chrono_literals;
 
 long int timestamp() {
   time_t t = std::time(0);
@@ -61,7 +63,10 @@ agd::Status Controller::Run(const Params& params,
     }
   }
 
-  // check if a checkpoint exists, if so, load it
+  if (params.checkpoint_interval) {
+    cout << "controller will checkpoint with interval of "
+         << params.checkpoint_interval << "\n";
+  }
 
   auto total_merges = sequences_.size() - 1;
   outstanding_merges_ = total_merges;
@@ -303,8 +308,6 @@ agd::Status Controller::Run(const Params& params,
   char response = 'n';
   if (params.checkpoint_interval &&
       CheckpointFileExists(params.checkpoint_dir)) {
-    cout << "Checkpoint found at " << params.checkpoint_dir
-         << ". Do you want to load it? (Y/n):";
     auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
                                ". Do you want to load it? (y/n):");
     while (PromptForChar(prompt, response)) {
@@ -331,7 +334,9 @@ agd::Status Controller::Run(const Params& params,
     if (!stat.ok()) {
       return stat;
     }
-    cout << "Loaded checkpoint.\n";
+    outstanding_merges_ = sets_to_merge_queue_->size() - 1;
+    cout << "Loaded checkpoint, outstanding merges: " << outstanding_merges_
+         << "\n";
   }
   cout << "done\n";
 
@@ -349,11 +354,12 @@ agd::Status Controller::Run(const Params& params,
     if (params.checkpoint_interval > 0 &&
         timestamp() - checkpoint_timer_ > params.checkpoint_interval) {
       cout << "Checkpointing, waiting for outstanding requests...\n";
-      checkpoint_timer_ = timestamp();
 
-      while (outstanding_requests.load() > 0)
-        ;
-      ;
+      while (outstanding_requests.load() > 0) {
+        cout << "Waiting to checkpoint, " << outstanding_requests.load()
+             << " requests outstanding ...\n";
+        std::this_thread::sleep_for(500ms);
+      }
       cout << "Writing checkpoint ...\n";
       // write sets to merge queue
       agd::Status stat =
@@ -361,6 +367,7 @@ agd::Status Controller::Run(const Params& params,
       if (!stat.ok()) {
         return stat;
       }
+      checkpoint_timer_ = timestamp();
       cout << "Checkpoint complete\n";
     }
 
@@ -435,8 +442,8 @@ agd::Status Controller::Run(const Params& params,
         // partial_request->set().clusters_size() << " clusters in set and ID: "
         // << request.id() << "\n";
         request_queue_->push(std::move(request));
-        outstanding_requests++;
       }
+      outstanding_requests++;
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";

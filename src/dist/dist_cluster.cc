@@ -105,11 +105,6 @@ int main(int argc, char* argv[]) {
       " [0 (off)]",
       {'c', "checkpoint_interval"});
 
-  long int checkpoint_interval = 0;
-  if (checkpoint_interval_arg) {
-    checkpoint_interval = args::get(checkpoint_interval_arg);
-  }
-
   try {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
@@ -124,6 +119,12 @@ int main(int argc, char* argv[]) {
     std::cerr << parser;
     return 1;
   }
+  
+  long int checkpoint_interval = 0;
+  if (checkpoint_interval_arg) {
+    checkpoint_interval = args::get(checkpoint_interval_arg);
+    cout << "checkpoint interval: " << checkpoint_interval << "\n";
+  } 
 
   // parse the server cluster config file to see if we are a worker or the
   // controller

@@ -504,7 +504,8 @@ agd::Status Controller::Run(const Params& params,
   timing_file << sec.count() << "\n";
 
   ClusterSet set(final_set, sequences_);
-  set.DumpJson("dist_clusters.json");
+  std::vector<string> placeholder = {"dist_placeholder"};
+  set.DumpJson("dist_clusters.json", placeholder);
 
   if (!params.exclude_allall) {
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,

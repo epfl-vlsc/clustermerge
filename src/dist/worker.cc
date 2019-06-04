@@ -8,13 +8,97 @@
 #include "src/common/aligner.h"
 #include "src/common/alignment_environment.h"
 #include "src/common/params.h"
+#include <csignal>
+#include <sys/types.h>
+#include <unistd.h>
 
 using std::cout;
 using std::string;
 using std::thread;
 
+agd::Status Worker::signal_handler(int signal_num) {
+    
+    //disconnect receive socket
+    try {
+      zmq_recv_socket_->disconnect(request_queue_address.c_str());
+    } catch (...) {
+      return agd::errors::Internal("Could not disconnect to zmq at ",
+                                  request_queue_address);
+    }
+
+    //drain zmq buffer  
+    zmq::message_t msg;
+    while(true) {
+      bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+      if (!msg_received) {
+        break;
+      }
+      MarshalledRequest rq;
+      rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
+      incomplete_request_queue_->push(std::move(rq));
+    }
+    
+    //terminate wqt and empty work_queue_
+    wqt_signal_ = true;
+    work_queue_thread_.join();
+    while (work_queue_->size() != 0) {
+      work_queue_->pop(msg);
+      MarshalledRequest rq;
+      rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
+      incomplete_request_queue_->push(std::move(rq));
+    }
+    cout << "Work queue emptied.\n";
+
+   //terminate all worker threads
+    worker_signal_ = true;
+    for (auto& t : worker_threads_) {
+      t.join();
+    }
+    cout << "All worker threads have joined.\n";
+
+    //terminate irqt and empty incomplete_request_queue_ 
+    irqt_signal_ = true;
+    incomplete_request_queue_->unblock();
+    incomplete_request_queue_thread_.join();
+    assert(incomplete_request_queue_->size() == 0);
+    cout << "Incomplete request queue emptied\n"; 
+
+    //terminate rqt and empty result_queue_
+    rqt_signal_ = true;
+    result_queue_->unblock();
+    result_queue_thread_.join();
+    assert(result_queue_->size() == 0);
+    cout << "Resuly queue emptied.\n";
+
+
+    try {
+      zmq_send_socket_->disconnect(response_queue_address.c_str());
+    } catch (...) {
+      return agd::errors::Internal("Could not disconnect to zmq at ",
+                                  response_queue_address);
+    }
+
+    try {
+      zmq_incomp_req_socket_->disconnect(incomplete_request_queue_address.c_str());
+    } catch (...) {
+      return agd::errors:: Internal("Could not disconnect to zmq at ",
+                                    incomplete_request_queue_address);
+    }
+
+    cout << "Remaining zmq's disconnected.\n";
+
+    cout << "Quitting nicely..!\n";
+    exit(signal_num);
+    // return agd::Status::OK();
+}
+
 agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
-                        std::vector<std::unique_ptr<Dataset>>& datasets) {
+                        std::vector<std::unique_ptr<Dataset>>& datasets, int* const signal_num) {
+
+  //print the process id
+  pid_t pid = getpid();
+  cout << "Process id: " << pid << std::endl;
+
   // index all sequences
   agd::Status s = Status::OK();
   const char* data;
@@ -68,10 +152,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   // connect to zmq queues
   auto address = absl::StrCat("tcp://", params.controller_ip, ":");
-  auto response_queue_address =
+  response_queue_address =
       absl::StrCat(address, params.response_queue_port);
-  auto request_queue_address = absl::StrCat(address, params.request_queue_port);
-  auto incomplete_request_queue_address = 
+  request_queue_address = absl::StrCat(address, params.request_queue_port);
+  incomplete_request_queue_address = 
       absl::StrCat(address, params.incomplete_request_queue_port);
   //update params to have an incomplete request queue address
 
@@ -132,7 +216,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     // put in work queue
     // repeat
     //cmproto::MergeRequest merge_request;
-    while (run_) {
+    while (run_ and !wqt_signal_) {
       zmq::message_t msg;
       bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
       if (!msg_received) {
@@ -146,23 +230,24 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   });
 
   int nPartial = 0;
-  auto worker_func = [this, &envs, &aligner_params, &nPartial]() {
+  int nJoined = 0;
+  auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
     ProteinAligner aligner(&envs, &aligner_params);
 
     //cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
-    while (run_) {
+    while (run_ && !worker_signal_) {
       zmq::message_t msg;
       if (!work_queue_->pop(msg)) {
-        continue;
+          continue;
       }
       MarshalledRequestView request(reinterpret_cast<char*>(msg.data()), msg.size());
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-
+      cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
-        cout << "its a batch, request ID is " << request.ID() << " \n";
+        //cout << "its a batch, request ID is " << request.ID() << " \n";
         //auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
@@ -229,6 +314,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         return;
       }
     }
+    nJoined++;
+    cout << "Ending thread [" << nJoined << "]\n";
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -237,9 +324,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     worker_threads_.push_back(std::thread(worker_func));
   }
 
-  result_queue_thread_ = thread([this]() {
-    while (run_) {
+  result_queue_thread_ = thread([this, &params]() {
+    while (run_ && !(rqt_signal_ && result_queue_->size() == 0)) {
       MarshalledResponse response;
+      
       if (!result_queue_->pop(response)) {
         continue;
       }
@@ -250,17 +338,19 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
     }
 
-    cout << "Work queue thread ending.\n";
+    cout << "Result queue thread ending.\n";
   });
 
 
-  incomplete_request_queue_thread_ = thread([this]()  {
+  incomplete_request_queue_thread_ = thread([this, &params]()  {
     auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
-    while(run_) {
+    while(run_ && !(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;
+      
       if(!incomplete_request_queue_->pop(request))  {
         continue;
       }
+
       auto size = request.buf.size();
       zmq::message_t msg(request.buf.release_raw(), size, free_func, NULL);
       bool success = zmq_incomp_req_socket_->send(std::move(msg));
@@ -275,26 +365,50 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   timestamps_.reserve(100000);
   queue_sizes_.reserve(100000);
 
-  queue_measure_thread_ = std::thread([this](){
-      // get timestamp, queue size
-      //cout << "queue measure thread starting ...\n";
-      while(run_) {
-        time_t result = std::time(nullptr);
-        timestamps_.push_back(static_cast<long int>(result));
-        queue_sizes_.push_back(work_queue_->size());
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        if (queue_sizes_.size() >= 1000000) {
-          break;  // dont run forever ... 
-        }
-      }
-      //cout << "queue measure thread finished\n";
-    }
-  );
+  // queue_measure_thread_ = std::thread([this](){
+  //     // get timestamp, queue size
+  //     //cout << "queue measure thread starting ...\n";
+  //     while(run_) {
+  //       time_t result = std::time(nullptr);
+  //       timestamps_.push_back(static_cast<long int>(result));
+  //       queue_sizes_.push_back(work_queue_->size());
+  //       std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  //       if (queue_sizes_.size() >= 1000000) {
+  //         break;  // dont run forever ... 
+  //       }
+  //     }
+  //     cout << "queue measure thread finished\n";
+  //   }
+  // );
 
-  std::thread partial_measure_thread_ = std::thread([this, &nPartial]()  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(7*60*1000));
-    std::cout << "Number of partial merges: " << nPartial << std::endl;
-  });
+  //Raises SIGUSR1 in 15 secs time
+  // std::thread partial_measure_thread_ = std::thread([this, &nPartial]()  {
+  //   std::this_thread::sleep_for(std::chrono::milliseconds(15*1000));
+  //   cout << "Number of partial merges: " << nPartial << std::endl;
+  //   //cout << "Raising SIGUSR1 to true\n";
+  //   //raise(SIGUSR1);
+  //   cout << "Partial measure thread ending.\n";
+  // });
+
+  
+  // std::thread validation_thread_ = std :: thread([this, &signal_num](){
+  //   while(!(*signal_num)) {
+  //     std::this_thread::sleep_for(std::chrono::milliseconds(5*1000));
+  //     cout << "Size of work queue: " << work_queue_->size() << std::endl;
+  //     cout << "Size of incomplete response queue: " << incomplete_request_queue_->size() << std::endl;
+  //     cout << "Size of result queue: " << result_queue_->size() << std::endl;
+  //   }
+  // });
+
+  while(!(*signal_num))  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10*100));
+  //   cout << "Size of work queue: " << work_queue_->size() << std::endl;
+  //   cout << "Size of incomplete response queue: " << incomplete_request_queue_->size() << std::endl;
+  //   cout << "Size of result queue: " << result_queue_->size() << std::endl;
+  }
+  cout << "Response [signal_num] value change received.\n";
+  signal_handler(*signal_num);
+
 
   cout << "Worker running, press button to exit\n";
   //std::cin.get();
@@ -303,16 +417,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   //run_ = false;
   //work_queue_->unblock();
   //result_queue_->unblock();
-  partial_measure_thread_.join();
+  //partial_measure_thread_.join();
+  //work_queue_->unblock();
+  // queue_measure_thread_.join();
+  // work_queue_thread_.join();
+  // for (auto& t : worker_threads_) {
+  //   t.join();
+  // }
+
   incomplete_request_queue_thread_.join();
   result_queue_thread_.join();
-
-  //work_queue_->unblock();
-  work_queue_thread_.join();
-  queue_measure_thread_.join();
-  for (auto& t : worker_threads_) {
-    t.join();
-  }
   
   // queue size stats
   std::vector<std::pair<size_t, size_t>> values;

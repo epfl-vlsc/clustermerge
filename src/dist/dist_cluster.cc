@@ -15,6 +15,7 @@
 #include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
+#include <csignal>
 
 using namespace std;
 
@@ -37,9 +38,16 @@ Server cluster format example
 constexpr char cluster_config_default[] = "data/default_cluster.json";
 
 #define DEFAULT_QUEUE_DEPTH 5
-#define DEFAULT_RESPONSE_QUEUE_PORT 5556
-#define DEFAULT_REQUEST_QUEUE_PORT 5555
-#define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 5557
+#define DEFAULT_RESPONSE_QUEUE_PORT 6556
+#define DEFAULT_REQUEST_QUEUE_PORT 6555
+#define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 6557
+
+volatile int signal_num = 0;
+
+void my_handler(int sig) {
+  signal_num = sig;
+  cout << "[signal_num] value changed.\n";
+}
 
 int main(int argc, char* argv[]) {
   args::ArgumentParser parser("ClusterMerge",
@@ -315,7 +323,8 @@ int main(int argc, char* argv[]) {
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
-    Status stat = worker.Run(params, aligner_params, datasets);
+    signal(SIGUSR1, my_handler);
+    Status stat = worker.Run(params, aligner_params, datasets, (int*) &signal_num);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

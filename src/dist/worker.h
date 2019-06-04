@@ -29,7 +29,10 @@ class Worker {
   // reuse agd status for error passing
   // requires num_threads, data_dir_path, controller_ip, push_port, pull_port
   agd::Status Run(const Params& params, const Parameters& aligner_params,
-                  std::vector<std::unique_ptr<Dataset>>& datasets);
+                  std::vector<std::unique_ptr<Dataset>>& datasets, int* const signal_num);
+
+  //signal handler
+  agd::Status signal_handler(int signal_num);                
 
  private:
   zmq::context_t context_;
@@ -41,18 +44,22 @@ class Worker {
   // all other threads do work and push to output buffer
   std::unique_ptr<ConcurrentQueue<zmq::message_t>> work_queue_;
   std::thread work_queue_thread_;
+  bool wqt_signal_ = false;
 
   std::vector<std::thread> worker_threads_;
+  bool worker_signal_ = false;
 
   // local output buffer
   // one thread encodes, sends results to controller
   std::unique_ptr<ConcurrentQueue<MarshalledResponse>> result_queue_;
   std::thread result_queue_thread_;
+  bool rqt_signal_ = false;
 
   //local output buffer for incomplete requests
   //one thread which encodes and sends to the controller
   std::unique_ptr<ConcurrentQueue<MarshalledRequest>> incomplete_request_queue_;
   std::thread incomplete_request_queue_thread_;
+  bool irqt_signal_ = false;
 
   volatile bool run_ = true;
 
@@ -61,4 +68,9 @@ class Worker {
   std::thread queue_measure_thread_;
   std::vector<long int> timestamps_;
   std::vector<size_t> queue_sizes_;
+
+  //addresses
+  std::string response_queue_address;
+  std::string request_queue_address;
+  std::string incomplete_request_queue_address;  
 };

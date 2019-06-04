@@ -219,6 +219,7 @@ agd::Status Controller::Run(const Params& params,
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
+        // cout << "req qt -- Stuck here.\n";
         continue;
       }
       auto size = merge_request.buf.size();
@@ -235,28 +236,29 @@ agd::Status Controller::Run(const Params& params,
         cout << "Thread failed to send request over zmq!\n";
       }
       total_sent++;
+      cout << "Total sent: " << total_sent << std::endl;
     }
 
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
 
-
-  response_queue_thread_ = thread([this]() {
+  int total_received = 0;
+  response_queue_thread_ = thread([this, &total_received]() {
     // get msg from work queue (output)
     // encode
     // put in work queue zmq
     // repeat
-    int total_received = 0;
     while (run_) {
       MarshalledResponse response;
       bool msg_received = zmq_recv_socket_->recv(&response.msg, ZMQ_NOBLOCK);
       // basically implements polling to avoid blocking recv calls
       // not ideal but whatever, this is a research project! :-D
       if (!msg_received) {
+        // cout << "res qt -- Stuck here.\n";
         continue;
       }
       total_received++;
-
+      cout << "response qt: Total received: " << total_received << std::endl;
       //cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
 
       response_queue_->push(std::move(response));
@@ -266,15 +268,18 @@ agd::Status Controller::Run(const Params& params,
          << "\n";
   });
 
-  incomplete_request_queue_thread_ = thread([this]()  {
+  incomplete_request_queue_thread_ = thread([this, &total_received]()  {
     //get msg from incomplete request queue
     //put into work queue
     while (run_)  {
       zmq::message_t msg;
       bool msg_received = zmq_incomp_req_socket_->recv(&msg, ZMQ_NOBLOCK);
       if (!msg_received) {
+        // cout << "irqt -- Stuck here.\n";
         continue;
       }
+      total_received++;
+      cout << "irqt: Total received: " << total_received << std::endl;
       //read as Marshalled request and push into request_queue_
       MarshalledRequest request;
       request.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
@@ -300,6 +305,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledResponse response;
     while (run_) {
       if (!response_queue_->pop(response)) {
+        cout << "worker_func -- no response\n";
         continue;
       }
 
@@ -368,6 +374,16 @@ agd::Status Controller::Run(const Params& params,
       }
     }
   };
+
+  // std::thread validation_thread_ = std :: thread([this](){
+  //   while(true) {
+  //     std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
+  //     cout << "Size of response queue: " << response_queue_->size() << std :: endl;
+  //     cout << "Size of request queue: " << request_queue_->size() << std :: endl;
+  //     cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
+  //     cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
+  //   }
+  // });    
 
   worker_threads_.reserve(params.num_threads);
   for (int i = 0; i < params.num_threads; i++) {

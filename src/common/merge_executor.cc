@@ -39,7 +39,7 @@ void MergeExecutor::EnqueueMerge(const WorkItem& item) {
 }
 
 void MergeExecutor::Worker() {
-  int my_id = id_.fetch_add(1, std::memory_order_relaxed);
+  //int my_id = id_.fetch_add(1, std::memory_order_relaxed);
 
   //std::cout << absl::StrCat("merger thread spinning up with id ",
                    //my_id, "\n");

@@ -106,9 +106,6 @@ struct MarshalledClusterSet {
             sizeof(ClusterSetHeader) + sizeof(ClusterHeader) + sizeof(uint32_t),
             512)) {  // create from single sequence
 
-    size_t sz =
-        sizeof(ClusterSetHeader) + sizeof(ClusterHeader) + sizeof(uint32_t);
-    // buf.reserve(sz);
     ClusterSetHeader h;
     h.num_clusters = 1;
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));

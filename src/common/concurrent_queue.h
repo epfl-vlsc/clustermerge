@@ -38,13 +38,18 @@ class ConcurrentQueue {
   uint64_t num_push_waits();
   uint64_t num_peek_waits();
 
+  // these are for iterating the queue to do the checkpointing
+  // these are not threadsafe
+  typename std::deque<T>::const_iterator begin() const { return queue_.begin(); }
+  typename std::deque<T>::const_iterator end() const { return queue_.end(); }
+
  private:
   // mutex to protect the queue
   mutable absl::Mutex mu_;
   // cond vars for block/wait/notify on queue push/pop
   mutable absl::CondVar queue_pop_cv_;
   mutable absl::CondVar queue_push_cv_;
-  std::queue<T> queue_;
+  std::deque<T> queue_;
   size_t capacity_;
   // block on calls to push, pop
   bool block_ = true;
@@ -52,6 +57,7 @@ class ConcurrentQueue {
   uint64_t num_push_waits_ = 0;
   uint64_t num_peek_waits_ = 0;
   uint64_t num_push_ = 0;
+
 };
 
 template <typename T>
@@ -95,7 +101,7 @@ bool ConcurrentQueue<T>::drop_if_equal(T& item) {
   {
     absl::MutexLock l(&mu_);
     if (!queue_.empty() && queue_.front() == item) {
-      queue_.pop();
+      queue_.pop_front();
       ret = true;
     }
   }
@@ -118,7 +124,7 @@ bool ConcurrentQueue<T>::pop(T& item) {
 
     if (!queue_.empty()) {
       item = std::move(queue_.front());
-      queue_.pop();
+      queue_.pop_front();
       popped = true;
     }
   }
@@ -145,7 +151,7 @@ bool ConcurrentQueue<T>::push(const T& item) {
     }
 
     if (queue_.size() < capacity_) {
-      queue_.push(item);
+      queue_.push_back(item);
       pushed = true;
     }
   }
@@ -176,7 +182,7 @@ bool ConcurrentQueue<T>::push(T&& item) {
     }
 
     if (queue_.size() < capacity_) {
-      queue_.push(std::move(item));
+      queue_.push_back(std::move(item));
       pushed = true;
     }
   }

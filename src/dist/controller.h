@@ -29,6 +29,8 @@ class Controller {
     uint32_t dup_removal_thresh;
     bool exclude_allall;
     int dataset_limit;
+    long int checkpoint_interval;
+    absl::string_view checkpoint_dir;
   };
 
   agd::Status Run(const Params& params, const Parameters& aligner_params,
@@ -60,6 +62,7 @@ class Controller {
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
+  long int checkpoint_timer_;
   // indexed cluster and partial merge set to facilitate efficient 
   // parallel merging of remotely executed partial merge items
 

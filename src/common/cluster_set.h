@@ -41,7 +41,7 @@ class ClusterSet {
   // keep any fully merged cluster, but mark it
   // the central controller will eliminate fully merged clusters
   // after merging partial results
-  ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner);
+  ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner, bool& worker_signal_);
 
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);

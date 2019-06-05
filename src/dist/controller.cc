@@ -163,7 +163,7 @@ agd::Status Controller::Run(const Params& params,
   }
 
   try {
-    zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
+    zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_REP));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
   }
@@ -223,6 +223,11 @@ agd::Status Controller::Run(const Params& params,
         // cout << "req qt -- Stuck here.\n";
         continue;
       }
+
+      zmq::message_t message;
+      zmq_send_socket_->recv(&message);
+      // cout << "Got work request.\n";
+
       auto size = merge_request.buf.size();
       // inline message_t(void *data_, size_t size_, free_fn *ffn_, void *hint_
       // = NULL) release the buf pointer directly to avoid an additional copy
@@ -374,17 +379,17 @@ agd::Status Controller::Run(const Params& params,
     }
   };
 
-  std::thread validation_thread_ = std :: thread([this, &total_sent, &total_received](){
-    while(true) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
-      // cout << "Size of response queue: " << response_queue_->size() << std :: endl;
-      // cout << "Size of request queue: " << request_queue_->size() << std :: endl;
-      // cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
-      // cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
-      cout << "Total sent: " << total_sent << std::endl;
-      cout << "Total received: " << total_received << std::endl;
-    }
-  });    
+  // std::thread validation_thread_ = std :: thread([this, &total_sent, &total_received](){
+  //   while(true) {
+  //     std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
+  //     // cout << "Size of response queue: " << response_queue_->size() << std :: endl;
+  //     // cout << "Size of request queue: " << request_queue_->size() << std :: endl;
+  //     // cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
+  //     // cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
+  //     cout << "Total sent: " << total_sent << std::endl;
+  //     cout << "Total received: " << total_received << std::endl;
+  //   }
+  // });    
 
   worker_threads_.reserve(params.num_threads);
   for (int i = 0; i < params.num_threads; i++) {

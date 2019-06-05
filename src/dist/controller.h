@@ -38,6 +38,7 @@ class Controller {
  private:
   zmq::context_t context_;
   zmq::context_t context_sink_;
+  zmq::context_t context_ir_sink_;  //ir stands for incomplete requests
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
   std::unique_ptr<zmq::socket_t> zmq_incomp_req_socket_;

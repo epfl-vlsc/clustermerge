@@ -26,6 +26,8 @@ agd::Status Worker::signal_handler(int signal_num) {
                                   request_queue_address);
     }
 
+    cout << "Before draining zmq buffer -- irq size: " << incomplete_request_queue_->size() << "\n";
+
     //drain zmq buffer  
     zmq::message_t msg;
     while(true) {
@@ -38,6 +40,8 @@ agd::Status Worker::signal_handler(int signal_num) {
       incomplete_request_queue_->push(std::move(rq));
     }
     
+    cout << "Before draining work queue -- irq size: " << incomplete_request_queue_->size() << "\n";
+
     //terminate wqt and empty work_queue_
     wqt_signal_ = true;
     work_queue_thread_.join();
@@ -56,12 +60,16 @@ agd::Status Worker::signal_handler(int signal_num) {
     }
     cout << "All worker threads have joined.\n";
 
+    cout << "Before draining irq -- irq size: " << incomplete_request_queue_->size() << "\n";
+
     //terminate irqt and empty incomplete_request_queue_ 
     irqt_signal_ = true;
     incomplete_request_queue_->unblock();
     incomplete_request_queue_thread_.join();
     assert(incomplete_request_queue_->size() == 0);
     cout << "Incomplete request queue emptied\n"; 
+
+    cout << "After draining irq -- irq size: " << incomplete_request_queue_->size() << "\n";
 
     //terminate rqt and empty result_queue_
     rqt_signal_ = true;
@@ -88,8 +96,8 @@ agd::Status Worker::signal_handler(int signal_num) {
     cout << "Remaining zmq's disconnected.\n";
 
     cout << "Quitting nicely..!\n";
-    exit(signal_num);
-    // return agd::Status::OK();
+    //exit(signal_num);
+    return agd::Status::OK();
 }
 
 agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
@@ -157,8 +165,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   request_queue_address = absl::StrCat(address, params.request_queue_port);
   incomplete_request_queue_address = 
       absl::StrCat(address, params.incomplete_request_queue_port);
-  //update params to have an incomplete request queue address
-
+  
   context_ = zmq::context_t(1);
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_PULL));
@@ -199,9 +206,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                   incomplete_request_queue_address);
   }
 
-  zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
-  int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  cout << "snd hwm value is " << val << " \n";
+  // zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
+  // int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  // cout << "snd hwm value is " << val << " \n";
 
   work_queue_.reset(
       new ConcurrentQueue<zmq::message_t>(params.queue_depth));
@@ -245,7 +252,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-      cout << "Got a request: " << request.ID() << std::endl;
+      // cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
         //cout << "its a batch, request ID is " << request.ID() << " \n";
         //auto& batch = request.batch();

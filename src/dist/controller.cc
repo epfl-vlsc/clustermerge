@@ -155,6 +155,7 @@ agd::Status Controller::Run(const Params& params,
 
   context_ = zmq::context_t(1);
   context_sink_ = zmq::context_t(2);
+  context_ir_sink_ = zmq::context_t(1);
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_sink_, ZMQ_PULL));
   } catch (...) {
@@ -168,7 +169,7 @@ agd::Status Controller::Run(const Params& params,
   }
 
   try {
-    zmq_incomp_req_socket_.reset(new zmq::socket_t(context_, ZMQ_PULL));
+    zmq_incomp_req_socket_.reset(new zmq::socket_t(context_ir_sink_, ZMQ_PULL));
   } catch(...) {
     return agd::errors::Internal("Could not create zmq INCOMP REQ socket ");
   }
@@ -208,13 +209,13 @@ agd::Status Controller::Run(const Params& params,
       new ConcurrentQueue<MarshalledClusterSet>(sequences_.size()));
     
 
-  request_queue_thread_ = thread([this]() {
+  int total_sent = 0;
+  request_queue_thread_ = thread([this, &total_sent]() {
     // get msg from work queue (output)
     // encode
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    int total_sent = 0;
     auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
 
     while (run_) {
@@ -236,7 +237,6 @@ agd::Status Controller::Run(const Params& params,
         cout << "Thread failed to send request over zmq!\n";
       }
       total_sent++;
-      cout << "Total sent: " << total_sent << std::endl;
     }
 
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
@@ -258,7 +258,7 @@ agd::Status Controller::Run(const Params& params,
         continue;
       }
       total_received++;
-      cout << "response qt: Total received: " << total_received << std::endl;
+      // cout << "response qt: Total received: " << total_received << std::endl;
       //cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
 
       response_queue_->push(std::move(response));
@@ -279,7 +279,6 @@ agd::Status Controller::Run(const Params& params,
         continue;
       }
       total_received++;
-      cout << "irqt: Total received: " << total_received << std::endl;
       //read as Marshalled request and push into request_queue_
       MarshalledRequest request;
       request.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
@@ -375,15 +374,17 @@ agd::Status Controller::Run(const Params& params,
     }
   };
 
-  // std::thread validation_thread_ = std :: thread([this](){
-  //   while(true) {
-  //     std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
-  //     cout << "Size of response queue: " << response_queue_->size() << std :: endl;
-  //     cout << "Size of request queue: " << request_queue_->size() << std :: endl;
-  //     cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
-  //     cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
-  //   }
-  // });    
+  std::thread validation_thread_ = std :: thread([this, &total_sent, &total_received](){
+    while(true) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
+      // cout << "Size of response queue: " << response_queue_->size() << std :: endl;
+      // cout << "Size of request queue: " << request_queue_->size() << std :: endl;
+      // cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
+      // cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
+      cout << "Total sent: " << total_sent << std::endl;
+      cout << "Total received: " << total_received << std::endl;
+    }
+  });    
 
   worker_threads_.reserve(params.num_threads);
   for (int i = 0; i < params.num_threads; i++) {

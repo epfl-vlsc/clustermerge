@@ -1,13 +1,13 @@
 
 #include "controller.h"
 //#include <google/protobuf/text_format.h>
-#include "src/agd/errors.h"
-#include "src/common/all_all_executor.h"
-#include "src/common/cluster_set.h"
+#include <unistd.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
-#include <unistd.h>
+#include "src/agd/errors.h"
+#include "src/common/all_all_executor.h"
+#include "src/common/cluster_set.h"
 
 using std::cout;
 using std::string;
@@ -83,15 +83,15 @@ using std::thread;
   // cout << "done merging\n";
 }*/
 
-agd::Status Controller::Run(const Params &params,
-                            const Parameters &aligner_params,
-                            std::vector<std::unique_ptr<Dataset>> &datasets) {
+agd::Status Controller::Run(const Params& params,
+                            const Parameters& aligner_params,
+                            std::vector<std::unique_ptr<Dataset>>& datasets) {
   // index all sequences
   agd::Status s = Status::OK();
-  const char *data;
+  const char* data;
   size_t length;
-  size_t id = 0; // absolute ID
-  for (auto &dataset : datasets) {
+  size_t id = 0;  // absolute ID
+  for (auto& dataset : datasets) {
     size_t dataset_index = 0;
     s = dataset->GetNextRecord(&data, &length);
     while (s.ok()) {
@@ -218,8 +218,8 @@ agd::Status Controller::Run(const Params &params,
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    auto free_func = [](void *data, void *hint) {
-      delete reinterpret_cast<char *>(data);
+    auto free_func = [](void* data, void* hint) {
+      delete reinterpret_cast<char*>(data);
     };
 
     while (run_) {
@@ -292,10 +292,10 @@ agd::Status Controller::Run(const Params &params,
       total_received++;
       // read as Marshalled request and push into request_queue_
       MarshalledRequest request;
-      request.buf.AppendBuffer(reinterpret_cast<const char *>(msg.data()),
+      request.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
                                msg.size());
-      PartialRequestHeader *h =
-          reinterpret_cast<PartialRequestHeader *>(msg.data());
+      PartialRequestHeader* h =
+          reinterpret_cast<PartialRequestHeader*>(msg.data());
       cout << "Received incomplete request with ID: " << h->id << std::endl;
       request_queue_->push(std::move(request));
     }
@@ -323,7 +323,7 @@ agd::Status Controller::Run(const Params &params,
 
       auto id = response.ID();
       // cout << "repsonse id is " << id << "\n";
-      PartialMergeItem *partial_item;
+      PartialMergeItem* partial_item;
 
       {
         absl::MutexLock l(&mu_);
@@ -416,13 +416,12 @@ agd::Status Controller::Run(const Params &params,
   // for now assumes all of this will fit in memory
   // even a million sequences would just be a few MB
   int i = 0;
-  for (const auto &s : sequences_) {
+  for (const auto& s : sequences_) {
     /*cmproto::ClusterSet set;
     auto* c = set.add_clusters();
     c->add_indexes(s.ID());*/
     if (params.dataset_limit > 0) {
-      if (i == params.dataset_limit)
-        break;
+      if (i == params.dataset_limit) break;
     }
     MarshalledClusterSet set(s.ID());
     sets_to_merge_queue_->push(std::move(set));
@@ -598,7 +597,7 @@ agd::Status Controller::Run(const Params &params,
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
   // worker_thread_.join();
-  for (auto &t : worker_threads_) {
+  for (auto& t : worker_threads_) {
     t.join();
   }
   request_queue_thread_.join();

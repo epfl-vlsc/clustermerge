@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <thread>
 #include "src/agd/status.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/params.h"
@@ -8,11 +9,10 @@
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "zmq.hpp"
-#include <thread>
 
 // interface to manage local worker
 class Worker {
-public:
+ public:
   Worker() {}
 
   struct Params {
@@ -28,14 +28,14 @@ public:
   // main worker entry point
   // reuse agd status for error passing
   // requires num_threads, data_dir_path, controller_ip, push_port, pull_port
-  agd::Status Run(const Params &params, const Parameters &aligner_params,
-                  std::vector<std::unique_ptr<Dataset>> &datasets,
-                  int *const signal_num);
+  agd::Status Run(const Params& params, const Parameters& aligner_params,
+                  std::vector<std::unique_ptr<Dataset>>& datasets,
+                  int* const signal_num);
 
   // signal handler
   agd::Status SignalHandler(int signal_num);
 
-private:
+ private:
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
@@ -64,7 +64,7 @@ private:
 
   volatile bool run_ = true;
 
-  std::vector<Sequence> sequences_; // abs indexable sequences
+  std::vector<Sequence> sequences_;  // abs indexable sequences
 
   std::thread queue_measure_thread_;
   std::vector<long int> timestamps_;

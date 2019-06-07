@@ -22,7 +22,7 @@
 
 }*/
 
-void PartialMergeSet::Init(MarshalledClusterSet &set) {
+void PartialMergeSet::Init(MarshalledClusterSet& set) {
   MarshalledClusterView cluster;
   while (set.NextCluster(&cluster)) {
     IndexedCluster ic(cluster);
@@ -30,16 +30,16 @@ void PartialMergeSet::Init(MarshalledClusterSet &set) {
   }
 }
 
-void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet *set) {
+void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
   ClusterSetHeader h;
-  h.num_clusters = 0; // set after once we know the value
+  h.num_clusters = 0;  // set after once we know the value
   set->buf.reset();
   set->buf.reserve(512);
-  set->buf.AppendBuffer(reinterpret_cast<char *>(&h), sizeof(ClusterSetHeader));
+  set->buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
   uint32_t total_not_merged = 0;
   absl::flat_hash_set<uint32_t> seq_set;
-  for (const auto &c : clusters_) {
+  for (const auto& c : clusters_) {
     if (c.IsFullyMerged()) {
       continue;
     }
@@ -54,28 +54,28 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet *set) {
     ClusterHeader ch;
     ch.fully_merged = false;
     ch.num_seqs = seq_set.size();
-    set->buf.AppendBuffer(reinterpret_cast<char *>(&ch), sizeof(ClusterHeader));
+    set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     auto r = c.Representative();
-    set->buf.AppendBuffer(reinterpret_cast<char *>(&r), sizeof(uint32_t));
+    set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
     // remove duplicates in new seqs using the set
     int i = 1;
     for (auto s : seq_set) {
       if (s != r) {
         i++;
-        set->buf.AppendBuffer(reinterpret_cast<char *>(&s), sizeof(uint32_t));
+        set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
       }
     }
     assert(i == seq_set.size());
   }
 
   // dont forget the new clusters, they are already marshalled
-  for (auto &c : new_clusters_) {
+  for (auto& c : new_clusters_) {
     set->buf.AppendBuffer(c.buf.data(), c.buf.size());
     total_not_merged++;
   }
 
-  char *data = set->buf.mutable_data();
-  ClusterSetHeader *hp = reinterpret_cast<ClusterSetHeader *>(data);
+  char* data = set->buf.mutable_data();
+  ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
   hp->num_clusters = total_not_merged;
 }
 

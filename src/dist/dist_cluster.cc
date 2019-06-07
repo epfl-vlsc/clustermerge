@@ -5,25 +5,26 @@
 // Stuart Byma, EPFL
 //
 
+#include <limits.h>
+#include <csignal>
+#include <fstream>
+#include <iostream>
+#include <thread>
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
 #include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
-#include <csignal>
-#include <fstream>
-#include <iostream>
-#include <limits.h>
-#include <thread>
 
 using namespace std;
 
-constexpr char cluster_format[] = "{\n"
-                                  " \"controller\": \"<ip/addr>\",\n"
-                                  " \"request_queue_port\": <port num>,\n"
-                                  " \"response_queue_port\": <port num>,\n"
-                                  "}\n";
+constexpr char cluster_format[] =
+    "{\n"
+    " \"controller\": \"<ip/addr>\",\n"
+    " \"request_queue_port\": <port num>,\n"
+    " \"response_queue_port\": <port num>,\n"
+    "}\n";
 
 /*
 Server cluster format example
@@ -49,7 +50,7 @@ void my_handler(int sig) {
   cout << "[signal_num] value changed.\n";
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   args::ArgumentParser parser("ClusterMerge",
                               "Bottom up protein cluster merge.");
   args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
@@ -183,14 +184,14 @@ int main(int argc, char *argv[]) {
 
   auto request_queue_port_it = server_config_json.find("request_queue_port");
   if (request_queue_port_it == server_config_json.end()) {
-    request_queue_port = DEFAULT_REQUEST_QUEUE_PORT; // default
+    request_queue_port = DEFAULT_REQUEST_QUEUE_PORT;  // default
   } else {
     request_queue_port = *request_queue_port_it;
   }
 
   auto response_queue_port_it = server_config_json.find("response_queue_port");
   if (response_queue_port_it == server_config_json.end()) {
-    response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT; // default
+    response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT;  // default
   } else {
     response_queue_port = *response_queue_port_it;
   }
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]) {
       server_config_json.find("incomplete_request_queue_port");
   if (incomplete_request_queue_port_it == server_config_json.end()) {
     incomplete_request_queue_port =
-        DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT; // default
+        DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT;  // default
   } else {
     incomplete_request_queue_port = *incomplete_request_queue_port_it;
   }
@@ -288,7 +289,7 @@ int main(int argc, char *argv[]) {
     if (min_full_merge_score_it != aligner_params_json.end()) {
       aligner_params.min_full_merge_score = *min_full_merge_score_it;
     }
-  } // if not present, aligner params defaults used
+  }  // if not present, aligner params defaults used
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
@@ -328,7 +329,7 @@ int main(int argc, char *argv[]) {
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     signal(SIGUSR1, my_handler);
     Status stat =
-        worker.Run(params, aligner_params, datasets, (int *)&signal_num);
+        worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

@@ -1,23 +1,22 @@
 
 #include "worker.h"
+#include <sys/types.h>
+#include <unistd.h>
+#include <csignal>
+#include <deque>
+#include <fstream>
 #include "absl/strings/str_cat.h"
 #include "json.hpp"
 #include "merge_batch.h"
 #include "src/common/aligner.h"
 #include "src/common/alignment_environment.h"
 #include "src/common/params.h"
-#include <csignal>
-#include <deque>
-#include <fstream>
-#include <sys/types.h>
-#include <unistd.h>
 
 using std::cout;
 using std::string;
 using std::thread;
 
 agd::Status Worker::SignalHandler(int signal_num) {
-
   zmq::message_t msg;
 
   // terminate wqt and drain work_queue_
@@ -26,7 +25,7 @@ agd::Status Worker::SignalHandler(int signal_num) {
   while (work_queue_->size() != 0) {
     work_queue_->pop(msg);
     MarshalledRequest rq;
-    rq.buf.AppendBuffer(reinterpret_cast<const char *>(msg.data()), msg.size());
+    rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
     incomplete_request_queue_->push(std::move(rq));
   }
   assert(work_queue_->size() == 0);
@@ -35,7 +34,7 @@ agd::Status Worker::SignalHandler(int signal_num) {
   // terminate all worker threads
   worker_signal_ = true;
   work_queue_->unblock();
-  for (auto &t : worker_threads_) {
+  for (auto& t : worker_threads_) {
     t.join();
   }
   cout << "All worker threads have joined.\n";
@@ -83,20 +82,19 @@ agd::Status Worker::SignalHandler(int signal_num) {
   return agd::Status::OK();
 }
 
-agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
-                        std::vector<std::unique_ptr<Dataset>> &datasets,
-                        int *const signal_num) {
-
+agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
+                        std::vector<std::unique_ptr<Dataset>>& datasets,
+                        int* const signal_num) {
   // print the process id
   pid_t pid = getpid();
   cout << "Process id: " << pid << std::endl;
 
   // index all sequences
   agd::Status s = Status::OK();
-  const char *data;
+  const char* data;
   size_t length;
-  size_t id = 0; // absolute ID
-  for (auto &dataset : datasets) {
+  size_t id = 0;  // absolute ID
+  for (auto& dataset : datasets) {
     size_t dataset_index = 0;
     s = dataset->GetNextRecord(&data, &length);
     while (s.ok()) {
@@ -212,7 +210,7 @@ agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
       memcpy(msg.data(), "Send-Work", 9);
       // std::cout << "Requesting for work..\n";
       zmq_recv_socket_->send(msg);
-      bool msg_received = zmq_recv_socket_->recv(&msg); //, ZMQ_NOBLOCK);
+      bool msg_received = zmq_recv_socket_->recv(&msg);  //, ZMQ_NOBLOCK);
       if (!msg_received) {
         continue;
       }
@@ -235,7 +233,7 @@ agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
       if (!work_queue_->pop(msg)) {
         continue;
       }
-      MarshalledRequestView request(reinterpret_cast<char *>(msg.data()),
+      MarshalledRequestView request(reinterpret_cast<char*>(msg.data()),
                                     msg.size());
       // build cluster(s)
       // merge (do work)
@@ -258,7 +256,7 @@ agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
         // cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
-        auto &final_set = sets_to_merge[0];
+        auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
         // cout << "the merged set has " << final_set.Size() << " clusters\n";
 
@@ -291,7 +289,7 @@ agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
           MarshalledRequest rq;
-          rq.buf.AppendBuffer(reinterpret_cast<const char *>(msg.data()),
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
                               msg.size());
           incomplete_request_queue_->push(std::move(rq));
           std ::cout << "Pushing into incomplete queue with ID: "
@@ -338,8 +336,8 @@ agd::Status Worker::Run(const Params &params, const Parameters &aligner_params,
   });
 
   incomplete_request_queue_thread_ = thread([this, &params]() {
-    auto free_func = [](void *data, void *hint) {
-      delete reinterpret_cast<char *>(data);
+    auto free_func = [](void* data, void* hint) {
+      delete reinterpret_cast<char*>(data);
     };
     while (run_ && !(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;

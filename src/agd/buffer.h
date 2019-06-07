@@ -18,8 +18,8 @@ class Buffer : public Data {
 
   Buffer(Buffer&&) = default;
   Buffer& operator=(Buffer&&) = default;
-  Buffer(decltype(size_) initial_size = 2 * 1024 * 1024,
-         decltype(size_) extend_extra = 8 * 1024 * 1024);
+  Buffer(decltype(size_) initial_size = 64,
+         decltype(size_) extend_extra = 64);
 
   Status WriteBuffer(const char* content, std::size_t content_size);
   Status AppendBuffer(const char* content, std::size_t content_size);

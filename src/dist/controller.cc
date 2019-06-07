@@ -144,6 +144,7 @@ agd::Status Controller::Run(const Params& params,
                                  request_queue_address);
   }
 
+  zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
   zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 5);
   int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";

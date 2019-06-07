@@ -84,7 +84,7 @@ Status AGDDataset::Initialize(const string& agd_json_path,
         return Internal("Unable to map file ", path, ", returned ", mapped);
       }
 
-      Buffer chunk_buf;
+      Buffer chunk_buf(size, 1024*1024);
       uint64_t first_ordinal;
       uint32_t num_records;
       string record_id;

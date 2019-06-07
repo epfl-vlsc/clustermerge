@@ -46,6 +46,7 @@ agd::Status FastaDataset::Initialize(const std::string file_path) {
                                  ", returned ", mapped);
   }
 
+  seqs_buf_ = agd::Buffer(size, 1024*1024);
   std::vector<size_t> record_sizes;
 
   char* cur = mapped;

@@ -1,18 +1,18 @@
 
 #pragma once
 
-#include <thread>
 #include "src/agd/status.h"
 #include "src/common/concurrent_queue.h"
-#include "src/common/sequence.h"
 #include "src/common/params.h"
-#include "src/dataset/dataset.h"
+#include "src/common/sequence.h"
 #include "src/comms/requests.h"
+#include "src/dataset/dataset.h"
 #include "zmq.hpp"
+#include <thread>
 
 // interface to manage local worker
 class Worker {
- public:
+public:
   Worker() {}
 
   struct Params {
@@ -28,17 +28,18 @@ class Worker {
   // main worker entry point
   // reuse agd status for error passing
   // requires num_threads, data_dir_path, controller_ip, push_port, pull_port
-  agd::Status Run(const Params& params, const Parameters& aligner_params,
-                  std::vector<std::unique_ptr<Dataset>>& datasets, int* const signal_num);
+  agd::Status Run(const Params &params, const Parameters &aligner_params,
+                  std::vector<std::unique_ptr<Dataset>> &datasets,
+                  int *const signal_num);
 
-  //signal handler
-  agd::Status signal_handler(int signal_num);                
+  // signal handler
+  agd::Status SignalHandler(int signal_num);
 
- private:
+private:
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
-  std::unique_ptr<zmq::socket_t> zmq_incomp_req_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_incomplete_request_socket_;
   // local input buffer
   // one thread receives zmq messages, decodes, puts work in work queue
   // all other threads do work and push to output buffer
@@ -55,22 +56,22 @@ class Worker {
   std::thread result_queue_thread_;
   bool rqt_signal_ = false;
 
-  //local output buffer for incomplete requests
-  //one thread which encodes and sends to the controller
+  // local output buffer for incomplete requests
+  // one thread which encodes and sends to the controller
   std::unique_ptr<ConcurrentQueue<MarshalledRequest>> incomplete_request_queue_;
   std::thread incomplete_request_queue_thread_;
   bool irqt_signal_ = false;
 
   volatile bool run_ = true;
 
-  std::vector<Sequence> sequences_;  // abs indexable sequences
+  std::vector<Sequence> sequences_; // abs indexable sequences
 
   std::thread queue_measure_thread_;
   std::vector<long int> timestamps_;
   std::vector<size_t> queue_sizes_;
 
-  //addresses
+  // addresses
   std::string response_queue_address;
   std::string request_queue_address;
-  std::string incomplete_request_queue_address;  
+  std::string incomplete_request_queue_address;
 };

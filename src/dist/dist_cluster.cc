@@ -5,10 +5,6 @@
 // Stuart Byma, EPFL
 //
 
-#include <limits.h>
-#include <fstream>
-#include <iostream>
-#include <thread>
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
@@ -16,15 +12,18 @@
 #include "src/dataset/load_dataset.h"
 #include "worker.h"
 #include <csignal>
+#include <fstream>
+#include <iostream>
+#include <limits.h>
+#include <thread>
 
 using namespace std;
 
-constexpr char cluster_format[] =
-    "{\n"
-    " \"controller\": \"<ip/addr>\",\n"
-    " \"request_queue_port\": <port num>,\n"
-    " \"response_queue_port\": <port num>,\n"
-    "}\n";
+constexpr char cluster_format[] = "{\n"
+                                  " \"controller\": \"<ip/addr>\",\n"
+                                  " \"request_queue_port\": <port num>,\n"
+                                  " \"response_queue_port\": <port num>,\n"
+                                  "}\n";
 
 /*
 Server cluster format example
@@ -42,6 +41,7 @@ constexpr char cluster_config_default[] = "data/default_cluster.json";
 #define DEFAULT_REQUEST_QUEUE_PORT 6555
 #define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 6557
 
+// captures kill signal and notifies Worker
 volatile int signal_num = 0;
 
 void my_handler(int sig) {
@@ -49,7 +49,7 @@ void my_handler(int sig) {
   cout << "[signal_num] value changed.\n";
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   args::ArgumentParser parser("ClusterMerge",
                               "Bottom up protein cluster merge.");
   args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
@@ -71,8 +71,7 @@ int main(int argc, char* argv[]) {
       "How many small clusters should be batched together.",
       {'b', "batch_size"});
   args::ValueFlag<unsigned int> dataset_limit_arg(
-      parser, "dataset limit",
-      "Cluster only this many sequences",
+      parser, "dataset limit", "Cluster only this many sequences",
       {'D', "dataset_limit"});
   args::ValueFlag<unsigned int> dup_removal_threshold_arg(
       parser, "duplicate removal threshold",
@@ -83,7 +82,8 @@ int main(int argc, char* argv[]) {
       parser, "file_list", "JSON containing list of input AGD datasets.",
       {'i', "input_list"});
   args::ValueFlag<std::string> aligner_params_arg(
-      parser, "aligner parameters", "JSON containing alignment and clustering parameters.",
+      parser, "aligner parameters",
+      "JSON containing alignment and clustering parameters.",
       {'a', "aligner_params"});
   args::ValueFlag<std::string> output_dir(
       parser, "output dir",
@@ -183,21 +183,23 @@ int main(int argc, char* argv[]) {
 
   auto request_queue_port_it = server_config_json.find("request_queue_port");
   if (request_queue_port_it == server_config_json.end()) {
-    request_queue_port = DEFAULT_REQUEST_QUEUE_PORT;  // default
+    request_queue_port = DEFAULT_REQUEST_QUEUE_PORT; // default
   } else {
     request_queue_port = *request_queue_port_it;
   }
 
   auto response_queue_port_it = server_config_json.find("response_queue_port");
   if (response_queue_port_it == server_config_json.end()) {
-    response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT;  // default
+    response_queue_port = DEFAULT_RESPONSE_QUEUE_PORT; // default
   } else {
     response_queue_port = *response_queue_port_it;
   }
 
-  auto incomplete_request_queue_port_it = server_config_json.find("incomplete_request_queue_port");
-  if (incomplete_request_queue_port_it == server_config_json.end())  {
-    incomplete_request_queue_port = DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT; //default
+  auto incomplete_request_queue_port_it =
+      server_config_json.find("incomplete_request_queue_port");
+  if (incomplete_request_queue_port_it == server_config_json.end()) {
+    incomplete_request_queue_port =
+        DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT; // default
   } else {
     incomplete_request_queue_port = *incomplete_request_queue_port_it;
   }
@@ -275,13 +277,14 @@ int main(int argc, char* argv[]) {
     if (min_score_it != aligner_params_json.end()) {
       aligner_params.min_score = *min_score_it;
     }
-    
+
     auto max_aa_uncovered_it = aligner_params_json.find("max_aa_uncovered");
     if (max_aa_uncovered_it != aligner_params_json.end()) {
       aligner_params.max_n_aa_not_covered = *max_aa_uncovered_it;
     }
 
-    auto min_full_merge_score_it = aligner_params_json.find("min_full_merge_score");
+    auto min_full_merge_score_it =
+        aligner_params_json.find("min_full_merge_score");
     if (min_full_merge_score_it != aligner_params_json.end()) {
       aligner_params.min_full_merge_score = *min_full_merge_score_it;
     }
@@ -324,7 +327,8 @@ int main(int argc, char* argv[]) {
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     signal(SIGUSR1, my_handler);
-    Status stat = worker.Run(params, aligner_params, datasets, (int*) &signal_num);
+    Status stat =
+        worker.Run(params, aligner_params, datasets, (int *)&signal_num);
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
     }

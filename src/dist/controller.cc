@@ -1,12 +1,12 @@
 
 #include "controller.h"
 //#include <google/protobuf/text_format.h>
-#include <chrono>
-#include <fstream>
-#include <iostream>
 #include "src/agd/errors.h"
 #include "src/common/all_all_executor.h"
 #include "src/common/cluster_set.h"
+#include <chrono>
+#include <fstream>
+#include <iostream>
 #include <unistd.h>
 
 using std::cout;
@@ -83,15 +83,15 @@ using std::thread;
   // cout << "done merging\n";
 }*/
 
-agd::Status Controller::Run(const Params& params,
-                            const Parameters& aligner_params,
-                            std::vector<std::unique_ptr<Dataset>>& datasets) {
+agd::Status Controller::Run(const Params &params,
+                            const Parameters &aligner_params,
+                            std::vector<std::unique_ptr<Dataset>> &datasets) {
   // index all sequences
   agd::Status s = Status::OK();
-  const char* data;
+  const char *data;
   size_t length;
-  size_t id = 0;  // absolute ID
-  for (auto& dataset : datasets) {
+  size_t id = 0; // absolute ID
+  for (auto &dataset : datasets) {
     size_t dataset_index = 0;
     s = dataset->GetNextRecord(&data, &length);
     while (s.ok()) {
@@ -151,7 +151,8 @@ agd::Status Controller::Run(const Params& params,
   auto response_queue_address =
       absl::StrCat(address, params.response_queue_port);
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
-  auto incomplete_request_queue_address = absl::StrCat(address, params.incomplete_request_queue_port);
+  auto incomplete_request_queue_address =
+      absl::StrCat(address, params.incomplete_request_queue_port);
 
   context_ = zmq::context_t(1);
   context_sink_ = zmq::context_t(2);
@@ -169,8 +170,9 @@ agd::Status Controller::Run(const Params& params,
   }
 
   try {
-    zmq_incomp_req_socket_.reset(new zmq::socket_t(context_ir_sink_, ZMQ_PULL));
-  } catch(...) {
+    zmq_incomplete_request_socket_.reset(
+        new zmq::socket_t(context_ir_sink_, ZMQ_PULL));
+  } catch (...) {
     return agd::errors::Internal("Could not create zmq INCOMP REQ socket ");
   }
 
@@ -189,10 +191,11 @@ agd::Status Controller::Run(const Params& params,
   }
 
   try {
-    zmq_incomp_req_socket_->bind(incomplete_request_queue_address.c_str());
-  } catch(...)  {
+    zmq_incomplete_request_socket_->bind(
+        incomplete_request_queue_address.c_str());
+  } catch (...) {
     return agd::errors::Internal("Could not connect to zmq at ",
-                                  incomplete_request_queue_address);
+                                 incomplete_request_queue_address);
   }
 
   zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 5);
@@ -207,7 +210,6 @@ agd::Status Controller::Run(const Params& params,
       new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
   sets_to_merge_queue_.reset(
       new ConcurrentQueue<MarshalledClusterSet>(sequences_.size()));
-    
 
   int total_sent = 0;
   request_queue_thread_ = thread([this, &total_sent]() {
@@ -216,7 +218,9 @@ agd::Status Controller::Run(const Params& params,
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    auto free_func = [](void* data, void* hint) { delete reinterpret_cast<char*>(data); };
+    auto free_func = [](void *data, void *hint) {
+      delete reinterpret_cast<char *>(data);
+    };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
@@ -264,7 +268,8 @@ agd::Status Controller::Run(const Params& params,
       }
       total_received++;
       // cout << "response qt: Total received: " << total_received << std::endl;
-      //cout << "response set size "  << response.Set().NumClusters() << " clusters\n";
+      // cout << "response set size "  << response.Set().NumClusters() << "
+      // clusters\n";
 
       response_queue_->push(std::move(response));
     }
@@ -273,25 +278,28 @@ agd::Status Controller::Run(const Params& params,
          << "\n";
   });
 
-  incomplete_request_queue_thread_ = thread([this, &total_received]()  {
-    //get msg from incomplete request queue
-    //put into work queue
-    while (run_)  {
+  incomplete_request_queue_thread_ = thread([this, &total_received]() {
+    // get msg from incomplete request queue
+    // put into work queue
+    while (run_) {
       zmq::message_t msg;
-      bool msg_received = zmq_incomp_req_socket_->recv(&msg, ZMQ_NOBLOCK);
+      bool msg_received =
+          zmq_incomplete_request_socket_->recv(&msg, ZMQ_NOBLOCK);
       if (!msg_received) {
         // cout << "irqt -- Stuck here.\n";
         continue;
       }
       total_received++;
-      //read as Marshalled request and push into request_queue_
+      // read as Marshalled request and push into request_queue_
       MarshalledRequest request;
-      request.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
-      PartialRequestHeader* h = reinterpret_cast<PartialRequestHeader*>(msg.data());
-      cout << "Received incomplete request with ID: " << h->id <<  std::endl;
+      request.buf.AppendBuffer(reinterpret_cast<const char *>(msg.data()),
+                               msg.size());
+      PartialRequestHeader *h =
+          reinterpret_cast<PartialRequestHeader *>(msg.data());
+      cout << "Received incomplete request with ID: " << h->id << std::endl;
       request_queue_->push(std::move(request));
     }
-  }); 
+  });
 
   // partial mergers in this thread may need to be more fully parallelized to
   // prevent bottlenecks. May be required to use a different structure for
@@ -315,7 +323,7 @@ agd::Status Controller::Run(const Params& params,
 
       auto id = response.ID();
       // cout << "repsonse id is " << id << "\n";
-      PartialMergeItem* partial_item;
+      PartialMergeItem *partial_item;
 
       {
         absl::MutexLock l(&mu_);
@@ -325,7 +333,7 @@ agd::Status Controller::Run(const Params& params,
             cout << "error thing in map was not -1, was " << id << "\n";
             exit(0);
           }
-          //cout << "pushing full result \n";
+          // cout << "pushing full result \n";
           /*if (response.set().clusters_size() > params.dup_removal_thresh) {
             RemoveDuplicates(*response.mutable_set());
           }*/
@@ -364,10 +372,12 @@ agd::Status Controller::Run(const Params& params,
           RemoveDuplicates(set);
         }*/
         // remove partial it, its done now
-        //cout << "partial id " << id << " is complete, with " << set.NumClusters() << " clusters\n";
+        // cout << "partial id " << id << " is complete, with " <<
+        // set.NumClusters() << " clusters\n";
         {
           if (outstanding_merges_ == 1) {
-            cout << "last request complete, 1 merge left, time: " << static_cast<long int>(std::time(0)) << "\n";
+            cout << "last request complete, 1 merge left, time: "
+                 << static_cast<long int>(std::time(0)) << "\n";
           }
           absl::MutexLock l(&mu_);
           partial_merge_map_.erase(id);
@@ -379,17 +389,22 @@ agd::Status Controller::Run(const Params& params,
     }
   };
 
-  // std::thread validation_thread_ = std :: thread([this, &total_sent, &total_received](){
+  // std::thread validation_thread_ = std :: thread([this, &total_sent,
+  // &total_received](){
   //   while(true) {
   //     std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
-  //     // cout << "Size of response queue: " << response_queue_->size() << std :: endl;
-  //     // cout << "Size of request queue: " << request_queue_->size() << std :: endl;
-  //     // cout << "Size of sets to merge queue: " << sets_to_merge_queue_->size() << std :: endl;
-  //     // cout << "Size of incomplete request queue: " << incomplete_request_queue_->size() << std :: endl;
-  //     cout << "Total sent: " << total_sent << std::endl;
-  //     cout << "Total received: " << total_received << std::endl;
+  //     // cout << "Size of response queue: " << response_queue_->size() << std
+  //     :: endl;
+  //     // cout << "Size of request queue: " << request_queue_->size() << std
+  //     :: endl;
+  //     // cout << "Size of sets to merge queue: " <<
+  //     sets_to_merge_queue_->size() << std :: endl;
+  //     // cout << "Size of incomplete request queue: " <<
+  //     incomplete_request_queue_->size() << std :: endl; cout << "Total sent:
+  //     " << total_sent << std::endl; cout << "Total received: " <<
+  //     total_received << std::endl;
   //   }
-  // });    
+  // });
 
   worker_threads_.reserve(params.num_threads);
   for (int i = 0; i < params.num_threads; i++) {
@@ -401,12 +416,13 @@ agd::Status Controller::Run(const Params& params,
   // for now assumes all of this will fit in memory
   // even a million sequences would just be a few MB
   int i = 0;
-  for (const auto& s : sequences_) {
+  for (const auto &s : sequences_) {
     /*cmproto::ClusterSet set;
     auto* c = set.add_clusters();
     c->add_indexes(s.ID());*/
     if (params.dataset_limit > 0) {
-      if (i == params.dataset_limit) break;
+      if (i == params.dataset_limit)
+        break;
     }
     MarshalledClusterSet set(s.ID());
     sets_to_merge_queue_->push(std::move(set));
@@ -438,10 +454,10 @@ agd::Status Controller::Run(const Params& params,
     if (sets[0].NumClusters() < params.batch_size ||
         sets[1].NumClusters() < params.batch_size) {
       // create a batch, they are small
-      //cout << "two sets are small, batching ...\n";
+      // cout << "two sets are small, batching ...\n";
 
       uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
-      //cout << "total clusters: " << total_clusters << "\n";
+      // cout << "total clusters: " << total_clusters << "\n";
       // marshal id, type, num sets
       // int id = -1; auto t = RequestType::Batch; int num_sets = 2;
       // sets[1].MarshalToBuffer(request.buf)
@@ -488,7 +504,7 @@ agd::Status Controller::Run(const Params& params,
       }*/
       // make a map entry for this multi-part request
 
-      //cout << "pushing partial ...\n";
+      // cout << "pushing partial ...\n";
       /*cout << "waiting for outstanding partial\n";
       while(outstanding_partial_) {
         ;;
@@ -509,12 +525,13 @@ agd::Status Controller::Run(const Params& params,
       // item.original_size = sets[1].clusters_size();
       {
         absl::MutexLock l(&mu_);
-        //cout << "pushing id " << outstanding_merges_ << " to map\n";
-        partial_merge_map_.insert_or_assign(outstanding_merges_, std::move(item));
+        // cout << "pushing id " << outstanding_merges_ << " to map\n";
+        partial_merge_map_.insert_or_assign(outstanding_merges_,
+                                            std::move(item));
       }
 
       MarshalledClusterView cluster;
-      //cout << "pushing id " << outstanding_merges_ << "\n";
+      // cout << "pushing id " << outstanding_merges_ << "\n";
       uint32_t total_cluster = sets[0].NumClusters();
       uint32_t i = 0;
       while (sets[0].NextCluster(&cluster)) {
@@ -528,13 +545,14 @@ agd::Status Controller::Run(const Params& params,
         request_queue_->push(std::move(request));
       }
       if (outstanding_merges_ == 1) {
-        cout << "last request sent, 1 merge left, time: " << static_cast<long int>(std::time(0)) << "\n";
+        cout << "last request sent, 1 merge left, time: "
+             << static_cast<long int>(std::time(0)) << "\n";
       }
       assert(i == total_cluster);
       // set partial outstanding
       // outstanding_partial_ = true;
     }
-    //cout << "outstanding merges: " << outstanding_merges_ << "\n";
+    // cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
 
   // we must now wait for the last results to come in
@@ -565,7 +583,7 @@ agd::Status Controller::Run(const Params& params,
 
   if (!params.exclude_allall) {
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
-        &aligner_params);
+                            &aligner_params);
     executor.Initialize();
     set.ScheduleAlignments(&executor);
     executor.FinishAndOutput("dist_output_dir");
@@ -580,7 +598,7 @@ agd::Status Controller::Run(const Params& params,
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
   // worker_thread_.join();
-  for (auto& t : worker_threads_) {
+  for (auto &t : worker_threads_) {
     t.join();
   }
   request_queue_thread_.join();

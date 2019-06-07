@@ -84,6 +84,10 @@ const AlignmentEnvironment& AlignmentEnvironments::JustScoreEnv() const {
   return just_score_env_;
 }
 
+const AlignmentEnvironment& AlignmentEnvironments::LogPamJustScoreEnv() const {
+  return logpam_just_score_;
+}
+
 void AlignmentEnvironments::CreateDayMatrices(vector<double>& gap_open,
                                               vector<double>& gap_ext,
                                               vector<double>& pam_dist,
@@ -129,7 +133,8 @@ void ReadJsonEnv(const json& json_env, AlignmentEnvironment* env) {
 }
 
 void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
-                                         const json& matrices_json) {
+                                         const json& matrices_json,
+                                         double threshold) {
   auto total_matrices = matrices_json["matrices"].size();
   envs_.resize(total_matrices);
   size_t i = 0;
@@ -143,10 +148,18 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
   just_score_env_.gap_open = -37.64 + 7.434 * log10(224);
   just_score_env_.gap_extend = -1.3961;
   just_score_env_.pam_distance = 224;
-  just_score_env_.threshold = 135.75;
+  just_score_env_.threshold = threshold * 0.75f;
+  
+  logpam_just_score_.gap_open = -37.64 + 7.434 * log10(224);
+  logpam_just_score_.gap_extend = -1.3961;
+  logpam_just_score_.pam_distance = 224;
+  logpam_just_score_.threshold = threshold * 0.75f;
+  // cout << "just score threshold is " << just_score_env_.threshold << "\n";
 
   just_score_env_.matrix = new double[MDIM];
+  logpam_just_score_.matrix = new double[MDIM];
   CreateOrigDayMatrix(logpam_env_.matrix, 224, just_score_env_.matrix);
+  CreateOrigDayMatrix(logpam_env_.matrix, 224, logpam_just_score_.matrix);
   just_score_env_.matrix_int8 =
       CreateScaled(just_score_env_.matrix, just_score_env_.threshold,
                    just_score_env_.gap_open, just_score_env_.gap_extend,
@@ -155,6 +168,14 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
       just_score_env_.matrix, just_score_env_.threshold,
       just_score_env_.gap_open, just_score_env_.gap_extend,
       just_score_env_.gap_open_int16, just_score_env_.gap_ext_int16);
+  logpam_just_score_.matrix_int8 =
+      CreateScaled(logpam_just_score_.matrix, logpam_just_score_.threshold,
+                   logpam_just_score_.gap_open, logpam_just_score_.gap_extend,
+                   logpam_just_score_.gap_open_int8, logpam_just_score_.gap_ext_int8);
+  logpam_just_score_.matrix_int16 = CreateScaled(
+      logpam_just_score_.matrix, logpam_just_score_.threshold,
+      logpam_just_score_.gap_open, logpam_just_score_.gap_extend,
+      logpam_just_score_.gap_open_int16, logpam_just_score_.gap_ext_int16);
 
   /*cout << "just score int 16\n";
   for (size_t i = 0; i < DIMSIZE; i++) {
@@ -183,4 +204,42 @@ void AlignmentEnvironments::InitFromJSON(const json& logpam_json,
   }
 
   CreateDayMatrices(gaps, gap_extends, pam_dists, double_matrices);
+}
+
+void AlignmentEnvironments::UseBlosum(const json& blosum_json,
+                                      double threshold) {
+  std::fill(just_score_env_.matrix, just_score_env_.matrix + MDIM, 0.0f);
+  const auto& column_order = blosum_json["column_order"];
+  const auto& compact_matrix = blosum_json["scores"];
+  just_score_env_.threshold = threshold;
+  just_score_env_.gap_open = (double)blosum_json["gap_open"];
+  just_score_env_.gap_extend = (double)blosum_json["gap_ext"];
+  // cout << "blosum override just score threshold is " <<
+  // just_score_env_.threshold << "\n";
+
+  for (size_t i = 0; i < column_order.size(); i++) {
+    if (compact_matrix[i].size() != column_order.size()) {
+      cout << "column order doesnt match!! " << compact_matrix[i].dump()
+           << " \n"
+           << column_order << "\n";
+      exit(0);
+    }
+    for (size_t j = 0; j < column_order.size(); j++) {
+      // cout << "column order first char is " <<
+      // column_order[i].get<string>().front() << "\n";
+      just_score_env_
+          .matrix[(column_order[i].get<string>().front() - 'A') * DIMSIZE +
+                  column_order[j].get<string>().front() - 'A'] =
+          (double)compact_matrix[i][j];
+    }
+  }
+
+  just_score_env_.matrix_int16 = CreateScaled(
+      just_score_env_.matrix, just_score_env_.threshold,
+      just_score_env_.gap_open, just_score_env_.gap_extend,
+      just_score_env_.gap_open_int16, just_score_env_.gap_ext_int16);
+  just_score_env_.matrix_int8 =
+      CreateScaled(just_score_env_.matrix, just_score_env_.threshold,
+                   just_score_env_.gap_open, just_score_env_.gap_extend,
+                   just_score_env_.gap_open_int8, just_score_env_.gap_ext_int8);
 }

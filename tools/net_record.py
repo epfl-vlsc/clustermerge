@@ -3,8 +3,12 @@ import psutil
 import time
 import csv
 import pathlib
+import logging
 
-"""
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__file__)
+log.setLevel(level=logging.DEBUG)
+
 proc = subprocess.Popen(
     [
         "./bazel-bin/src/dist/dist_cluster",
@@ -27,6 +31,7 @@ proc = subprocess.Popen(
         "bacteria_datasets.json",
     ]
 )
+"""
 
 prior_time = None
 outpath = pathlib.Path("./net_stat.csv")

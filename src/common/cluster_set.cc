@@ -14,7 +14,7 @@
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) { delete reinterpret_cast<char*>(data); }
+void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   agd::Buffer buf;
@@ -25,8 +25,8 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   h.num_clusters = 0;  // set after once we know the value
   buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
-  for (const auto& c :
-       clusters_) {  // keep the fully merged for controller to remove
+  for (const auto& c : clusters_) {
+    // keep the fully merged for controller to remove
     ClusterHeader ch;
     ch.fully_merged = c.IsFullyMerged();
     ch.num_seqs = c.Sequences().size();
@@ -447,18 +447,31 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   std::cout << "Avoided " << num_avoided << " alignments.\n";
 }
 
-void ClusterSet::DumpJson(const std::string& filename) const {
-  vector<vector<size_t>> cluster_seqs;
-  for (const auto& c : clusters_) {
-    vector<size_t> seq_ids;
-    for (const auto& s : c.Sequences()) {
-      seq_ids.push_back(s.ID());
-    }
+void ClusterSet::DumpJson(const std::string& filename,
+                          std::vector<std::string>& dataset_file_names) const {
+  nlohmann::json j;
+  size_t counter = 0;
 
-    cluster_seqs.push_back(seq_ids);
+  j["datasets"] = json::array();
+  for (const auto& name : dataset_file_names) {
+    j["datasets"].push_back(name);
   }
 
-  nlohmann::json j(cluster_seqs);
+  j["clusters"] = json::array();
+
+  for (const auto& c : clusters_) {
+    j["clusters"].push_back(json::array());
+
+    for (const auto& s : c.Sequences()) {
+      nlohmann::json j_temp = json::object();
+      j_temp["Genome"] = s.Genome();
+      j_temp["Index"] = s.GenomeIndex();
+      j_temp["AbsoluteIndex"] = s.ID();
+      j["clusters"][counter].push_back(j_temp);
+    }
+
+    counter++;
+  }
 
   std::cout << "dumping clusters ...\n";
   std::ofstream o(filename);

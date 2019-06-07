@@ -111,12 +111,19 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");
   string all_matrices_json_file =
       absl::StrCat(params.data_dir_path, "all_matrices.json");
+  string blosum_json_file =
+      absl::StrCat(params.data_dir_path, "BLOSUM62.json");
 
   std::ifstream logpam_stream(logpam_json_file);
+  std::ifstream blosum_stream(blosum_json_file);
   std::ifstream allmat_stream(all_matrices_json_file);
 
   if (!logpam_stream.good()) {
     return agd::errors::Internal("File ", logpam_json_file, " not found.");
+  }
+
+  if (!blosum_stream.good()) {
+    return agd::errors::Internal("File ", blosum_json_file, " not found.");
   }
 
   if (!allmat_stream.good()) {
@@ -127,6 +134,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   json logpam_json;
   logpam_stream >> logpam_json;
 
+  json blosum_json;
+  blosum_stream >> blosum_json;
+
   json all_matrices_json;
   allmat_stream >> all_matrices_json;
 
@@ -135,7 +145,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   // initializing envs is expensive, so don't copy this
   cout << "Worker initializing environments from " << params.data_dir_path
        << "\n";
-  envs.InitFromJSON(logpam_json, all_matrices_json);
+  envs.InitFromJSON(logpam_json, all_matrices_json, aligner_params.min_score);
+  if (aligner_params.use_blosum) {
+    envs.UseBlosum(blosum_json, aligner_params.min_score);
+  }
   cout << "Done.\n";
 
   // done init envs

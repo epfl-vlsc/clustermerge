@@ -1,6 +1,7 @@
 #include "buffer.h"
 #include <cstddef>
 #include <cstring>
+#include <memory>
 #include "util.h"
 
 namespace agd {
@@ -11,7 +12,7 @@ using namespace errors;
 Buffer::Buffer(size_t initial_size, size_t extend_extra)
     : size_(0), allocation_(initial_size), extend_extra_(extend_extra) {
   // FIXME in an ideal world, allocation_ should be checked to be positive
-  buf_.reset(new char[allocation_]());
+  buf_ = std::make_unique<char[]>(allocation_);
 }
 
 Status Buffer::WriteBuffer(const char* content, size_t content_size) {
@@ -44,7 +45,7 @@ char& Buffer::operator[](size_t idx) const { return buf_[idx]; }
 void Buffer::reserve(size_t capacity) {
   if (capacity > allocation_) {
     allocation_ = capacity + extend_extra_;
-    decltype(buf_) a(new char[allocation_]());
+    decltype(buf_) a = std::make_unique<char[]>(allocation_);
     memcpy(a.get(), buf_.get(), size_);
     buf_.swap(a);
   }

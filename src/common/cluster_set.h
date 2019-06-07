@@ -17,6 +17,10 @@ class ClusterSet {
     Cluster c(seed);
     clusters_.push_back(std::move(c));
   }
+  ClusterSet(Cluster& c) {
+    // construct from a single sequence
+    clusters_.push_back(std::move(c));
+  }
 
   ClusterSet(size_t num) { clusters_.reserve(num); }
 
@@ -47,6 +51,9 @@ class ClusterSet {
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);
 
+  //Add by akash
+  void AddCluster(Cluster& c) { clusters_.push_back(std::move(c)); }
+
   // merge `this` with `cluster`, called from parallel merge executor
   void MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner);
 
@@ -57,7 +64,7 @@ class ClusterSet {
   void RemoveDuplicates();
 
   void DebugDump() const;
-  void DumpJson(const std::string& filename) const;
+  void DumpJson(const std::string& filename, std::vector <std::string>& dataset_file_names) const;
 
   void MarshalToBuffer(agd::Buffer* buf);
 

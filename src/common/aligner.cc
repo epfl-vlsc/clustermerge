@@ -307,7 +307,39 @@ bool ProteinAligner::PassesThreshold(const char* seq1, const char* seq2,
     value = score / (65535.0f / options.threshold);
 
   swps3_freeProfileShortSSE(profile);
-  //std::cout << "ALIGNER: value is " << value << " score is " << score;
+  //std::cout << "ALIGNER: value is " << value << ", score is " << score;
+  if (params_->use_blosum) {
+    return value >= params_->min_score;
+  } else {
+    return value >= 0.75f * params_->min_score;
+  }
+}
+
+bool ProteinAligner::LogPamPassesThreshold(const char* seq1, const char* seq2,
+                                     int seq1_len, int seq2_len) {
+  num_alignments_++;
+  // we use the short (int16) version for this
+  const auto& env = envs_->LogPamJustScoreEnv();
+  ProfileShort* profile =
+      swps3_createProfileShortSSE(seq1, seq1_len, env.matrix_int16);
+
+  Options options;
+  options.gapOpen = env.gap_open_int16;
+  options.gapExt = env.gap_ext_int16;
+  options.threshold = env.threshold;
+
+  // debug_profile("SHORT", profile, seq1, seq1_len, env.matrix_int16, 1);
+  // debug_alignment("SHORT", profile, seq2, seq2_len, &options);
+
+  double score = swps3_alignmentShortSSE(profile, seq2, seq2_len, &options);
+  double value;
+  if (score >= FLT_MAX)
+    value = SHRT_MAX;
+  else
+    value = score / (65535.0f / options.threshold);
+
+  swps3_freeProfileShortSSE(profile);
+  //std::cout << "ALIGNER: value is " << value << ", score is " << score;
   return value >= 0.75f * params_->min_score;
 }
 

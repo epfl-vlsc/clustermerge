@@ -167,10 +167,6 @@ agd::Status Controller::Run(const Params& params,
                                  incomplete_request_queue_address);
   }
 
-  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 5);
-  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  cout << "snd hwm value is " << val << " \n";
-
   request_queue_.reset(
       new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
   response_queue_.reset(

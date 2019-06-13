@@ -32,10 +32,6 @@ void Cluster::AddSequence(const Sequence& seq) {
     }
   }
   if (!found) {
-    residue_total_ += seq.Seq().size();
-    if (seq.Seq().size() > longest_) {
-      longest_ = seq.Seq().size();
-    }
     seqs_.push_back(seq);
   }
 }
@@ -71,10 +67,6 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
     if (!found) {
       if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
                                    rep.Seq().size(), seq.Seq().size())) {
-        residue_total_ += seq.Seq().size();
-        if (seq.Seq().size() > longest_) {
-          longest_ = seq.Seq().size();
-        }
         seqs_.push_back(seq);
       }
     }
@@ -113,10 +105,6 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
     if (!found) {
       if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
                                    rep.Seq().size(), seq.Seq().size())) {
-        residue_total_ += seq.Seq().size();
-        if (seq.Seq().size() > longest_) {
-          longest_ = seq.Seq().size();
-        }
         seqs_.push_back(seq);
       }
     }

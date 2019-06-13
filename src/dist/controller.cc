@@ -132,6 +132,11 @@ agd::Status Controller::Run(const Params& params,
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
   }
+  
+  //zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
+  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 10);
+  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  cout << "snd hwm value is " << val << " \n";
 
   try {
     zmq_incomplete_request_socket_.reset(
@@ -504,6 +509,7 @@ agd::Status Controller::Run(const Params& params,
     }
     // cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
+
 
   // we must now wait for the last results to come in
   // wait for worker thread to push last merged set

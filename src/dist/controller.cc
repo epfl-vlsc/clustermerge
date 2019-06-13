@@ -183,7 +183,7 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     MarshalledRequest merge_request;
     auto free_func = [](void* data, void* hint) {
-      delete reinterpret_cast<char*>(data);
+      delete [] reinterpret_cast<char*>(data);
     };
 
     while (run_) {
@@ -340,23 +340,6 @@ agd::Status Controller::Run(const Params& params,
       }
     }
   };
-
-  // std::thread validation_thread_ = std :: thread([this, &total_sent,
-  // &total_received](){
-  //   while(true) {
-  //     std::this_thread::sleep_for(std::chrono::milliseconds(10*1000));
-  //     // cout << "Size of response queue: " << response_queue_->size() << std
-  //     :: endl;
-  //     // cout << "Size of request queue: " << request_queue_->size() << std
-  //     :: endl;
-  //     // cout << "Size of sets to merge queue: " <<
-  //     sets_to_merge_queue_->size() << std :: endl;
-  //     // cout << "Size of incomplete request queue: " <<
-  //     incomplete_request_queue_->size() << std :: endl; cout << "Total sent:
-  //     " << total_sent << std::endl; cout << "Total received: " <<
-  //     total_received << std::endl;
-  //   }
-  // });
 
   worker_threads_.reserve(params.num_threads);
   for (size_t i = 0; i < params.num_threads; i++) {

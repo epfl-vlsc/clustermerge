@@ -202,9 +202,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                  incomplete_request_queue_address);
   }
 
-  // zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
-  // int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  // cout << "snd hwm value is " << val << " \n";
+  zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
+  int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  cout << "snd hwm value is " << val << " \n";
 
   work_queue_.reset(new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(
@@ -218,7 +218,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     // put in work queue
     // repeat
     // cmproto::MergeRequest merge_request;
-    while (run_ and !wqt_signal_) {
+    while (!wqt_signal_) {
       zmq::message_t msg;
       memcpy(msg.data(), "Send-Work", 9);
       // std::cout << "Requesting for work..\n";
@@ -241,7 +241,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
     // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
-    while (run_ && !worker_signal_) {
+    while (!worker_signal_) {
       zmq::message_t msg;
       if (!work_queue_->pop(msg)) {
         continue;
@@ -332,7 +332,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   }
 
   result_queue_thread_ = thread([this, &params]() {
-    while (run_ && !(rqt_signal_ && result_queue_->size() == 0)) {
+    while (!(rqt_signal_ && result_queue_->size() == 0)) {
       MarshalledResponse response;
 
       if (!result_queue_->pop(response)) {
@@ -350,9 +350,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   incomplete_request_queue_thread_ = thread([this, &params]() {
     auto free_func = [](void* data, void* hint) {
-      delete reinterpret_cast<char*>(data);
+      delete [] reinterpret_cast<char*>(data);
     };
-    while (run_ && !(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
+    while (!(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;
 
       if (!incomplete_request_queue_->pop(request)) {
@@ -389,25 +389,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   //   }
   // );
 
-  // Raises SIGUSR1 in 15 secs time
-  // std::thread partial_measure_thread_ = std::thread([this, &nPartial]()  {
-  //   std::this_thread::sleep_for(std::chrono::milliseconds(15*1000));
-  //   cout << "Number of partial merges: " << nPartial << std::endl;
-  //   //cout << "Raising SIGUSR1 to true\n";
-  //   //raise(SIGUSR1);
-  //   cout << "Partial measure thread ending.\n";
-  // });
-
-  // std::thread validation_thread_ = std :: thread([this, &signal_num](){
-  //   while(!(*signal_num)) {
-  //     std::this_thread::sleep_for(std::chrono::milliseconds(5*1000));
-  //     cout << "Size of work queue: " << work_queue_->size() << std::endl;
-  //     cout << "Size of incomplete response queue: " <<
-  //     incomplete_request_queue_->size() << std::endl; cout << "Size of result
-  //     queue: " << result_queue_->size() << std::endl;
-  //   }
-  // });
-
   while (!(*signal_num)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));
   }
@@ -418,16 +399,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   // std::cin.get();
 
   cout << "joining threads ...\n";
-  // run_ = false;
-  // work_queue_->unblock();
-  // result_queue_->unblock();
-  // partial_measure_thread_.join();
-  // work_queue_->unblock();
-  // queue_measure_thread_.join();
-  // work_queue_thread_.join();
-  // for (auto& t : worker_threads_) {
-  //   t.join();
-  // }
 
   incomplete_request_queue_thread_.join();
   result_queue_thread_.join();

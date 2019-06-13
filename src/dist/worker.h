@@ -62,8 +62,6 @@ class Worker {
   std::thread incomplete_request_queue_thread_;
   bool irqt_signal_ = false;
 
-  volatile bool run_ = true;
-
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   std::thread queue_measure_thread_;

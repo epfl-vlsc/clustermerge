@@ -38,9 +38,9 @@ Server cluster format example
 constexpr char cluster_config_default[] = "data/default_cluster.json";
 
 #define DEFAULT_QUEUE_DEPTH 5
-#define DEFAULT_RESPONSE_QUEUE_PORT 6556
-#define DEFAULT_REQUEST_QUEUE_PORT 6555
-#define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 6557
+#define DEFAULT_RESPONSE_QUEUE_PORT 5556
+#define DEFAULT_REQUEST_QUEUE_PORT 5555
+#define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 5554
 
 // captures kill signal and notifies Worker
 volatile int signal_num = 0;
@@ -349,6 +349,7 @@ int main(int argc, char* argv[]) {
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     signal(SIGUSR1, my_handler);
+    signal(SIGINT, my_handler);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {

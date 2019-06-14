@@ -17,8 +17,12 @@ using std::vector;
 void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
-  agd::Buffer buf;
-  buf.reserve(256);
+  // calculate buffer size for a single alloc
+  size_t buf_size = sizeof(int) + sizeof(ClusterSetHeader);
+  for (const auto& c : clusters_) {
+    buf_size += sizeof(ClusterHeader) + c.Sequences().size()*sizeof(int);
+  }
+  agd::Buffer buf(buf_size);
   buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
 
   ClusterSetHeader h;
@@ -31,7 +35,7 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
     ch.fully_merged = c.IsFullyMerged();
     ch.num_seqs = c.Sequences().size();
     buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
-    for (auto s : c.Sequences()) {
+    for (const auto& s : c.Sequences()) {
       uint32_t i = s.ID();
       buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
     }

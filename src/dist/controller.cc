@@ -115,9 +115,12 @@ agd::Status Controller::Run(const Params& params,
   auto response_queue_address =
       absl::StrCat(address, params.response_queue_port);
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
+  auto incomplete_request_queue_address =
+      absl::StrCat(address, params.incomplete_request_queue_port);
 
   context_ = zmq::context_t(1);
   context_sink_ = zmq::context_t(2);
+  context_ir_sink_ = zmq::context_t(1);
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_sink_, ZMQ_PULL));
   } catch (...) {
@@ -125,7 +128,7 @@ agd::Status Controller::Run(const Params& params,
   }
 
   try {
-    zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
+    zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_REP));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
   }
@@ -135,6 +138,13 @@ agd::Status Controller::Run(const Params& params,
   zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
   int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";
+
+  try {
+    zmq_incomplete_request_socket_.reset(
+        new zmq::socket_t(context_ir_sink_, ZMQ_PULL));
+  } catch (...) {
+    return agd::errors::Internal("Could not create zmq INCOMP REQ socket ");
+  }
 
   try {
     zmq_recv_socket_->bind(response_queue_address.c_str());
@@ -150,29 +160,44 @@ agd::Status Controller::Run(const Params& params,
                                  request_queue_address);
   }
 
+  try {
+    zmq_incomplete_request_socket_->bind(
+        incomplete_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ",
+                                 incomplete_request_queue_address);
+  }
 
   request_queue_.reset(
       new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
   response_queue_.reset(
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
+  incomplete_request_queue_.reset(
+      new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
   sets_to_merge_queue_.reset(
       new ConcurrentQueue<MarshalledClusterSet>(sequences_.size()));
 
-  request_queue_thread_ = thread([this]() {
+  int total_sent = 0;
+  request_queue_thread_ = thread([this, &total_sent]() {
     // get msg from work queue (output)
     // encode
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    int total_sent = 0;
     auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
+      delete [] reinterpret_cast<char*>(data);
     };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
+        // cout << "req qt -- Stuck here.\n";
         continue;
       }
+
+      zmq::message_t message;
+      zmq_send_socket_->recv(&message);
+      // cout << "Got work request.\n";
+
       auto size = merge_request.buf.size();
       zmq::message_t msg(merge_request.buf.release_raw(), size, free_func,
                          NULL);
@@ -189,22 +214,22 @@ agd::Status Controller::Run(const Params& params,
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
 
-  response_queue_thread_ = thread([this]() {
+  int total_received = 0;
+  response_queue_thread_ = thread([this, &total_received]() {
     // get msg from work queue (output)
     // encode
     // put in work queue zmq
     // repeat
-    int total_received = 0;
     while (run_) {
       MarshalledResponse response;
       bool msg_received = zmq_recv_socket_->recv(&response.msg, ZMQ_NOBLOCK);
       // basically implements polling to avoid blocking recv calls
       // not ideal but whatever, this is a research project! :-D
       if (!msg_received) {
+        // cout << "res qt -- Stuck here.\n";
         continue;
       }
       total_received++;
-
       // cout << "response set size "  << response.Set().NumClusters() << "
       // clusters\n";
 
@@ -213,6 +238,29 @@ agd::Status Controller::Run(const Params& params,
 
     cout << "Work queue thread ending. Total received: " << total_received
          << "\n";
+  });
+
+  incomplete_request_queue_thread_ = thread([this, &total_received]() {
+    // get msg from incomplete request queue
+    // put into work queue
+    while (run_) {
+      zmq::message_t msg;
+      bool msg_received =
+          zmq_incomplete_request_socket_->recv(&msg, ZMQ_NOBLOCK);
+      if (!msg_received) {
+        // cout << "irqt -- Stuck here.\n";
+        continue;
+      }
+      total_received++;
+      // read as Marshalled request and push into request_queue_
+      MarshalledRequest request;
+      request.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+                               msg.size());
+      PartialRequestHeader* h =
+          reinterpret_cast<PartialRequestHeader*>(msg.data());
+      cout << "Received incomplete request with ID: " << h->id << std::endl;
+      request_queue_->push(std::move(request));
+    }
   });
 
   // partial mergers in this thread may need to be more fully parallelized to
@@ -230,6 +278,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledResponse response;
     while (run_) {
       if (!response_queue_->pop(response)) {
+        cout << "worker_func -- no response\n";
         continue;
       }
 

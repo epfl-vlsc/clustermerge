@@ -27,13 +27,13 @@ class ClusterSet {
   // construct from protobuf (for dist version)
   ClusterSet(MarshalledClusterSet& marshalled_set,
              const std::vector<Sequence>& sequences);
-  
+
   ClusterSet(MarshalledClusterSetView& marshalled_set,
              const std::vector<Sequence>& sequences);
 
   void BuildMarshalledResponse(int id, MarshalledResponse* response);
 
-  //void ConstructProto(cmproto::ClusterSet* set_proto);
+  // void ConstructProto(cmproto::ClusterSet* set_proto);
 
   void Swap(ClusterSet* other) { clusters_.swap(other->clusters_); }
 
@@ -45,7 +45,8 @@ class ClusterSet {
   // keep any fully merged cluster, but mark it
   // the central controller will eliminate fully merged clusters
   // after merging partial results
-  ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner);
+  ClusterSet MergeCluster(Cluster& c_other, ProteinAligner* aligner,
+                          bool& worker_signal_);
 
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);

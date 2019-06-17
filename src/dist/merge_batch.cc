@@ -1,7 +1,8 @@
 
 #include "merge_batch.h"
 
-void MergeBatch(std::deque<ClusterSet>& sets_to_merge, ProteinAligner* aligner) {
+void MergeBatch(std::deque<ClusterSet>& sets_to_merge,
+                ProteinAligner* aligner) {
   while (sets_to_merge.size() > 1) {
     // dequeue 2 sets
     // merge the sets into one

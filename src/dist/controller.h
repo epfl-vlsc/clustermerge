@@ -1,12 +1,12 @@
 
 #pragma once
 
-#include <thread>
 #include <atomic>
+#include <thread>
 #include "absl/container/node_hash_map.h"
 #include "src/common/concurrent_queue.h"
-#include "src/common/sequence.h"
 #include "src/common/params.h"
+#include "src/common/sequence.h"
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "src/dist/partial_merge.h"
@@ -24,6 +24,7 @@ class Controller {
     absl::string_view controller_ip;
     int request_queue_port;
     int response_queue_port;
+    int incomplete_request_queue_port;
     absl::string_view data_dir_path;
     uint32_t batch_size;
     uint32_t dup_removal_thresh;
@@ -39,8 +40,10 @@ class Controller {
  private:
   zmq::context_t context_;
   zmq::context_t context_sink_;
+  zmq::context_t context_ir_sink_;  // ir stands for incomplete requests
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_incomplete_request_socket_;
 
   // thread reads from zmq and puts into response queue
   std::unique_ptr<ConcurrentQueue<MarshalledResponse>> response_queue_;
@@ -60,15 +63,20 @@ class Controller {
   // may need more than one thread .... we'll see
   std::thread request_queue_thread_;
 
+  // controller reads incomplete requests into this queue
+  std::unique_ptr<ConcurrentQueue<MarshalledRequest>> incomplete_request_queue_;
+  std::thread incomplete_request_queue_thread_;
+
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   long int checkpoint_timer_;
   // indexed cluster and partial merge set to facilitate efficient 
+
   // parallel merging of remotely executed partial merge items
 
   // map structure to track incomplete partial merges
   struct PartialMergeItem {
-    //cmproto::ClusterSet partial_set;
+    // cmproto::ClusterSet partial_set;
     PartialMergeItem() = default;
     PartialMergeItem(const PartialMergeItem& other) = delete;
     PartialMergeItem(PartialMergeItem&& other) {
@@ -85,7 +93,7 @@ class Controller {
     PartialMergeSet partial_set;
     uint32_t num_expected;
     std::atomic_uint_fast32_t num_received;
-    //uint32_t original_size;
+    // uint32_t original_size;
   };
 
   // we use a node map so that pointers remain stable, and we can reduce the

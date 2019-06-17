@@ -1,5 +1,8 @@
 
 #include "worker.h"
+#include <sys/types.h>
+#include <unistd.h>
+#include <csignal>
 #include <deque>
 #include <fstream>
 #include "absl/strings/str_cat.h"
@@ -13,8 +16,79 @@ using std::cout;
 using std::string;
 using std::thread;
 
+agd::Status Worker::SignalHandler(int signal_num) {
+  zmq::message_t msg;
+
+  // terminate wqt and drain work_queue_
+  wqt_signal_ = true;
+  work_queue_thread_.join();
+  while (work_queue_->size() != 0) {
+    work_queue_->pop(msg);
+    MarshalledRequest rq;
+    rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()), msg.size());
+    incomplete_request_queue_->push(std::move(rq));
+  }
+  assert(work_queue_->size() == 0);
+  cout << "Work queue emptied.\n";
+
+  // terminate all worker threads
+  worker_signal_ = true;
+  work_queue_->unblock();
+  for (auto& t : worker_threads_) {
+    t.join();
+  }
+  cout << "All worker threads have joined.\n";
+
+  // terminate irqt and drain incomplete_request_queue_
+  irqt_signal_ = true;
+  incomplete_request_queue_->unblock();
+  incomplete_request_queue_thread_.join();
+  assert(incomplete_request_queue_->size() == 0);
+  cout << "Incomplete request queue emptied\n";
+
+  // terminate rqt and drain result_queue_
+  rqt_signal_ = true;
+  result_queue_->unblock();
+  result_queue_thread_.join();
+  assert(result_queue_->size() == 0);
+  cout << "Resuly queue emptied.\n";
+
+  try {
+    zmq_recv_socket_->disconnect(request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not disconnect to zmq at ",
+                                 request_queue_address);
+  }
+
+  try {
+    zmq_send_socket_->disconnect(response_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not disconnect to zmq at ",
+                                 response_queue_address);
+  }
+
+  try {
+    zmq_incomplete_request_socket_->disconnect(
+        incomplete_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not disconnect to zmq at ",
+                                 incomplete_request_queue_address);
+  }
+
+  cout << "Zmq's disconnected.\n";
+
+  cout << "Quitting nicely..!\n";
+  // exit(signal_num);
+  return agd::Status::OK();
+}
+
 agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
-                        std::vector<std::unique_ptr<Dataset>>& datasets) {
+                        std::vector<std::unique_ptr<Dataset>>& datasets,
+                        int* const signal_num) {
+  // print the process id
+  pid_t pid = getpid();
+  cout << "Process id: " << pid << std::endl;
+
   // index all sequences
   agd::Status s = Status::OK();
   const char* data;
@@ -81,13 +155,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   // connect to zmq queues
   auto address = absl::StrCat("tcp://", params.controller_ip, ":");
-  auto response_queue_address =
-      absl::StrCat(address, params.response_queue_port);
-  auto request_queue_address = absl::StrCat(address, params.request_queue_port);
+  response_queue_address = absl::StrCat(address, params.response_queue_port);
+  request_queue_address = absl::StrCat(address, params.request_queue_port);
+  incomplete_request_queue_address =
+      absl::StrCat(address, params.incomplete_request_queue_port);
 
   context_ = zmq::context_t(1);
+  // worker is the requester --> requests for work items
   try {
-    zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_PULL));
+    zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_REQ));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PULL socket ");
   }
@@ -96,6 +172,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
+  }
+
+  try {
+    zmq_incomplete_request_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
+  } catch (...) {
+    return agd::errors::Internal("Could not create zmq INCOMPLETE REQ socket ");
   }
 
   try {
@@ -112,57 +194,73 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                  response_queue_address);
   }
 
+  try {
+    zmq_incomplete_request_socket_->connect(
+        incomplete_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ",
+                                 incomplete_request_queue_address);
+  }
+
   zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
   int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";
 
-  work_queue_.reset(
-      new ConcurrentQueue<zmq::message_t>(params.queue_depth));
+  work_queue_.reset(new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
+  incomplete_request_queue_.reset(
+      new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq
     // decode
     // put in work queue
     // repeat
-    //cmproto::MergeRequest merge_request;
-    while (run_) {
+    // cmproto::MergeRequest merge_request;
+    while (!wqt_signal_) {
       zmq::message_t msg;
-      bool msg_received = zmq_recv_socket_->recv(&msg, ZMQ_NOBLOCK);
+      memcpy(msg.data(), "Send-Work", 9);
+      // std::cout << "Requesting for work..\n";
+      zmq_recv_socket_->send(msg);
+      bool msg_received = zmq_recv_socket_->recv(&msg);  //, ZMQ_NOBLOCK);
       if (!msg_received) {
         continue;
       }
-
+      // cout << "Received work item.\n";
       work_queue_->push(std::move(msg));
     }
 
     cout << "Work queue thread ending.\n";
   });
 
-  auto worker_func = [this, &envs, &aligner_params]() {
+  int nPartial = 0;
+  int nJoined = 0;
+  auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
     ProteinAligner aligner(&envs, &aligner_params);
 
-    //cmproto::MergeRequest request;
+    // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
-    while (run_) {
+    while (!worker_signal_) {
       zmq::message_t msg;
       if (!work_queue_->pop(msg)) {
         continue;
       }
-      MarshalledRequestView request(reinterpret_cast<char*>(msg.data()), msg.size());
+      MarshalledRequestView request(reinterpret_cast<char*>(msg.data()),
+                                    msg.size());
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-
+      // cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
-        cout << "its a batch, request ID is " << request.ID() << " \n";
-        //auto& batch = request.batch();
+        // cout << "its a batch, request ID is " << request.ID() << " \n";
+        // auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto
           // TODO add ClusterSet constructor
-          //cout << "marshalled cluster set has " << clusterset.NumClusters() << " clusters\n";
+          // cout << "marshalled cluster set has " << clusterset.NumClusters()
+          // << " clusters\n";
           ClusterSet cs(clusterset, sequences_);
           sets_to_merge.push_back(std::move(cs));
         }
@@ -173,21 +271,22 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // queue now has final set
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
-        //cout << "the merged set has " << final_set.Size() << " clusters\n";
+        // cout << "the merged set has " << final_set.Size() << " clusters\n";
 
-        //final_set.ConstructProto(new_cs_proto);
+        // final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
         final_set.BuildMarshalledResponse(request.ID(), &response);
         MarshalledClusterSetView view;
         view = response.Set();
-        //cout << "final set has " << view.NumClusters() << " clusters.\n";
+        // cout << "final set has " << view.NumClusters() << " clusters.\n";
 
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
 
       } else if (request.Type() == RequestType::Partial) {
-        //cout << "has partial\n";
-        //auto& partial = request.partial();
+        nPartial++;
+        // cout << "has partial\n";
+        // auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
         // the controller can merge other partial merge requests
@@ -195,26 +294,35 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         MarshalledClusterView cluster;
         request.ClusterAndSet(&set, &cluster);
 
-        //cout << "set has " << set.NumClusters() << " clusters\n";
+        // cout << "set has " << set.NumClusters() << " clusters\n";
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
-        auto new_cs = cs.MergeCluster(c, &aligner);
-        //cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+        if (worker_signal_) {
+          MarshalledRequest rq;
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+                              msg.size());
+          incomplete_request_queue_->push(std::move(rq));
+          std ::cout << "Pushing into incomplete queue with ID: "
+                     << request.ID() << std::endl;
+          continue;
+        }
+        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
         MarshalledResponse response;
         new_cs.BuildMarshalledResponse(request.ID(), &response);
         assert(response.Set().NumClusters() == new_cs.Size());
-
         result_queue_->push(std::move(response));
-
 
       } else {
         cout << "request was not any type!!!!!!\n";
         return;
       }
     }
+    nJoined++;
+    cout << "Ending thread [" << nJoined << "]\n";
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -223,9 +331,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     worker_threads_.push_back(std::thread(worker_func));
   }
 
-  result_queue_thread_ = thread([this]() {
-    while (run_) {
+  result_queue_thread_ = thread([this, &params]() {
+    while (!(rqt_signal_ && result_queue_->size() == 0)) {
       MarshalledResponse response;
+
       if (!result_queue_->pop(response)) {
         continue;
       }
@@ -236,44 +345,64 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
     }
 
-    cout << "Work queue thread ending.\n";
+    cout << "Result queue thread ending.\n";
+  });
+
+  incomplete_request_queue_thread_ = thread([this, &params]() {
+    auto free_func = [](void* data, void* hint) {
+      delete [] reinterpret_cast<char*>(data);
+    };
+    while (!(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
+      MarshalledRequest request;
+
+      if (!incomplete_request_queue_->pop(request)) {
+        continue;
+      }
+
+      auto size = request.buf.size();
+      zmq::message_t msg(request.buf.release_raw(), size, free_func, NULL);
+      bool success = zmq_incomplete_request_socket_->send(std::move(msg));
+      if (!success) {
+        cout << "INCOMP REQ Thread failed to send response over zmq!\n";
+      }
+    }
+
+    cout << "Incomplete request queue thread ending.\n";
   });
 
   timestamps_.reserve(100000);
   queue_sizes_.reserve(100000);
 
-  queue_measure_thread_ = std::thread([this](){
-      // get timestamp, queue size
-      //cout << "queue measure thread starting ...\n";
-      while(run_) {
-        time_t result = std::time(nullptr);
-        timestamps_.push_back(static_cast<long int>(result));
-        queue_sizes_.push_back(work_queue_->size());
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        if (queue_sizes_.size() >= 1000000) {
-          break;  // dont run forever ... 
-        }
-      }
-      //cout << "queue measure thread finished\n";
-    }
-  );
+  // queue_measure_thread_ = std::thread([this](){
+  //     // get timestamp, queue size
+  //     //cout << "queue measure thread starting ...\n";
+  //     while(run_) {
+  //       time_t result = std::time(nullptr);
+  //       timestamps_.push_back(static_cast<long int>(result));
+  //       queue_sizes_.push_back(work_queue_->size());
+  //       std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  //       if (queue_sizes_.size() >= 1000000) {
+  //         break;  // dont run forever ...
+  //       }
+  //     }
+  //     cout << "queue measure thread finished\n";
+  //   }
+  // );
+
+  while (!(*signal_num)) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));
+  }
+  cout << "Response [signal_num] value change received.\n";
+  SignalHandler(*signal_num);
 
   cout << "Worker running, press button to exit\n";
-  //std::cin.get();
+  // std::cin.get();
 
   cout << "joining threads ...\n";
-  //run_ = false;
-  //work_queue_->unblock();
-  //result_queue_->unblock();
+
+  incomplete_request_queue_thread_.join();
   result_queue_thread_.join();
 
-  //work_queue_->unblock();
-  work_queue_thread_.join();
-  queue_measure_thread_.join();
-  for (auto& t : worker_threads_) {
-    t.join();
-  }
-  
   // queue size stats
   std::vector<std::pair<size_t, size_t>> values;
   for (size_t i = 0; i < timestamps_.size(); i++) {

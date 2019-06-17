@@ -308,7 +308,8 @@ void ClusterSet::DebugDump() const {
   }
 }
 
-ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
+ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
+                                    bool& worker_signal_) {
   // for the dist version, we keep fully merged clusters around,
   // because this is a partial merge of two large sets,
   // the results of which need to be merged by the controller
@@ -317,6 +318,10 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner) {
   ProteinAligner::Alignment alignment;
   agd::Status s;
   for (auto& c : clusters_) {
+    if (worker_signal_) {
+      std::cout << "Breaking partial merge.\n";
+      break;
+    }
     if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);

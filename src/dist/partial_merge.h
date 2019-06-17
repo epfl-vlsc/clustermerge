@@ -1,16 +1,16 @@
 
+#include <iostream>
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 #include "src/comms/requests.h"
-#include <iostream>
 
-template<typename T>
+template <typename T>
 struct Node {
-  T t; 
+  T t;
   Node* next;
 };
 
-template<typename T>
+template <typename T>
 class AtomicList {
   std::atomic<Node<T>*> head_{nullptr};
   std::atomic_uint_fast32_t size_{0};
@@ -42,7 +42,8 @@ class AtomicList {
     auto p = new Node<T>();
     p->t = t;
     p->next = head_;
-    while (!head_.compare_exchange_weak(p->next, p)) {}
+    while (!head_.compare_exchange_weak(p->next, p)) {
+    }
     size_++;
   }
   uint32_t Size() const { return size_.load(); }
@@ -77,12 +78,12 @@ class IndexedCluster {
     }
     orig_seqs_ = num_seqs;
     if (num_seqs != seq_indexes_.size()) {
-      std::cout <<  "there were dups!!!!!!!!!!!!!\n";
+      std::cout << "there were dups!!!!!!!!!!!!!\n";
     }
   }
   void Insert(uint32_t seq_index) {
-    //absl::MutexLock l(&mu_);
-    //seq_indexes_.insert(seq_index);
+    // absl::MutexLock l(&mu_);
+    // seq_indexes_.insert(seq_index);
     new_seqs_.push_atomic(seq_index);
   }
   void SetFullyMerged() { fully_merged_ = true; }
@@ -113,7 +114,7 @@ class IndexedCluster {
   // track explicitly the rep because the set is not ordered
   uint32_t respresentative_idx_ = 0;
   // lock to insert new set indexes
-  //absl::Mutex mu_;
+  // absl::Mutex mu_;
 };
 
 class PartialMergeSet {
@@ -127,7 +128,7 @@ class PartialMergeSet {
   // build final set, not including fully merged clusters
   void BuildMarshalledSet(MarshalledClusterSet* set);
   void Init(MarshalledClusterSet& set);
-  //void RemoveFullyMerged();
+  // void RemoveFullyMerged();
   const std::vector<IndexedCluster>& Clusters() const { return clusters_; }
 
  private:

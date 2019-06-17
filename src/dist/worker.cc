@@ -251,10 +251,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-      // cout << "Got a request: " << request.ID() << std::endl;
+      time_t now_time = std::time(0);
+      cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] Request received:\n";
       if (request.Type() == RequestType::Batch) {
-        // cout << "its a batch, request ID is " << request.ID() << " \n";
-        // auto& batch = request.batch();
+        cout << "its a batch, request ID is " << request.ID() << std::endl;
+        //auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto

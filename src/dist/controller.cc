@@ -406,13 +406,18 @@ agd::Status Controller::Run(const Params& params,
     if (params.checkpoint_interval > 0 &&
         timestamp() - checkpoint_timer_ > params.checkpoint_interval) {
       cout << "Checkpointing, waiting for outstanding requests...\n";
+      auto start_wait_checkpoint_time = std::chrono::high_resolution_clock::now();
 
       while (outstanding_requests.load() > 0) {
         cout << "Waiting to checkpoint, " << outstanding_requests.load()
              << " requests outstanding ...\n";
         std::this_thread::sleep_for(500ms);
       }
-      cout << "Writing checkpoint ...\n";
+      auto end_wait_checkpoint_time = std::chrono::high_resolution_clock::now();
+      auto wait_duration = end_wait_checkpoint_time - start_wait_checkpoint_time;
+      cout << "Writing checkpoint after " 
+           << std::chrono::duration_cast<std::chrono::seconds>(wait_duration).count()
+           << "sec waiting for outstanding requests ..." << std::endl;
       // write sets to merge queue
       agd::Status stat =
           WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
@@ -420,7 +425,7 @@ agd::Status Controller::Run(const Params& params,
         return stat;
       }
       checkpoint_timer_ = timestamp();
-      cout << "Checkpoint complete\n";
+      cout << "Checkpoint complete" << std::endl;
     }
 
     if (!sets_to_merge_queue_->pop(sets[0])) {
@@ -504,7 +509,9 @@ agd::Status Controller::Run(const Params& params,
       // set partial outstanding
       // outstanding_partial_ = true;
     }
-    // cout << "outstanding merges: " << outstanding_merges_ << "\n";
+    time_t now_time = std::time(0);
+    cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] " 
+         << "outstanding merges: " << outstanding_merges_ << std::endl;
   }
 
 

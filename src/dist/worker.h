@@ -22,6 +22,7 @@ class Worker {
     int request_queue_port;
     int response_queue_port;
     int incomplete_request_queue_port;
+    int large_partial_merge_port;
     absl::string_view data_dir_path;
   };
 
@@ -40,6 +41,7 @@ class Worker {
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
   std::unique_ptr<zmq::socket_t> zmq_incomplete_request_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_large_partial_merge_socket_;
   // local input buffer
   // one thread receives zmq messages, decodes, puts work in work queue
   // all other threads do work and push to output buffer
@@ -72,4 +74,5 @@ class Worker {
   std::string response_queue_address;
   std::string request_queue_address;
   std::string incomplete_request_queue_address;
+  std::string large_partial_merge_channel_address;
 };

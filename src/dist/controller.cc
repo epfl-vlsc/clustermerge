@@ -118,9 +118,12 @@ agd::Status Controller::Run(const Params& params,
   auto incomplete_request_queue_address =
       absl::StrCat(address, params.incomplete_request_queue_port);
 
+  auto large_partial_merge_channel_address = 
+      absl::StrCat(address, params.large_partial_merge_port);
   context_ = zmq::context_t(1);
   context_sink_ = zmq::context_t(2);
   context_ir_sink_ = zmq::context_t(1);
+  context_large_partial_merge_ = zmq::context_t(1);
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_sink_, ZMQ_PULL));
   } catch (...) {
@@ -130,7 +133,13 @@ agd::Status Controller::Run(const Params& params,
   try {
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_REP));
   } catch (...) {
-    return agd::errors::Internal("Could not create zmq PUSH socket ");
+    return agd::errors::Internal("Could not create zmq REP socket");
+  }
+
+  try {
+    zmq_large_partial_merge_socket_.reset(new zmq::socket_t(context_large_partial_merge_, ZMQ_REP));
+  } catch (...) {
+    return agd::errors::Internal("Could not create a zmp REP socket -- large_pm");
   }
   
   //zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
@@ -158,6 +167,12 @@ agd::Status Controller::Run(const Params& params,
   } catch (...) {
     return agd::errors::Internal("Could not connect to zmq at ",
                                  request_queue_address);
+  }
+
+  try {
+    zmq_large_partial_merge_socket_->bind(large_partial_merge_channel_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ", large_partial_merge_channel_address);
   }
 
   try {
@@ -212,6 +227,40 @@ agd::Status Controller::Run(const Params& params,
     }
 
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
+  });
+
+  large_partial_merge_thread_ = thread([this](){
+    //receive requests from worker and send them cluster sets
+    
+    auto free_func = [](void* data, void* hint) {
+      delete [] reinterpret_cast<char*>(data);
+    };
+    
+    while(run_) {
+      zmq::message_t message;
+      zmq_large_partial_merge_socket_->recv(&message);
+      //extract the id
+      int id = *reinterpret_cast<int*>(message.data());
+      
+      //search in partial merge map
+      PartialMergeItem* partial_item;
+      {
+        absl::MutexLock l(&mu_);
+        auto partial_it = partial_merge_map_.find(id);
+        if (partial_it == partial_merge_map_.end()) {
+          cout << "the set with " << id << " is not in the map \n";
+          exit(0);
+        }
+        partial_item = &partial_it->second;
+        auto size = partial_item->set2.TotalSize();
+        zmq::message_t msg(partial_item->set2.buf.release_raw(), size, free_func, NULL);
+        bool success = zmq_large_partial_merge_socket_->send(std::move(msg));  
+        if(!success)  {
+          cout << "Thread failed to send cluster set over zmq!\n";
+        }
+      }
+    }
+
   });
 
   int total_received = 0;
@@ -475,6 +524,8 @@ agd::Status Controller::Run(const Params& params,
       // all clusters in sets[1]
       item.num_expected = sets[0].NumClusters();
       item.partial_set.Init(sets[1]);
+      //copies the set
+      item.set2 = MarshalledClusterSet(sets[1]);
       {
         absl::MutexLock l(&mu_);
         // cout << "pushing id " << outstanding_merges_ << " to map\n";
@@ -486,10 +537,19 @@ agd::Status Controller::Run(const Params& params,
       // cout << "pushing id " << outstanding_merges_ << "\n";
       uint32_t total_cluster = sets[0].NumClusters();
       uint32_t i = 0;
+      bool isLarge;
+      //add to params
+      if(sets[1].TotalSize() > 500) {
+        isLarge = true;
+      }
       while (sets[0].NextCluster(&cluster)) {
         i++;
         MarshalledRequest request;
-        request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
+        if(isLarge) {
+          request.CreateLargePartialRequest(outstanding_merges_, cluster);
+        } else {
+          request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
+        }
         // cout << "pushing partial request with " <<
         // partial_request->set().clusters_size() << " clusters in set and ID: "
         // << request.id() << "\n";
@@ -556,6 +616,7 @@ agd::Status Controller::Run(const Params& params,
   }
   request_queue_thread_.join();
   response_queue_thread_.join();
+  incomplete_request_queue_thread_.join();
 
   cout << "All threads joined.\n";
 

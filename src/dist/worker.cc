@@ -159,19 +159,27 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   request_queue_address = absl::StrCat(address, params.request_queue_port);
   incomplete_request_queue_address =
       absl::StrCat(address, params.incomplete_request_queue_port);
+  large_partial_merge_channel_address = 
+      absl::StrCat(address, params.large_partial_merge_port);
 
   context_ = zmq::context_t(1);
   // worker is the requester --> requests for work items
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_REQ));
   } catch (...) {
-    return agd::errors::Internal("Could not create zmq PULL socket ");
+    return agd::errors::Internal("Could not create zmq REQ socket ");
   }
 
   try {
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
+  }
+
+  try {
+    zmq_large_partial_merge_socket_.reset(new zmq::socket_t(context_, ZMQ_REQ));
+  } catch (...)  {
+    return agd::errors::Internal("Could not create zmq REQ socket -- large pm ");
   }
 
   try {
@@ -192,6 +200,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   } catch (...) {
     return agd::errors::Internal("Could not connect to zmq at ",
                                  response_queue_address);
+  }
+
+  try {
+    zmq_large_partial_merge_socket_->connect(large_partial_merge_channel_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ", large_partial_merge_channel_address);
   }
 
   try {
@@ -316,6 +330,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
+      } else if(request.Type() == RequestType::LargePartial) {
+        //extract id and cluster
+        int id = request.ID();
+        MarshalledClusterView cluster;
+        request.Cluster(&cluster);
+
+        //search in map
+
+
+        // if not in map
       } else {
         cout << "request was not any type!!!!!!\n";
         return;

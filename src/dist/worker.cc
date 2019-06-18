@@ -235,14 +235,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     while (!wqt_signal_) {
       zmq::message_t msg;
       memcpy(msg.data(), "Send-Work", 9);
-      // std::cout << "Requesting for work..\n";
+      //std::cout << "Requesting for work..\n";
       zmq_recv_socket_->send(msg);
       bool msg_received = zmq_recv_socket_->recv(&msg);  //, ZMQ_NOBLOCK);
       if (!msg_received) {
         continue;
       }
-      // cout << "Received work item.\n";
+      //cout << "Received work item.\n";
       work_queue_->push(std::move(msg));
+      //cout << "Pushing into work_queue_\n";
     }
 
     cout << "Work queue thread ending.\n";
@@ -265,9 +266,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-      // cout << "Got a request: " << request.ID() << std::endl;
+      //cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
-        // cout << "its a batch, request ID is " << request.ID() << " \n";
+        //cout << "its a batch, request ID is " << request.ID() << " \n";
         // auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
@@ -280,12 +281,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         // sets are constructed and in the queue, proceed to merge them
         // MergeSets(sets_to_merge)
-        // cout << "merging a batch...\n";
+        cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
+        cout << "--\n";
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
-        // cout << "the merged set has " << final_set.Size() << " clusters\n";
+        cout << "the merged set has " << final_set.Size() << " clusters\n";
 
         // final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
@@ -294,12 +296,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         view = response.Set();
         // cout << "final set has " << view.NumClusters() << " clusters.\n";
 
+        cout << "Pushing to result queue.\n";
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
-
+        cout << "Pushed to result queue.\n";
       } else if (request.Type() == RequestType::Partial) {
         nPartial++;
-        // cout << "has partial\n";
+        cout << "Its a partial request\n";
         // auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
@@ -330,16 +333,55 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
-      } else if(request.Type() == RequestType::LargePartial) {
-        //extract id and cluster
-        int id = request.ID();
-        MarshalledClusterView cluster;
-        request.Cluster(&cluster);
+      // } else if(request.Type() == RequestType::LargePartial) {
+      //   //extract id and cluster
+      //   int id = request.ID();
+      //   cout << "Received a large partial request with id " << id << "\n";
+      //   MarshalledClusterView cluster;
+      //   request.Cluster(&cluster);
 
-        //search in map
+      //   MarshalledClusterSet set;
+      //   //search in map
+      //   auto it = set_map.find(id);
+      //   if(it == set_map.end()) {
+      //     cout << "[" << id << "] Set not cached. Requesting...\n";
+      //     // if not in map
+      //     zmq::message_t msg(&id, sizeof(int));
+      //     bool success = zmq_large_partial_merge_socket_->send(msg);
+      //     if(!success)  {
+      //       cout << "Failed to send the id over zmq -- worker func.\n";
+      //     }
+      //     zmq_recv_socket_->recv(&msg);
+      //     set.buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
+      //     set_map[id] = set;
+      //     cout << "[" << id << "] Received set from controller.\n";
+      //   }
+      //   else {
+      //     cout << "Found in set map.\n";
+      //     set = it->second; 
+      //   }
 
+      //   ClusterSet cs(set, sequences_);
+      //   Cluster c(cluster, sequences_);
 
-        // if not in map
+      //   // same code as Partial Merge
+      //   auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+      //   if (worker_signal_) {
+      //     MarshalledRequest rq;
+      //     rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+      //                         msg.size());
+      //     incomplete_request_queue_->push(std::move(rq));
+      //     std ::cout << "Pushing into incomplete queue with ID: "
+      //                << request.ID() << std::endl;
+      //     continue;
+      //   }
+      //   // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+      //   assert(set.NumClusters() <= new_cs.Size());
+      //   MarshalledResponse response;
+      //   new_cs.BuildMarshalledResponse(request.ID(), &response);
+      //   assert(response.Set().NumClusters() == new_cs.Size());
+      //   result_queue_->push(std::move(response));
+
       } else {
         cout << "request was not any type!!!!!!\n";
         return;
@@ -362,11 +404,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       if (!result_queue_->pop(response)) {
         continue;
       }
-
+      cout << "Popped from response queue.\n";
       bool success = zmq_send_socket_->send(std::move(response.msg));
       if (!success) {
         cout << "Thread failed to send response over zmq!\n";
       }
+      cout << "Sent to controller.\n";
     }
 
     cout << "Result queue thread ending.\n";

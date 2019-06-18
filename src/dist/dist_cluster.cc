@@ -360,7 +360,7 @@ int main(int argc, char* argv[]) {
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.large_partial_merge_port = large_partial_merge_port;
     signal(SIGUSR1, my_handler);
-    signal(SIGINT, my_handler);
+    //signal(SIGINT, my_handler);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {

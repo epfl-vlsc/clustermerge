@@ -3,6 +3,7 @@
 
 void MergeBatch(std::deque<ClusterSet>& sets_to_merge,
                 ProteinAligner* aligner) {
+  std::cout<<"Beginning to merge sets.\n";
   while (sets_to_merge.size() > 1) {
     // dequeue 2 sets
     // merge the sets into one
@@ -23,4 +24,5 @@ void MergeBatch(std::deque<ClusterSet>& sets_to_merge,
     sets_to_merge.pop_front();
     sets_to_merge.push_back(std::move(merged_set));
   };
+  std::cout << "Finished merging sets.\n"; 
 }

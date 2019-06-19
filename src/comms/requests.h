@@ -117,15 +117,6 @@ struct MarshalledClusterSet {
 
     buf.AppendBuffer(reinterpret_cast<char*>(&idx), sizeof(uint32_t));
   }
-
-  MarshalledClusterSet& operator=(const MarshalledClusterSet& other)  {
-    buf.AppendBuffer(other.buf.data(), other.TotalSize());
-    return *this;
-  } 
-  
-  MarshalledClusterSet(const MarshalledClusterSet& other) {
-    buf.AppendBuffer(other.buf.data(), other.TotalSize());
-  }
   
   MarshalledClusterSet(MarshalledResponse& response)
       : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {

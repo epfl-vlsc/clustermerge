@@ -64,8 +64,8 @@ class Worker {
   std::thread incomplete_request_queue_thread_;
   bool irqt_signal_ = false;
 
-  //map for large sets
-  std::unordered_map<int, MarshalledClusterSet> set_map;
+  //map for large sets, buf is the buf of MarshalledClusterSet
+  std::unordered_map<int, agd::Buffer> set_map;
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
 

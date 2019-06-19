@@ -89,17 +89,20 @@ class Controller {
       partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
+      buf = std::move(other.buf);
     }
     PartialMergeItem& operator=(PartialMergeItem&& other) {
       partial_set = std::move(other.partial_set);
       num_expected = other.num_expected;
       num_received.store(other.num_received.load());
+      buf = std::move(other.buf);
       return *this;
     }
     PartialMergeSet partial_set;
     uint32_t num_expected;
     std::atomic_uint_fast32_t num_received;
-    MarshalledClusterSet set2;
+    //holds the MarshalledClusterSet
+    agd::Buffer buf;
     // uint32_t original_size;
   };
 

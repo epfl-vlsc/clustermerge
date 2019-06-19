@@ -41,7 +41,7 @@ constexpr char cluster_config_default[] = "data/default_cluster.json";
 #define DEFAULT_RESPONSE_QUEUE_PORT 5556
 #define DEFAULT_REQUEST_QUEUE_PORT 5555
 #define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 5554
-#define DEFAULT_LARGE_PARTIAL_MERGE_PORT 5553
+#define DEFAULT_LARGE_PARTIAL_MERGE_PORT 5557
 
 // captures kill signal and notifies Worker
 volatile int signal_num = 0;

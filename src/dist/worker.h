@@ -9,6 +9,7 @@
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "zmq.hpp"
+#include "src/common/multi_notification.h"
 
 // interface to manage local worker
 class Worker {
@@ -64,9 +65,15 @@ class Worker {
   std::thread incomplete_request_queue_thread_;
   bool irqt_signal_ = false;
 
-  //map for large sets, buf is the buf of MarshalledClusterSet
+  //cache for partial merge sets, buf is the buf of MarshalledClusterSet
   std::unordered_map<int, agd::Buffer> set_map;
+  absl::Mutex mu_;  //for locking set_map
 
+  // queue to hold set requests
+  std::unique_ptr<ConcurrentQueue<std::pair<int, MultiNotification*>>> set_request_queue_;
+  std::thread set_request_thread_;
+  
+  
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   std::thread queue_measure_thread_;

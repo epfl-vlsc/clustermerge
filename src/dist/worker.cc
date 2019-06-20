@@ -225,6 +225,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
   incomplete_request_queue_.reset(
       new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
+  set_request_queue_.reset(
+      new ConcurrentQueue<std::pair<int, MultiNotification*>>(params.num_threads));
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq
@@ -249,11 +251,47 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Work queue thread ending.\n";
   });
 
+  set_request_thread_ = thread([this](){
+    while(true) {
+      std::pair<int, MultiNotification*> pr;
+      if(!set_request_queue_->pop(pr))  {
+        continue;
+      }
+      int id = pr.first;
+      //if its not in the cache
+      mu_.Lock();
+      if(set_map.find(id) == set_map.end()) {
+        mu_.Unlock();
+        zmq::message_t msg(&id, sizeof(int));
+        bool success = zmq_large_partial_merge_socket_->send(msg);
+        if(!success)  {
+          cout << "Failed to send the id over zmq -- worker func.\n";
+        }
+        success = zmq_large_partial_merge_socket_->recv(&msg);
+        if(!success)  {
+          cout << "Requested set was not received.\n";
+        }
+        //cout << "Received message size --> " << msg.size() << std::endl;
+        //copy to put in the map
+        agd::Buffer buf;
+        buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
+        mu_.Lock();
+        set_map[id] = std::move(buf);
+        mu_.Unlock();
+        cout << "Communicating thread --> fetched set: " << id << "\n";
+      }
+      else {
+        mu_.Unlock();
+        cout << "Communicating thread --> set already present: " << id << "\n";
+      }
+      pr.second->Notify();
+    }    
+  });
+
   int nPartial = 0;
   int nJoined = 0;
   auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
     ProteinAligner aligner(&envs, &aligner_params);
-
     // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
     while (!worker_signal_) {
@@ -268,7 +306,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // encode result, put in queue
       //cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
-        cout << "its a batch, request ID is " << request.ID() << " \n";
+        //cout << "its a batch, request ID is " << request.ID() << " \n";
         // auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
@@ -302,7 +340,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         //cout << "Pushed to result queue.\n";
       } else if (request.Type() == RequestType::Partial) {
         nPartial++;
-        cout << "Its a partial request\n";
+        //cout << "Its a partial request\n";
         // auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
@@ -336,41 +374,29 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       } else if(request.Type() == RequestType::LargePartial) {
         //extract id and cluster
         int id = request.ID();
-        cout << "Received a large partial request with id " << id << "\n";
+        //cout << "Received a large partial request with id " << id << "\n";
         MarshalledClusterView cluster;
         request.Cluster(&cluster);
 
         MarshalledClusterSet set;
         //search in map
+        mu_.Lock();
         auto it = set_map.find(id);
         if(it == set_map.end()) {
-          cout << "[" << id << "] Set not cached. Requesting...\n";
-          // if not in map
-          zmq::message_t msg(&id, sizeof(int));
-          bool success = zmq_large_partial_merge_socket_->send(msg);
-          if(!success)  {
-            cout << "Failed to send the id over zmq -- worker func.\n";
-          }
-          success = zmq_large_partial_merge_socket_->recv(&msg);
-          if(!success)  {
-            cout << "Requested set was not received.\n";
-          }
-          cout << "Received message size --> " << msg.size() << std::endl;
-          //copy to put in the map
-          // agd::Buffer buf;
-          // buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
-          // cout << id << "\n";
-          // set_map[id] = std::move(buf);
-          
-          //create a copy for my current use
-          set.buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
-          
-          cout << "[" << id << "] Received set from controller.\n";
-        } else {
-          cout << "Found in set map.\n";
-          //create a copy for my current use
-          set.buf.AppendBuffer(it->second.data(), it->second.size()); 
+          mu_.Unlock();
+          MultiNotification n;
+          cout << "Worker thread --> [" << id << "] Set not cached. Requesting...\n";
+          set_request_queue_->push(std::make_pair(id, &n));
+          n.SetMinNotifies(1);
+          n.WaitForNotification();
+          mu_.Lock();
+          it = set_map.find(id);
+          assert(it != set_map.end());
+          cout << "Worker thread --> [" << id << "] Received set.\n";
         }
+        
+        set.buf.AppendBuffer(it->second.data(), it->second.size()); 
+        mu_.Unlock();
 
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
@@ -476,8 +502,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   cout << "joining threads ...\n";
 
-  incomplete_request_queue_thread_.join();
-  result_queue_thread_.join();
+  //incomplete_request_queue_thread_.join();
+  //result_queue_thread_.join();
 
   // queue size stats
   std::vector<std::pair<size_t, size_t>> values;

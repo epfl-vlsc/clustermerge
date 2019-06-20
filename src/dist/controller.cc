@@ -551,11 +551,13 @@ agd::Status Controller::Run(const Params& params,
   response_queue_->unblock();
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
+  incomplete_request_queue_->unblock();
   for (auto& t : worker_threads_) {
     t.join();
   }
   request_queue_thread_.join();
   response_queue_thread_.join();
+  incomplete_request_queue_thread_.join();
 
   cout << "All threads joined.\n";
 

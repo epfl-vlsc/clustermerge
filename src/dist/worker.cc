@@ -53,6 +53,14 @@ agd::Status Worker::SignalHandler(int signal_num) {
   assert(result_queue_->size() == 0);
   cout << "Resuly queue emptied.\n";
 
+  // terminating rqt
+  // expecting size of set request queue == 0 (since all workers will have quit)
+  srt_signal_ = true;
+  set_request_queue_->unblock();
+  set_request_thread_.join();
+  assert(set_request_queue_->size() == 0);
+  cout << "Set request queue emptied and thread terminated.\n";
+
   try {
     zmq_recv_socket_->disconnect(request_queue_address.c_str());
   } catch (...) {
@@ -65,6 +73,14 @@ agd::Status Worker::SignalHandler(int signal_num) {
   } catch (...) {
     return agd::errors::Internal("Could not disconnect to zmq at ",
                                  response_queue_address);
+  }
+
+  try {
+    zmq_large_partial_merge_socket_->disconnect(
+        large_partial_merge_channel_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not disconnect to zmq at ",
+                                 large_partial_merge_channel_address);
   }
 
   try {
@@ -252,7 +268,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   });
 
   set_request_thread_ = thread([this](){
-    while(true) {
+    while(!srt_signal_) {
       std::pair<int, MultiNotification*> pr;
       if(!set_request_queue_->pop(pr))  {
         continue;
@@ -262,6 +278,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       mu_.Lock();
       if(set_map.find(id) == set_map.end()) {
         mu_.Unlock();
+        
         zmq::message_t msg(&id, sizeof(int));
         bool success = zmq_large_partial_merge_socket_->send(msg);
         if(!success)  {
@@ -271,6 +288,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         if(!success)  {
           cout << "Requested set was not received.\n";
         }
+        
         //cout << "Received message size --> " << msg.size() << std::endl;
         //copy to put in the map
         agd::Buffer buf;
@@ -284,6 +302,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         mu_.Unlock();
         cout << "Communicating thread --> set already present: " << id << "\n";
       }
+      
       pr.second->Notify();
     }    
   });

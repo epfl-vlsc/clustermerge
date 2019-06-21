@@ -72,7 +72,7 @@ class Worker {
   // queue to hold set requests
   std::unique_ptr<ConcurrentQueue<std::pair<int, MultiNotification*>>> set_request_queue_;
   std::thread set_request_thread_;
-  
+  bool srt_signal_ = false; //srq stands for set request thread
   
   std::vector<Sequence> sequences_;  // abs indexable sequences
 

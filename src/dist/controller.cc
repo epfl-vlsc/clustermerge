@@ -626,6 +626,7 @@ agd::Status Controller::Run(const Params& params,
   request_queue_thread_.join();
   response_queue_thread_.join();
   incomplete_request_queue_thread_.join();
+  //large_partial_merge_thread_.join();
 
   cout << "All threads joined.\n";
 

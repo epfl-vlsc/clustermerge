@@ -492,8 +492,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Incomplete request queue thread ending.\n";
   });
 
-  timestamps_.reserve(100000);
-  queue_sizes_.reserve(100000);
+  /*timestamps_.reserve(100000);
+  queue_sizes_.reserve(100000);*/
 
   // queue_measure_thread_ = std::thread([this](){
   //     // get timestamp, queue size
@@ -515,9 +515,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));
   }
   cout << "Response [signal_num] value change received.\n";
-  SignalHandler(*signal_num);
+  return SignalHandler(*signal_num);
 
-  cout << "Worker running, press button to exit\n";
+  /*cout << "Worker running, press button to exit\n";
   // std::cin.get();
 
   cout << "joining threads ...\n";
@@ -536,7 +536,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   std::cout << "dumping queue sizes ...\n";
   std::ofstream o("queue.json");
 
-  o << std::setw(2) << j << std::endl;
+  o << std::setw(2) << j << std::endl;*/
 
   return agd::Status::OK();
 }

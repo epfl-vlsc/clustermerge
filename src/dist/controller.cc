@@ -640,6 +640,7 @@ agd::Status Controller::Run(const Params& params,
   response_queue_->unblock();
   request_queue_->unblock();
   sets_to_merge_queue_->unblock();
+  incomplete_request_queue_->unblock();
   for (auto& t : worker_threads_) {
     t.join();
   }

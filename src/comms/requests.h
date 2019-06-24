@@ -117,7 +117,7 @@ struct MarshalledClusterSet {
 
     buf.AppendBuffer(reinterpret_cast<char*>(&idx), sizeof(uint32_t));
   }
-  
+
   MarshalledClusterSet(MarshalledResponse& response)
       : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {
     // a response buffer is an int id and a marshalled clusterset
@@ -200,7 +200,7 @@ struct MarshalledRequest {
     assert(buf.size() == total + sizeof(PartialRequestHeader));
   }
 
-  //Does not have a clusterset, but is still large :P
+  // Does not have a clusterset, but is still large :P
   void CreateLargePartialRequest(int id, MarshalledClusterView cluster) {
     buf.reserve(cluster.TotalSize() + sizeof(PartialRequestHeader));
     PartialRequestHeader h;
@@ -208,7 +208,7 @@ struct MarshalledRequest {
     h.type = RequestType::LargePartial;
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
     buf.AppendBuffer(cluster.data, cluster.TotalSize());
-    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));  
+    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));
   }
 
   agd::Buffer buf;
@@ -247,7 +247,7 @@ struct MarshalledRequestView {
   }
 
   // for Large Partial requests
-  void Cluster(MarshalledClusterView* cluster)  {
+  void Cluster(MarshalledClusterView* cluster) {
     const char* cluster_ptr = data + sizeof(PartialRequestHeader);
     *cluster = MarshalledClusterView(cluster_ptr);
   }

@@ -21,11 +21,12 @@ class Controller {
   struct Params {
     size_t num_threads;
     size_t queue_depth;
+    size_t max_set_size;
     absl::string_view controller_ip;
     int request_queue_port;
     int response_queue_port;
     int incomplete_request_queue_port;
-    int large_partial_merge_port;
+    int set_request_port;
     absl::string_view data_dir_path;
     uint32_t batch_size;
     uint32_t dup_removal_thresh;
@@ -42,11 +43,11 @@ class Controller {
   zmq::context_t context_;
   zmq::context_t context_sink_;
   zmq::context_t context_ir_sink_;  // ir stands for incomplete requests
-  zmq::context_t context_large_partial_merge_;  //pm : partial merge 
+  zmq::context_t context_set_request_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
   std::unique_ptr<zmq::socket_t> zmq_incomplete_request_socket_;
-  std::unique_ptr<zmq::socket_t> zmq_large_partial_merge_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_set_request_socket_;
 
   // thread reads from zmq and puts into response queue
   std::unique_ptr<ConcurrentQueue<MarshalledResponse>> response_queue_;
@@ -71,12 +72,12 @@ class Controller {
   std::thread incomplete_request_queue_thread_;
 
   // thread to send partial merge sets
-  std::thread large_partial_merge_thread_;
+  std::thread set_request_thread_;
 
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   long int checkpoint_timer_;
-  // indexed cluster and partial merge set to facilitate efficient 
+  // indexed cluster and partial merge set to facilitate efficient
 
   // parallel merging of remotely executed partial merge items
 
@@ -101,7 +102,7 @@ class Controller {
     PartialMergeSet partial_set;
     uint32_t num_expected;
     std::atomic_uint_fast32_t num_received;
-    //holds the MarshalledClusterSet
+    // holds the MarshalledClusterSet responding to set requests
     agd::Buffer buf;
     // uint32_t original_size;
   };

@@ -4,12 +4,12 @@
 #include <thread>
 #include "src/agd/status.h"
 #include "src/common/concurrent_queue.h"
+#include "src/common/multi_notification.h"
 #include "src/common/params.h"
 #include "src/common/sequence.h"
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "zmq.hpp"
-#include "src/common/multi_notification.h"
 
 // interface to manage local worker
 class Worker {
@@ -23,7 +23,7 @@ class Worker {
     int request_queue_port;
     int response_queue_port;
     int incomplete_request_queue_port;
-    int large_partial_merge_port;
+    int set_request_port;
     absl::string_view data_dir_path;
   };
 
@@ -42,7 +42,7 @@ class Worker {
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;
   std::unique_ptr<zmq::socket_t> zmq_incomplete_request_socket_;
-  std::unique_ptr<zmq::socket_t> zmq_large_partial_merge_socket_;
+  std::unique_ptr<zmq::socket_t> zmq_set_request_socket_;
   // local input buffer
   // one thread receives zmq messages, decodes, puts work in work queue
   // all other threads do work and push to output buffer
@@ -65,15 +65,16 @@ class Worker {
   std::thread incomplete_request_queue_thread_;
   bool irqt_signal_ = false;
 
-  //cache for partial merge sets, buf is the buf of MarshalledClusterSet
+  // cache for partial merge sets, buf is the buf of MarshalledClusterSet
   std::unordered_map<int, agd::Buffer> set_map;
-  absl::Mutex mu_;  //for locking set_map
+  absl::Mutex mu_;  // for locking set_map
 
   // queue to hold set requests
-  std::unique_ptr<ConcurrentQueue<std::pair<int, MultiNotification*>>> set_request_queue_;
+  std::unique_ptr<ConcurrentQueue<std::pair<int, MultiNotification*>>>
+      set_request_queue_;
   std::thread set_request_thread_;
-  bool srt_signal_ = false; //srq stands for set request thread
-  
+  bool srt_signal_ = false;  // srq stands for set request thread
+
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   std::thread queue_measure_thread_;
@@ -84,5 +85,5 @@ class Worker {
   std::string response_queue_address;
   std::string request_queue_address;
   std::string incomplete_request_queue_address;
-  std::string large_partial_merge_channel_address;
+  std::string set_request_queue_address;
 };

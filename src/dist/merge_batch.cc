@@ -10,7 +10,7 @@ void MergeBatch(std::deque<ClusterSet>& sets_to_merge,
 
     auto& s1 = sets_to_merge[0];
     auto& s2 = sets_to_merge[1];
-    
+
     /*cout << "Merging cluster sets of size " << s1.Size()
       << " and " << s2.Size() << "\n";
     cout << "Cluster sets remaining: " << sets_.size() - 2 << "\n";*/

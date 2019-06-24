@@ -39,6 +39,14 @@ agd::Status Worker::SignalHandler(int signal_num) {
   }
   cout << "All worker threads have joined.\n";
 
+  // terminating rqt
+  // expecting size of set request queue == 0 (since all workers will have quit)
+  srt_signal_ = true;
+  set_request_queue_->unblock();
+  set_request_thread_.join();
+  assert(set_request_queue_->size() == 0);
+  cout << "Set request queue emptied and thread terminated.\n";
+
   // terminate irqt and drain incomplete_request_queue_
   irqt_signal_ = true;
   incomplete_request_queue_->unblock();
@@ -52,14 +60,6 @@ agd::Status Worker::SignalHandler(int signal_num) {
   result_queue_thread_.join();
   assert(result_queue_->size() == 0);
   cout << "Resuly queue emptied.\n";
-
-  // terminating rqt
-  // expecting size of set request queue == 0 (since all workers will have quit)
-  srt_signal_ = true;
-  set_request_queue_->unblock();
-  set_request_thread_.join();
-  assert(set_request_queue_->size() == 0);
-  cout << "Set request queue emptied and thread terminated.\n";
 
   try {
     zmq_recv_socket_->disconnect(request_queue_address.c_str());
@@ -296,11 +296,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         mu_.Lock();
         set_map[id] = std::move(buf);
         mu_.Unlock();
-        cout << "Communicating thread --> fetched set: " << id << "\n";
+        cout << "Fetched set: [" << id << "]\n";
       }
       else {
         mu_.Unlock();
-        cout << "Communicating thread --> set already present: " << id << "\n";
+        //cout << "Communicating thread --> set already present: " << id << "\n";
       }
       
       pr.second->Notify();
@@ -404,14 +404,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         if(it == set_map.end()) {
           mu_.Unlock();
           MultiNotification n;
-          cout << "Worker thread --> [" << id << "] Set not cached. Requesting...\n";
+          //cout << "Worker thread --> [" << id << "] Set not cached. Requesting...\n";
           set_request_queue_->push(std::make_pair(id, &n));
           n.SetMinNotifies(1);
           n.WaitForNotification();
           mu_.Lock();
           it = set_map.find(id);
           assert(it != set_map.end());
-          cout << "Worker thread --> [" << id << "] Received set.\n";
+          //cout << "Worker thread --> [" << id << "] Received set.\n";
         }
         
         set.buf.AppendBuffer(it->second.data(), it->second.size()); 

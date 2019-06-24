@@ -148,6 +148,11 @@ agd::Status Controller::Run(const Params& params,
   int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";
 
+  // waits for timeout time and then returns with EAGAIN
+  zmq_large_partial_merge_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
+  val = zmq_large_partial_merge_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
+  cout << "recv timeout set to " << val << " ms \n";
+
   try {
     zmq_incomplete_request_socket_.reset(
         new zmq::socket_t(context_ir_sink_, ZMQ_PULL));
@@ -236,10 +241,15 @@ agd::Status Controller::Run(const Params& params,
     
     while(run_) {
       zmq::message_t message;
-      zmq_large_partial_merge_socket_->recv(&message);
+      bool success = zmq_large_partial_merge_socket_->recv(&message);
+      //returns 0 on timeout
+      if(!success) {
+        continue;
+      }
+      
       //extract the id
       int id = *reinterpret_cast<int*>(message.data());
-      cout << "Got set request with id [" << id << "]\n";
+      //cout << "Got set request with id [" << id << "]\n";
       
       //search in partial merge map
       PartialMergeItem* partial_item;
@@ -257,7 +267,7 @@ agd::Status Controller::Run(const Params& params,
         agd::Buffer buf;
         buf.AppendBuffer(partial_item->buf.data(), partial_item->buf.size());
         zmq::message_t msg(buf.release_raw(), buf.size(), free_func, NULL);
-        cout << "Size of message = " << msg.size() << std::endl;
+        //cout << "Size of message = " << msg.size() << std::endl;
         bool success = zmq_large_partial_merge_socket_->send(std::move(msg));  
         if(!success)  {
           cout << "Thread failed to send cluster set over zmq!\n";
@@ -332,7 +342,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledResponse response;
     while (run_) {
       if (!response_queue_->pop(response)) {
-        cout << "worker_func -- no response\n";
+        //cout << "worker_func -- no response\n";
         continue;
       }
 
@@ -534,7 +544,7 @@ agd::Status Controller::Run(const Params& params,
       //add to params
       if(sets[1].TotalSize() > 500) {
         isLarge = true;
-        cout << "Its a large partial set. Id = " << outstanding_merges_ << "\n";
+        //cout << "Its a large partial set. Id = " << outstanding_merges_ << "\n";
         item.buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
       }
       
@@ -626,7 +636,7 @@ agd::Status Controller::Run(const Params& params,
   request_queue_thread_.join();
   response_queue_thread_.join();
   incomplete_request_queue_thread_.join();
-  //large_partial_merge_thread_.join();
+  large_partial_merge_thread_.join();
 
   cout << "All threads joined.\n";
 

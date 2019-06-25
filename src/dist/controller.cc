@@ -117,10 +117,13 @@ agd::Status Controller::Run(const Params& params,
   auto request_queue_address = absl::StrCat(address, params.request_queue_port);
   auto incomplete_request_queue_address =
       absl::StrCat(address, params.incomplete_request_queue_port);
+  auto set_request_channel_address =
+      absl::StrCat(address, params.set_request_port);
 
   context_ = zmq::context_t(1);
   context_sink_ = zmq::context_t(2);
   context_ir_sink_ = zmq::context_t(1);
+  context_set_request_ = zmq::context_t(1);
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_sink_, ZMQ_PULL));
   } catch (...) {
@@ -130,14 +133,27 @@ agd::Status Controller::Run(const Params& params,
   try {
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_REP));
   } catch (...) {
-    return agd::errors::Internal("Could not create zmq PUSH socket ");
+    return agd::errors::Internal("Could not create zmq REP socket");
   }
-  
-  //zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
+
+  try {
+    zmq_set_request_socket_.reset(
+        new zmq::socket_t(context_set_request_, ZMQ_REP));
+  } catch (...) {
+    return agd::errors::Internal(
+        "Could not create a zmp REP socket -- large_pm");
+  }
+
+  // zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
   // TODO make sendhwm a param
   zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
   int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
   cout << "snd hwm value is " << val << " \n";
+
+  // waits for timeout time and then returns with EAGAIN
+  zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
+  val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
+  cout << "recv timeout set to " << val << " ms \n";
 
   try {
     zmq_incomplete_request_socket_.reset(
@@ -158,6 +174,13 @@ agd::Status Controller::Run(const Params& params,
   } catch (...) {
     return agd::errors::Internal("Could not connect to zmq at ",
                                  request_queue_address);
+  }
+
+  try {
+    zmq_set_request_socket_->bind(set_request_channel_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ",
+                                 set_request_channel_address);
   }
 
   try {
@@ -185,18 +208,16 @@ agd::Status Controller::Run(const Params& params,
     // repeat
     MarshalledRequest merge_request;
     auto free_func = [](void* data, void* hint) {
-      delete [] reinterpret_cast<char*>(data);
+      delete[] reinterpret_cast<char*>(data);
     };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
-        // cout << "req qt -- Stuck here.\n";
         continue;
       }
 
       zmq::message_t message;
       zmq_send_socket_->recv(&message);
-      // cout << "Got work request.\n";
 
       auto size = merge_request.buf.size();
       zmq::message_t msg(merge_request.buf.release_raw(), size, free_func,
@@ -212,6 +233,52 @@ agd::Status Controller::Run(const Params& params,
     }
 
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
+  });
+
+  set_request_thread_ = thread([this]() {
+    // receive requests from worker and send them cluster sets
+
+    auto free_func = [](void* data, void* hint) {
+      delete[] reinterpret_cast<char*>(data);
+    };
+
+    while (run_) {
+      zmq::message_t message;
+      bool success = zmq_set_request_socket_->recv(&message);
+      // returns 0 on timeout
+      if (!success) {
+        continue;
+      }
+
+      // extract the id
+      int id = *reinterpret_cast<int*>(message.data());
+      // cout << "Got set request with id [" << id << "]\n";
+
+      // search in partial merge map
+      PartialMergeItem* partial_item;
+      {
+        absl::MutexLock l(&mu_);
+        auto partial_it = partial_merge_map_.find(id);
+        if (partial_it == partial_merge_map_.end()) {
+          cout << "the set with " << id << " is not in the map \n";
+          exit(0);
+        }
+        partial_item = &partial_it->second;
+        // cout << "Some data --> " << partial_item->buf.size() << std::endl;
+
+        // creating a copy since zmq takes ownership without creating a copy
+        agd::Buffer buf;
+        buf.AppendBuffer(partial_item->marshalled_set_buf.data(),
+                         partial_item->marshalled_set_buf.size());
+        zmq::message_t msg(buf.release_raw(), buf.size(), free_func, NULL);
+        // cout << "Size of message = " << msg.size() << std::endl;
+        bool success = zmq_set_request_socket_->send(std::move(msg));
+        if (!success) {
+          cout << "Thread failed to send cluster set over zmq!\n";
+        }
+        cout << "Set sent with id: [" << id << "] \n";
+      }
+    }
   });
 
   int total_received = 0;
@@ -278,7 +345,7 @@ agd::Status Controller::Run(const Params& params,
     MarshalledResponse response;
     while (run_) {
       if (!response_queue_->pop(response)) {
-        cout << "worker_func -- no response\n";
+        // cout << "worker_func -- no response\n";
         continue;
       }
 
@@ -396,6 +463,7 @@ agd::Status Controller::Run(const Params& params,
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
+  std::vector<float> sizes;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
   while (outstanding_merges_ > 0) {
@@ -475,6 +543,18 @@ agd::Status Controller::Run(const Params& params,
       // all clusters in sets[1]
       item.num_expected = sets[0].NumClusters();
       item.partial_set.Init(sets[1]);
+
+      bool isLarge = false;
+      sizes.push_back(sets[1].TotalSize());
+      // add to params
+      if (sets[1].TotalSize() > params.max_set_size) {
+        isLarge = true;
+        // cout << "Its a large partial set. Id = " << outstanding_merges_ <<
+        // "\n";
+        item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
+                                             sets[1].buf.size());
+      }
+
       {
         absl::MutexLock l(&mu_);
         // cout << "pushing id " << outstanding_merges_ << " to map\n";
@@ -486,13 +566,19 @@ agd::Status Controller::Run(const Params& params,
       // cout << "pushing id " << outstanding_merges_ << "\n";
       uint32_t total_cluster = sets[0].NumClusters();
       uint32_t i = 0;
+
       while (sets[0].NextCluster(&cluster)) {
         i++;
         MarshalledRequest request;
-        request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
+        if (isLarge) {
+          request.CreateLargePartialRequest(outstanding_merges_, cluster);
+        } else {
+          request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
+        }
         // cout << "pushing partial request with " <<
         // partial_request->set().clusters_size() << " clusters in set and ID: "
         // << request.id() << "\n";
+        // cout << "Pushing partial merge request " << "\n";
         request_queue_->push(std::move(request));
       }
       outstanding_requests++;
@@ -506,7 +592,6 @@ agd::Status Controller::Run(const Params& params,
     }
     // cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
-
 
   // we must now wait for the last results to come in
   // wait for worker thread to push last merged set
@@ -527,6 +612,12 @@ agd::Status Controller::Run(const Params& params,
   auto duration = t1 - t0;
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
   cout << "Clustering execution time: " << sec.count() << " seconds.\n";
+
+  std::ofstream set_sizes("size_stats.csv", std::ofstream::out);
+  for (auto v : sizes) {
+    set_sizes << v << std::endl;
+  }
+  set_sizes.close();
 
   std::ofstream timing_file("dist_timing.txt", std::ofstream::out);
   timing_file << sec.count() << "\n";
@@ -558,6 +649,7 @@ agd::Status Controller::Run(const Params& params,
   request_queue_thread_.join();
   response_queue_thread_.join();
   incomplete_request_queue_thread_.join();
+  set_request_thread_.join();
 
   cout << "All threads joined.\n";
 

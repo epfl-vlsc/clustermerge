@@ -3,7 +3,7 @@
 #include "src/agd/buffer.h"
 #include "zmq.hpp"
 
-enum RequestType { Batch = 0, Partial };
+enum RequestType { Batch = 0, Partial, LargePartial };
 
 struct __attribute__((packed)) BatchRequestHeader {
   int id;
@@ -199,6 +199,18 @@ struct MarshalledRequest {
     buf.AppendBuffer(set.buf.data(), set.buf.size());
     assert(buf.size() == total + sizeof(PartialRequestHeader));
   }
+
+  // Does not have a clusterset, but is still large :P
+  void CreateLargePartialRequest(int id, MarshalledClusterView cluster) {
+    buf.reserve(cluster.TotalSize() + sizeof(PartialRequestHeader));
+    PartialRequestHeader h;
+    h.id = id;
+    h.type = RequestType::LargePartial;
+    buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
+    buf.AppendBuffer(cluster.data, cluster.TotalSize());
+    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));
+  }
+
   agd::Buffer buf;
 };
 
@@ -232,6 +244,12 @@ struct MarshalledRequestView {
 
     const char* cluster_set_ptr = cluster_ptr + sz;
     *cluster_set = MarshalledClusterSetView(cluster_set_ptr);
+  }
+
+  // for Large Partial requests
+  void Cluster(MarshalledClusterView* cluster) {
+    const char* cluster_ptr = data + sizeof(PartialRequestHeader);
+    *cluster = MarshalledClusterView(cluster_ptr);
   }
 
   // for batch

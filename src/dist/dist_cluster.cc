@@ -38,14 +38,17 @@ Server cluster format example
 constexpr char cluster_config_default[] = "data/default_cluster.json";
 
 #define DEFAULT_QUEUE_DEPTH 5
+#define DEFAULT_MAX_SET_SIZE \
+  500  // max set size parameter for large partial merges
 #define DEFAULT_RESPONSE_QUEUE_PORT 5556
 #define DEFAULT_REQUEST_QUEUE_PORT 5555
 #define DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT 5554
+#define DEFAULT_LARGE_PARTIAL_MERGE_PORT 5557
 
 // captures kill signal and notifies Worker
 volatile int signal_num = 0;
 
-void my_handler(int sig) {
+void signal_notifier(int sig) {
   signal_num = sig;
   cout << "[signal_num] value changed.\n";
 }
@@ -129,12 +132,12 @@ int main(int argc, char* argv[]) {
     std::cerr << parser;
     return 1;
   }
-  
+
   long int checkpoint_interval = 0;
   if (checkpoint_interval_arg) {
     checkpoint_interval = args::get(checkpoint_interval_arg);
     cout << "checkpoint interval: " << checkpoint_interval << "\n";
-  } 
+  }
 
   // parse the server cluster config file to see if we are a worker or the
   // controller
@@ -156,9 +159,11 @@ int main(int argc, char* argv[]) {
 
   json server_config_json;
   string controller_ip;
+  size_t max_set_size;
   int request_queue_port;
   int response_queue_port;
   int incomplete_request_queue_port;
+  int set_request_port;
   if (server_config_file) {
     string server_config_path = args::get(server_config_file);
     std::ifstream server_config_stream(server_config_path);
@@ -208,6 +213,13 @@ int main(int argc, char* argv[]) {
     response_queue_port = *response_queue_port_it;
   }
 
+  auto set_request_port_it = server_config_json.find("set_request_port");
+  if (set_request_port_it == server_config_json.end()) {
+    set_request_port = DEFAULT_LARGE_PARTIAL_MERGE_PORT;  // default
+  } else {
+    set_request_port = *set_request_port_it;
+  }
+
   auto incomplete_request_queue_port_it =
       server_config_json.find("incomplete_request_queue_port");
   if (incomplete_request_queue_port_it == server_config_json.end()) {
@@ -215,6 +227,13 @@ int main(int argc, char* argv[]) {
         DEFAULT_INCOMPLETE_REQUEST_QUEUE_PORT;  // default
   } else {
     incomplete_request_queue_port = *incomplete_request_queue_port_it;
+  }
+
+  auto max_set_size_it = server_config_json.find("max_set_size");
+  if (max_set_size_it == server_config_json.end()) {
+    max_set_size = DEFAULT_MAX_SET_SIZE;  // default
+  } else {
+    max_set_size = *max_set_size_it;
   }
 
   unsigned int threads = std::thread::hardware_concurrency();
@@ -306,7 +325,7 @@ int main(int argc, char* argv[]) {
     if (blosum_it != aligner_params_json.end()) {
       aligner_params.use_blosum = *blosum_it;
     }
-  } // if not present, aligner params defaults used
+  }  // if not present, aligner params defaults used
 
   if (is_controller) {
     // launch controller(push_port, pull_port)
@@ -322,7 +341,9 @@ int main(int argc, char* argv[]) {
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
+    params.set_request_port = set_request_port;
     params.dup_removal_thresh = dup_removal_threshold;
+    params.max_set_size = max_set_size;
     params.exclude_allall = exclude_allall;
     params.checkpoint_interval = checkpoint_interval;
     params.checkpoint_dir = absl::string_view(checkpoint_dir);
@@ -348,8 +369,9 @@ int main(int argc, char* argv[]) {
     params.request_queue_port = request_queue_port;
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
-    signal(SIGUSR1, my_handler);
-    signal(SIGINT, my_handler);
+    params.set_request_port = set_request_port;
+    signal(SIGUSR1, signal_notifier);
+    // signal(SIGINT, signal_notifier);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {

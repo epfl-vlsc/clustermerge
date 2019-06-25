@@ -48,7 +48,7 @@ constexpr char cluster_config_default[] = "data/default_cluster.json";
 // captures kill signal and notifies Worker
 volatile int signal_num = 0;
 
-void my_handler(int sig) {
+void signal_notifier(int sig) {
   signal_num = sig;
   cout << "[signal_num] value changed.\n";
 }
@@ -370,8 +370,8 @@ int main(int argc, char* argv[]) {
     params.response_queue_port = response_queue_port;
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.set_request_port = set_request_port;
-    signal(SIGUSR1, my_handler);
-    // signal(SIGINT, my_handler);
+    signal(SIGUSR1, signal_notifier);
+    // signal(SIGINT, signal_notifier);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {

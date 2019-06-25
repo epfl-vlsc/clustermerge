@@ -276,7 +276,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       int id = pr.first;
       // if its not in the cache
       mu_.Lock();
-      if (set_map.find(id) == set_map.end()) {
+      if (set_map_.find(id) == set_map_.end()) {
         mu_.Unlock();
 
         zmq::message_t msg(&id, sizeof(int));
@@ -291,10 +291,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         // cout << "Received message size --> " << msg.size() << std::endl;
         // copy to put in the map
-        agd::Buffer buf;
+        agd::Buffer buf(msg.size());
         buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
         mu_.Lock();
-        set_map[id] = std::move(buf);
+        set_map_[id] = std::move(buf);
         mu_.Unlock();
         cout << "Fetched set: [" << id << "]\n";
       } else {
@@ -400,8 +400,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         MarshalledClusterSet set;
         // search in map
         mu_.Lock();
-        auto it = set_map.find(id);
-        if (it == set_map.end()) {
+        auto it = set_map_.find(id);
+        if (it == set_map_.end()) {
           mu_.Unlock();
           MultiNotification n;
           // cout << "Worker thread --> [" << id << "] Set not cached.
@@ -410,8 +410,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
           n.SetMinNotifies(1);
           n.WaitForNotification();
           mu_.Lock();
-          it = set_map.find(id);
-          assert(it != set_map.end());
+          it = set_map_.find(id);
+          assert(it != set_map_.end());
           // cout << "Worker thread --> [" << id << "] Received set.\n";
         }
 

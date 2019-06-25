@@ -66,8 +66,8 @@ class Worker {
   bool irqt_signal_ = false;
 
   // cache for partial merge sets, buf is the buf of MarshalledClusterSet
-  std::unordered_map<int, agd::Buffer> set_map;
-  absl::Mutex mu_;  // for locking set_map
+  std::unordered_map<int, agd::Buffer> set_map_;
+  absl::Mutex mu_;  // for locking set_map_
 
   // queue to hold set requests
   std::unique_ptr<ConcurrentQueue<std::pair<int, MultiNotification*>>>

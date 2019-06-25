@@ -268,7 +268,8 @@ agd::Status Controller::Run(const Params& params,
 
         // creating a copy since zmq takes ownership without creating a copy
         agd::Buffer buf;
-        buf.AppendBuffer(partial_item->buf.data(), partial_item->buf.size());
+        buf.AppendBuffer(partial_item->marshalled_set_buf.data(),
+                         partial_item->marshalled_set_buf.size());
         zmq::message_t msg(buf.release_raw(), buf.size(), free_func, NULL);
         // cout << "Size of message = " << msg.size() << std::endl;
         bool success = zmq_set_request_socket_->send(std::move(msg));
@@ -550,7 +551,8 @@ agd::Status Controller::Run(const Params& params,
         isLarge = true;
         // cout << "Its a large partial set. Id = " << outstanding_merges_ <<
         // "\n";
-        item.buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
+        item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
+                                             sets[1].buf.size());
       }
 
       {

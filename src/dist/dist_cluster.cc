@@ -15,6 +15,7 @@
 #include "src/common/alignment_environment.h"
 #include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
+#include "src/common/cluster_set.h"
 #include "worker.h"
 
 using namespace std;
@@ -117,6 +118,11 @@ int main(int argc, char* argv[]) {
       "Recommended value 900s"
       " [0 (off)]",
       {'c', "checkpoint_interval"});
+  args::ValueFlag<std::string> file_name(
+      parser, "file",
+      "Adds clustering data from an already clustered json file and merges "
+      "with clusters from current dataset",
+      {'f', "file"});
 
   try {
     parser.ParseCLI(argc, argv);
@@ -270,7 +276,8 @@ int main(int argc, char* argv[]) {
 
   std::vector<unique_ptr<Dataset>> datasets;
   agd::Status s;
-
+  std::string input_file_name_temp = args::get(input_file_list);
+  
   if (datasets_opts) {
     // load and parse protein datasets
     // cluster merge sequences are simply string_views over this data
@@ -280,7 +287,7 @@ int main(int argc, char* argv[]) {
     }
     s = LoadDatasetsPositional(datasets_opts, &datasets);
   } else if (input_file_list) {
-    s = LoadDatasetsJSON(args::get(input_file_list), &datasets);
+    s = LoadDatasetsJSON(input_file_name_temp, &datasets);
   } else {
     cout << "No datasets provided. See usage: \n";
     std::cerr << parser;
@@ -328,10 +335,48 @@ int main(int argc, char* argv[]) {
   }  // if not present, aligner params defaults used
 
   if (is_controller) {
+    
+    //stuff for handling preexisting merge result
+    //parse and build a Datasets object
+    std::string input_file_name_temp = args::get(input_file_list);
+    std::vector<std::string> dataset_file_names;
+    std::vector<unique_ptr<Dataset>> datasets_old;
+    json dataset_json_obj;
+    ClusterSet old_set;
+      
+    if (file_name) {
+      agd::Status s_old;
+
+      std::ifstream dataset_stream(args::get(file_name));
+
+      if (!dataset_stream.good()) {
+        s_old = agd::errors::NotFound("No such file: ", args::get(file_name));
+      }
+
+      if (!s_old.ok()) {
+        cout << s_old.ToString() << "\n";
+        return 0;
+      }
+
+      dataset_stream >> dataset_json_obj;
+
+      for (const auto& old_dataset : dataset_json_obj["datasets"]) {
+        s_old = LoadDatasetsJSON(old_dataset, &datasets_old);
+        dataset_file_names.push_back(old_dataset);
+
+        if (!s_old.ok()) {
+          cout << s_old.ToString() << "\n";
+          return 0;
+        }
+      }
+     }
+
+    dataset_file_names.push_back(input_file_name_temp);
+
     // launch controller(push_port, pull_port)
     // TODO put checkpoint dir in params file and ensure exists
     string checkpoint_dir("./");
-    Controller controller;
+    
     Controller::Params params;
     params.batch_size = batch_size;
     params.controller_ip = controller_ip;
@@ -352,7 +397,15 @@ int main(int argc, char* argv[]) {
     } else {
       params.dataset_limit = -1;
     }
-    Status stat = controller.Run(params, aligner_params, datasets);
+
+    Status stat;
+    if(file_name) {
+      Controller controller(dataset_json_obj, datasets_old);
+      stat = controller.Run(params, aligner_params, datasets, dataset_file_names);
+    } else {
+      Controller controller;
+      stat = controller.Run(params, aligner_params, datasets, dataset_file_names);
+    }
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
       return -1;

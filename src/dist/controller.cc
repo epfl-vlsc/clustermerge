@@ -41,7 +41,8 @@ bool PromptForChar(const string& prompt, char& readch) {
 
 agd::Status Controller::Run(const Params& params,
                             const Parameters& aligner_params,
-                            std::vector<std::unique_ptr<Dataset>>& datasets) {
+                            std::vector<std::unique_ptr<Dataset>>& datasets,
+                            std::vector<std::string>& dataset_names) {
   checkpoint_timer_ = timestamp();
   std::atomic_int_fast32_t outstanding_requests{0};
 
@@ -49,7 +50,7 @@ agd::Status Controller::Run(const Params& params,
   agd::Status s = Status::OK();
   const char* data;
   size_t length;
-  size_t id = 0;  // absolute ID
+  size_t id = absolute_id_;  // absolute ID
   for (auto& dataset : datasets) {
     size_t dataset_index = 0;
     s = dataset->GetNextRecord(&data, &length);
@@ -623,8 +624,8 @@ agd::Status Controller::Run(const Params& params,
   timing_file << sec.count() << "\n";
 
   ClusterSet set(final_set, sequences_);
-  std::vector<string> placeholder = {"dist_placeholder"};
-  set.DumpJson("dist_clusters.json", placeholder);
+  //std::vector<string> placeholder = {"dist_placeholder"};
+  set.DumpJson("dist_clusters.json", dataset_names);
 
   if (!params.exclude_allall) {
     AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,

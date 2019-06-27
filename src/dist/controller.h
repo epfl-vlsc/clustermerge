@@ -25,10 +25,10 @@ class Controller {
     size_t size_old;
     uint32_t id_old = 0;
 
-    std::vector<Sequence> old_sequences;
+    //std::vector<Sequence> old_sequences;
 
     for (auto& dataset_old : datasets_old) {
-      std::cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
+      //std::cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
 
       auto s_old = dataset_old->GetNextRecord(&data_old, &size_old);
       uint32_t genome_index_old = 0;
@@ -42,7 +42,7 @@ class Controller {
         Sequence seq(absl::string_view(data_old, size_old), dataset_old->Name(),
                     dataset_old->Size(), genome_index_old++, id_old++);
 
-        old_sequences.push_back(std::move(seq));
+        sequences_.push_back(std::move(seq));
         s_old = dataset_old->GetNextRecord(&data_old, &size_old);
       }
     }
@@ -51,7 +51,7 @@ class Controller {
       Cluster c;
       for (const auto& seq : cluster) {
         int abs_index = seq["AbsoluteIndex"];
-        c.AddSequence(old_sequences[abs_index]);
+        c.AddSequence(sequences_[abs_index]);
       }
       old_set_.AddCluster(c);
     }

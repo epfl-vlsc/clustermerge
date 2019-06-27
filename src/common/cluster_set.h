@@ -33,6 +33,8 @@ class ClusterSet {
 
   void BuildMarshalledResponse(int id, MarshalledResponse* response);
 
+  void BuildMarshalledClusterSet(MarshalledClusterSet* set);
+
   // void ConstructProto(cmproto::ClusterSet* set_proto);
 
   void Swap(ClusterSet* other) { clusters_.swap(other->clusters_); }

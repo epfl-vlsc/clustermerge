@@ -49,6 +49,36 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
       zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
 }
 
+void ClusterSet::BuildMarshalledClusterSet(MarshalledClusterSet* set) {
+  // calculate buffer size for a single alloc
+  size_t buf_size = sizeof(ClusterSetHeader);
+  for (const auto& c : clusters_) {
+    buf_size += sizeof(ClusterHeader) + c.Sequences().size()*sizeof(int);
+  }
+  agd::Buffer buf(buf_size);
+  
+  ClusterSetHeader h;
+  h.num_clusters = 0;  // set after once we know the value
+  buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
+
+  for (const auto& c : clusters_) {
+    // keep the fully merged for controller to remove
+    ClusterHeader ch;
+    ch.fully_merged = c.IsFullyMerged();
+    ch.num_seqs = c.Sequences().size();
+    buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
+    for (const auto& s : c.Sequences()) {
+      uint32_t i = s.ID();
+      buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
+    }
+  }
+
+  char* data = buf.mutable_data();
+  ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
+  hp->num_clusters = clusters_.size();  
+  set->buf = std::move(buf);
+}
+
 ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
                        const std::vector<Sequence>& sequences) {
   // std::vector<Cluster> clusters(marshalled_set.NumClusters());

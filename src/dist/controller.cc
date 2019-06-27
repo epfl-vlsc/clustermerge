@@ -68,8 +68,7 @@ agd::Status Controller::Run(const Params& params,
     cout << "controller will checkpoint with interval of "
          << params.checkpoint_interval << "\n";
   }
-
-  auto total_merges = sequences_.size() - 1;
+  auto total_merges = sequences_.size() - 1 - absolute_id_;
   outstanding_merges_ = total_merges;
   if (params.dataset_limit > 0) {
     outstanding_merges_ = params.dataset_limit - 1;
@@ -439,11 +438,11 @@ agd::Status Controller::Run(const Params& params,
 
   if (response == 'n') {
     int i = 0;
-    for (const auto& s : sequences_) {
+    for (size_t j = absolute_id_; j < sequences_.size(); j++) {
       if (params.dataset_limit > 0) {
         if (i == params.dataset_limit) break;
       }
-      MarshalledClusterSet set(s.ID());
+      MarshalledClusterSet set(sequences_[j].ID());
       sets_to_merge_queue_->push(std::move(set));
       i++;
     }
@@ -467,6 +466,10 @@ agd::Status Controller::Run(const Params& params,
   std::vector<float> sizes;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
+  if(old_set_.Size() >= 1)  {
+    outstanding_merges_++;
+    cout << "One more outstanding merge -- preclustered sequences. \n"; 
+  }
   while (outstanding_merges_ > 0) {
     // check checkpoint timer
     // if time to checkpoint, wait till all in flight are complete, and
@@ -586,6 +589,13 @@ agd::Status Controller::Run(const Params& params,
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";
+        //push old_set_ to sets_to_merge_queue_   
+        if(old_set_.Size() > 0) {
+          MarshalledClusterSet set;
+          old_set_.BuildMarshalledClusterSet(&set);
+          sets_to_merge_queue_->push(std::move(set)); 
+          cout << "Pushed preclustered set into sets_to_merge_queue_.\n";
+        }
       }
       assert(i == total_cluster);
       // set partial outstanding

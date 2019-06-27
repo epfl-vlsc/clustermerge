@@ -10,11 +10,40 @@
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
 #include "zmq.hpp"
+#include <iostream>
 
 // interface to manage local worker
 class Worker {
  public:
   Worker() {}
+
+  Worker(std::vector<std::unique_ptr<Dataset>>& datasets_old)  {
+    const char* data_old;
+    size_t size_old;
+    uint32_t id_old = 0;
+
+    for (auto& dataset_old : datasets_old) {
+      //std::cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
+
+      auto s_old = dataset_old->GetNextRecord(&data_old, &size_old);
+      uint32_t genome_index_old = 0;
+      while (s_old.ok()) {
+        // cout << "Adding sequence id " << id << "\n";
+        if (size_old > 60000) {
+          std::cout << "over size " << size_old << "\n";
+          exit(0);
+        }
+
+        Sequence seq(absl::string_view(data_old, size_old), dataset_old->Name(),
+                    dataset_old->Size(), genome_index_old++, id_old++);
+
+        sequences_.push_back(std::move(seq));
+        s_old = dataset_old->GetNextRecord(&data_old, &size_old);
+      }
+    }
+
+    absolute_id_ = id_old;
+  }
 
   struct Params {
     size_t num_threads;
@@ -38,6 +67,9 @@ class Worker {
   agd::Status SignalHandler(int signal_num);
 
  private:
+  //for syncing with preclustered sequences  
+  size_t absolute_id_ = 0;
+
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;
   std::unique_ptr<zmq::socket_t> zmq_send_socket_;

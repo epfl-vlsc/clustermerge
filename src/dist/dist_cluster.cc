@@ -334,42 +334,42 @@ int main(int argc, char* argv[]) {
     }
   }  // if not present, aligner params defaults used
 
-  if (is_controller) {
+
+  //stuff for handling preexisting merge result
+  //parse and build a Datasets object
+  std::vector<std::string> dataset_file_names;
+  std::vector<unique_ptr<Dataset>> datasets_old;
+  json dataset_json_obj;
+  ClusterSet old_set;
     
-    //stuff for handling preexisting merge result
-    //parse and build a Datasets object
-    std::string input_file_name_temp = args::get(input_file_list);
-    std::vector<std::string> dataset_file_names;
-    std::vector<unique_ptr<Dataset>> datasets_old;
-    json dataset_json_obj;
-    ClusterSet old_set;
-      
-    if (file_name) {
-      agd::Status s_old;
+  if (file_name) {
+    agd::Status s_old;
 
-      std::ifstream dataset_stream(args::get(file_name));
+    std::ifstream dataset_stream(args::get(file_name));
 
-      if (!dataset_stream.good()) {
-        s_old = agd::errors::NotFound("No such file: ", args::get(file_name));
-      }
+    if (!dataset_stream.good()) {
+      s_old = agd::errors::NotFound("No such file: ", args::get(file_name));
+    }
+
+    if (!s_old.ok()) {
+      cout << s_old.ToString() << "\n";
+      return 0;
+    }
+
+    dataset_stream >> dataset_json_obj;
+
+    for (const auto& old_dataset : dataset_json_obj["datasets"]) {
+      s_old = LoadDatasetsJSON(old_dataset, &datasets_old);
+      dataset_file_names.push_back(old_dataset);
 
       if (!s_old.ok()) {
         cout << s_old.ToString() << "\n";
         return 0;
       }
+    }
+  }
 
-      dataset_stream >> dataset_json_obj;
-
-      for (const auto& old_dataset : dataset_json_obj["datasets"]) {
-        s_old = LoadDatasetsJSON(old_dataset, &datasets_old);
-        dataset_file_names.push_back(old_dataset);
-
-        if (!s_old.ok()) {
-          cout << s_old.ToString() << "\n";
-          return 0;
-        }
-      }
-     }
+  if (is_controller) {
 
     dataset_file_names.push_back(input_file_name_temp);
 
@@ -413,7 +413,6 @@ int main(int argc, char* argv[]) {
   } else {
     // load datasets, launch worker
     // launch worker(args, controller_ip, push_port, pull_port)
-    Worker worker;
     Worker::Params params;
     params.controller_ip = controller_ip;
     params.data_dir_path = json_dir_path;
@@ -425,8 +424,16 @@ int main(int argc, char* argv[]) {
     params.set_request_port = set_request_port;
     signal(SIGUSR1, signal_notifier);
     // signal(SIGINT, signal_notifier);
-    Status stat =
+    Status stat;
+    if(file_name) {
+      Worker worker(datasets_old);
+      stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
+    } else {
+      Worker worker;
+      stat =
+        worker.Run(params, aligner_params, datasets, (int*)&signal_num);
+    }
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
       return -1;

@@ -4,11 +4,11 @@
 #include <atomic>
 #include <thread>
 #include "absl/container/node_hash_map.h"
+#include "src/common/cluster_set.h"
 #include "src/common/concurrent_queue.h"
 #include "src/common/params.h"
 #include "src/common/sequence.h"
 #include "src/comms/requests.h"
-#include "src/common/cluster_set.h"
 #include "src/dataset/dataset.h"
 #include "src/dist/partial_merge.h"
 #include "zmq.hpp"
@@ -20,15 +20,15 @@
 class Controller {
  public:
   Controller(nlohmann::json dataset_json_obj,
-    std::vector<std::unique_ptr<Dataset>>& datasets_old) {
+             std::vector<std::unique_ptr<Dataset>>& datasets_old) {
     const char* data_old;
     size_t size_old;
     uint32_t id_old = 0;
 
-    //std::vector<Sequence> old_sequences;
+    // std::vector<Sequence> old_sequences;
 
     for (auto& dataset_old : datasets_old) {
-      //std::cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
+      // std::cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
 
       auto s_old = dataset_old->GetNextRecord(&data_old, &size_old);
       uint32_t genome_index_old = 0;
@@ -40,7 +40,7 @@ class Controller {
         }
 
         Sequence seq(absl::string_view(data_old, size_old), dataset_old->Name(),
-                    dataset_old->Size(), genome_index_old++, id_old++);
+                     dataset_old->Size(), genome_index_old++, id_old++);
 
         sequences_.push_back(std::move(seq));
         s_old = dataset_old->GetNextRecord(&data_old, &size_old);
@@ -56,7 +56,7 @@ class Controller {
       old_set_.AddCluster(c);
     }
 
-    absolute_id_ = id_old;  
+    absolute_id_ = id_old;
     std::cout << "Existing clusters: " << old_set_.Size() << "\n";
   }
 
@@ -81,7 +81,8 @@ class Controller {
   };
 
   agd::Status Run(const Params& params, const Parameters& aligner_params,
-                  std::vector<std::unique_ptr<Dataset>>& datasets, std::vector<std::string>& dataset_names);
+                  std::vector<std::unique_ptr<Dataset>>& datasets,
+                  std::vector<std::string>& dataset_names);
 
  private:
   zmq::context_t context_;
@@ -156,10 +157,10 @@ class Controller {
 
   // uint32_t current_request_id_ = 0;
 
-  //holds the preclustered result if json is passed
+  // holds the preclustered result if json is passed
   ClusterSet old_set_;
-  size_t absolute_id_ = 0;  //for syncing with preclustered sequences 
-  
+  size_t absolute_id_ = 0;  // for syncing with preclustered sequences
+
   volatile bool run_ = true;
   uint32_t outstanding_merges_ = 0;
   volatile bool outstanding_partial_ = false;

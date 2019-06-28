@@ -453,8 +453,8 @@ agd::Status Controller::Run(const Params& params,
     if (!stat.ok()) {
       return stat;
     }
-    //if there is a preclustered set
-    if(old_set_.Size() > 0) {
+    // if there is a preclustered set
+    if (old_set_.Size() > 0) {
       outstanding_merges_ = sets_to_merge_queue_->size();
     } else {
       outstanding_merges_ = sets_to_merge_queue_->size() - 1;
@@ -471,9 +471,9 @@ agd::Status Controller::Run(const Params& params,
   std::vector<float> sizes;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
-  if(old_set_.Size() >= 1)  {
+  if (old_set_.Size() >= 1) {
     outstanding_merges_++;
-    cout << "One more outstanding merge -- preclustered sequences. \n"; 
+    cout << "One more outstanding merge -- preclustered sequences. \n";
   }
   while (outstanding_merges_ > 0) {
     // check checkpoint timer
@@ -594,11 +594,11 @@ agd::Status Controller::Run(const Params& params,
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";
-        //push old_set_ to sets_to_merge_queue_   
-        if(old_set_.Size() > 0) {
+        // push old_set_ to sets_to_merge_queue_
+        if (old_set_.Size() > 0) {
           MarshalledClusterSet set;
           old_set_.BuildMarshalledClusterSet(&set);
-          sets_to_merge_queue_->push(std::move(set)); 
+          sets_to_merge_queue_->push(std::move(set));
           cout << "Merging with preclustered set..\n";
         }
       }
@@ -639,7 +639,7 @@ agd::Status Controller::Run(const Params& params,
   timing_file << sec.count() << "\n";
 
   ClusterSet set(final_set, sequences_);
-  //std::vector<string> placeholder = {"dist_placeholder"};
+  // std::vector<string> placeholder = {"dist_placeholder"};
   set.DumpJson("dist_clusters.json", dataset_names);
 
   if (!params.exclude_allall) {

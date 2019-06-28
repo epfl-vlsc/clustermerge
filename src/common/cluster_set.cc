@@ -14,13 +14,15 @@
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
+void free_func(void* data, void* hint) {
+  delete[] reinterpret_cast<char*>(data);
+}
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   // calculate buffer size for a single alloc
   size_t buf_size = sizeof(int) + sizeof(ClusterSetHeader);
   for (const auto& c : clusters_) {
-    buf_size += sizeof(ClusterHeader) + c.Sequences().size()*sizeof(int);
+    buf_size += sizeof(ClusterHeader) + c.Sequences().size() * sizeof(int);
   }
   agd::Buffer buf(buf_size);
   buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
@@ -53,10 +55,10 @@ void ClusterSet::BuildMarshalledClusterSet(MarshalledClusterSet* set) {
   // calculate buffer size for a single alloc
   size_t buf_size = sizeof(ClusterSetHeader);
   for (const auto& c : clusters_) {
-    buf_size += sizeof(ClusterHeader) + c.Sequences().size()*sizeof(int);
+    buf_size += sizeof(ClusterHeader) + c.Sequences().size() * sizeof(int);
   }
   agd::Buffer buf(buf_size);
-  
+
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value
   buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
@@ -75,7 +77,7 @@ void ClusterSet::BuildMarshalledClusterSet(MarshalledClusterSet* set) {
 
   char* data = buf.mutable_data();
   ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
-  hp->num_clusters = clusters_.size();  
+  hp->num_clusters = clusters_.size();
   set->buf = std::move(buf);
 }
 

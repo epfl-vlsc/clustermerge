@@ -320,13 +320,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
       MarshalledRequestView request(reinterpret_cast<char*>(msg.data()),
                                     msg.size());
-      //cout << "Got request: " << request.ID() << "\n";
+      // cout << "Got request: " << request.ID() << "\n";
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
       // cout << "Got a request: " << request.ID() << std::endl;
       if (request.Type() == RequestType::Batch) {
-        //cout << "its a batch, request ID is " << request.ID() << " \n";
+        // cout << "its a batch, request ID is " << request.ID() << " \n";
         // auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
@@ -342,7 +342,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
-        //cout << "--\n";
+        // cout << "--\n";
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
         // cout << "the merged set has " << final_set.Size() << " clusters\n";

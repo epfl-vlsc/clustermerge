@@ -13,9 +13,9 @@
 #include "args.h"
 #include "controller.h"
 #include "src/common/alignment_environment.h"
+#include "src/common/cluster_set.h"
 #include "src/common/params.h"
 #include "src/dataset/load_dataset.h"
-#include "src/common/cluster_set.h"
 #include "worker.h"
 
 using namespace std;
@@ -277,7 +277,7 @@ int main(int argc, char* argv[]) {
   std::vector<unique_ptr<Dataset>> datasets;
   agd::Status s;
   std::string input_file_name_temp = args::get(input_file_list);
-  
+
   if (datasets_opts) {
     // load and parse protein datasets
     // cluster merge sequences are simply string_views over this data
@@ -334,14 +334,13 @@ int main(int argc, char* argv[]) {
     }
   }  // if not present, aligner params defaults used
 
-
-  //stuff for handling preexisting merge result
-  //parse and build a Datasets object
+  // stuff for handling preexisting merge result
+  // parse and build a Datasets object
   std::vector<std::string> dataset_file_names;
   std::vector<unique_ptr<Dataset>> datasets_old;
   json dataset_json_obj;
   ClusterSet old_set;
-    
+
   if (file_name) {
     agd::Status s_old;
 
@@ -370,13 +369,12 @@ int main(int argc, char* argv[]) {
   }
 
   if (is_controller) {
-
     dataset_file_names.push_back(input_file_name_temp);
 
     // launch controller(push_port, pull_port)
     // TODO put checkpoint dir in params file and ensure exists
     string checkpoint_dir("./");
-    
+
     Controller::Params params;
     params.batch_size = batch_size;
     params.controller_ip = controller_ip;
@@ -399,12 +397,14 @@ int main(int argc, char* argv[]) {
     }
 
     Status stat;
-    if(file_name) {
+    if (file_name) {
       Controller controller(dataset_json_obj, datasets_old);
-      stat = controller.Run(params, aligner_params, datasets, dataset_file_names);
+      stat =
+          controller.Run(params, aligner_params, datasets, dataset_file_names);
     } else {
       Controller controller;
-      stat = controller.Run(params, aligner_params, datasets, dataset_file_names);
+      stat =
+          controller.Run(params, aligner_params, datasets, dataset_file_names);
     }
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";
@@ -425,14 +425,12 @@ int main(int argc, char* argv[]) {
     signal(SIGUSR1, signal_notifier);
     // signal(SIGINT, signal_notifier);
     Status stat;
-    if(file_name) {
+    if (file_name) {
       Worker worker(datasets_old);
-      stat =
-        worker.Run(params, aligner_params, datasets, (int*)&signal_num);
+      stat = worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     } else {
       Worker worker;
-      stat =
-        worker.Run(params, aligner_params, datasets, (int*)&signal_num);
+      stat = worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     }
     if (!stat.ok()) {
       cout << "Error: " << stat.error_message() << "\n";

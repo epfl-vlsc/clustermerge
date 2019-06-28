@@ -453,7 +453,12 @@ agd::Status Controller::Run(const Params& params,
     if (!stat.ok()) {
       return stat;
     }
-    outstanding_merges_ = sets_to_merge_queue_->size() - 1;
+    //if there is a preclustered set
+    if(old_set_.Size() > 0) {
+      outstanding_merges_ = sets_to_merge_queue_->size();
+    } else {
+      outstanding_merges_ = sets_to_merge_queue_->size() - 1;
+    }
     cout << "Loaded checkpoint, outstanding merges: " << outstanding_merges_
          << "\n";
   }
@@ -594,7 +599,7 @@ agd::Status Controller::Run(const Params& params,
           MarshalledClusterSet set;
           old_set_.BuildMarshalledClusterSet(&set);
           sets_to_merge_queue_->push(std::move(set)); 
-          cout << "Pushed preclustered set into sets_to_merge_queue_.\n";
+          cout << "Merging with preclustered set..\n";
         }
       }
       assert(i == total_cluster);

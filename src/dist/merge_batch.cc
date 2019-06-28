@@ -18,7 +18,6 @@ void MergeBatch(std::deque<ClusterSet>& sets_to_merge,
     // cout << "\nand\n";
     // s2.DebugDump();
     auto merged_set = s1.MergeClusters(s2, aligner);
-
     sets_to_merge.pop_front();
     sets_to_merge.pop_front();
     sets_to_merge.push_back(std::move(merged_set));

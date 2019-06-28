@@ -9,10 +9,12 @@
 // file is a blob
 // just a dump of serialized clusterSets in the sets to merge queue
 
-agd::Status WriteCheckpointFile(const absl::string_view path,
+agd::Status WriteCheckpointFile(
+    const absl::string_view path,
     const std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue);
 
-agd::Status LoadCheckpointFile(const absl::string_view path,
+agd::Status LoadCheckpointFile(
+    const absl::string_view path,
     std::unique_ptr<ConcurrentQueue<MarshalledClusterSet>>& queue);
 
 bool CheckpointFileExists(const absl::string_view path);

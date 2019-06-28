@@ -39,6 +39,14 @@ agd::Status Worker::SignalHandler(int signal_num) {
   }
   cout << "All worker threads have joined.\n";
 
+  // terminating rqt
+  // expecting size of set request queue == 0 (since all workers will have quit)
+  srt_signal_ = true;
+  set_request_queue_->unblock();
+  set_request_thread_.join();
+  assert(set_request_queue_->size() == 0);
+  cout << "Set request queue emptied and thread terminated.\n";
+
   // terminate irqt and drain incomplete_request_queue_
   irqt_signal_ = true;
   incomplete_request_queue_->unblock();
@@ -65,6 +73,13 @@ agd::Status Worker::SignalHandler(int signal_num) {
   } catch (...) {
     return agd::errors::Internal("Could not disconnect to zmq at ",
                                  response_queue_address);
+  }
+
+  try {
+    zmq_set_request_socket_->disconnect(set_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not disconnect to zmq at ",
+                                 set_request_queue_address);
   }
 
   try {
@@ -111,8 +126,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   string logpam_json_file = absl::StrCat(params.data_dir_path, "logPAM1.json");
   string all_matrices_json_file =
       absl::StrCat(params.data_dir_path, "all_matrices.json");
-  string blosum_json_file =
-      absl::StrCat(params.data_dir_path, "BLOSUM62.json");
+  string blosum_json_file = absl::StrCat(params.data_dir_path, "BLOSUM62.json");
 
   std::ifstream logpam_stream(logpam_json_file);
   std::ifstream blosum_stream(blosum_json_file);
@@ -159,19 +173,27 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   request_queue_address = absl::StrCat(address, params.request_queue_port);
   incomplete_request_queue_address =
       absl::StrCat(address, params.incomplete_request_queue_port);
+  set_request_queue_address = absl::StrCat(address, params.set_request_port);
 
   context_ = zmq::context_t(1);
   // worker is the requester --> requests for work items
   try {
     zmq_recv_socket_.reset(new zmq::socket_t(context_, ZMQ_REQ));
   } catch (...) {
-    return agd::errors::Internal("Could not create zmq PULL socket ");
+    return agd::errors::Internal("Could not create zmq REQ socket ");
   }
 
   try {
     zmq_send_socket_.reset(new zmq::socket_t(context_, ZMQ_PUSH));
   } catch (...) {
     return agd::errors::Internal("Could not create zmq PUSH socket ");
+  }
+
+  try {
+    zmq_set_request_socket_.reset(new zmq::socket_t(context_, ZMQ_REQ));
+  } catch (...) {
+    return agd::errors::Internal(
+        "Could not create zmq REQ socket -- large pm ");
   }
 
   try {
@@ -195,6 +217,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   }
 
   try {
+    zmq_set_request_socket_->connect(set_request_queue_address.c_str());
+  } catch (...) {
+    return agd::errors::Internal("Could not connect to zmq at ",
+                                 set_request_queue_address);
+  }
+
+  try {
     zmq_incomplete_request_socket_->connect(
         incomplete_request_queue_address.c_str());
   } catch (...) {
@@ -211,6 +240,9 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
   incomplete_request_queue_.reset(
       new ConcurrentQueue<MarshalledRequest>(params.queue_depth));
+  set_request_queue_.reset(
+      new ConcurrentQueue<std::pair<int, MultiNotification*>>(
+          params.num_threads));
 
   work_queue_thread_ = thread([this]() {
     // get msg from zmq
@@ -229,16 +261,56 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
       // cout << "Received work item.\n";
       work_queue_->push(std::move(msg));
+      // cout << "Pushing into work_queue_\n";
     }
 
     cout << "Work queue thread ending.\n";
+  });
+
+  set_request_thread_ = thread([this]() {
+    while (!srt_signal_) {
+      std::pair<int, MultiNotification*> pr;
+      if (!set_request_queue_->pop(pr)) {
+        continue;
+      }
+      int id = pr.first;
+      // if its not in the cache
+      mu_.Lock();
+      if (set_map_.find(id) == set_map_.end()) {
+        mu_.Unlock();
+
+        zmq::message_t msg(&id, sizeof(int));
+        bool success = zmq_set_request_socket_->send(msg);
+        if (!success) {
+          cout << "Failed to send the id over zmq -- worker func.\n";
+        }
+        success = zmq_set_request_socket_->recv(&msg);
+        if (!success) {
+          cout << "Requested set was not received.\n";
+        }
+
+        // cout << "Received message size --> " << msg.size() << std::endl;
+        // copy to put in the map
+        agd::Buffer buf(msg.size());
+        buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
+        mu_.Lock();
+        set_map_[id] = std::move(buf);
+        mu_.Unlock();
+        cout << "Fetched set: [" << id << "]\n";
+      } else {
+        mu_.Unlock();
+        // cout << "Communicating thread --> set already present: " << id <<
+        // "\n";
+      }
+
+      pr.second->Notify();
+    }
   });
 
   int nPartial = 0;
   int nJoined = 0;
   auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
     ProteinAligner aligner(&envs, &aligner_params);
-
     // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
     while (!worker_signal_) {
@@ -270,6 +342,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // cout << "merging a batch...\n";
         MergeBatch(sets_to_merge, &aligner);
         // queue now has final set
+        // cout << "--\n";
         auto& final_set = sets_to_merge[0];
         // encode to protobuf, push to queue
         // cout << "the merged set has " << final_set.Size() << " clusters\n";
@@ -281,12 +354,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         view = response.Set();
         // cout << "final set has " << view.NumClusters() << " clusters.\n";
 
+        // cout << "Pushing to result queue.\n";
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
-
+        // cout << "Pushed to result queue.\n";
       } else if (request.Type() == RequestType::Partial) {
         nPartial++;
-        // cout << "has partial\n";
+        // cout << "Its a partial request\n";
         // auto& partial = request.partial();
         // execute a partial merge, merge cluster into cluster set
         // do not remove any clusters, simply mark fully merged so
@@ -300,6 +374,55 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
+        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+        if (worker_signal_) {
+          MarshalledRequest rq;
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+                              msg.size());
+          incomplete_request_queue_->push(std::move(rq));
+          std ::cout << "Pushing into incomplete queue with ID: "
+                     << request.ID() << std::endl;
+          continue;
+        }
+        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        assert(set.NumClusters() <= new_cs.Size());
+        MarshalledResponse response;
+        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        assert(response.Set().NumClusters() == new_cs.Size());
+        result_queue_->push(std::move(response));
+
+      } else if (request.Type() == RequestType::LargePartial) {
+        // extract id and cluster
+        int id = request.ID();
+        // cout << "Received a large partial request with id " << id << "\n";
+        MarshalledClusterView cluster;
+        request.Cluster(&cluster);
+
+        MarshalledClusterSet set;
+        // search in map
+        mu_.Lock();
+        auto it = set_map_.find(id);
+        if (it == set_map_.end()) {
+          mu_.Unlock();
+          MultiNotification n;
+          // cout << "Worker thread --> [" << id << "] Set not cached.
+          // Requesting...\n";
+          set_request_queue_->push(std::make_pair(id, &n));
+          n.SetMinNotifies(1);
+          n.WaitForNotification();
+          mu_.Lock();
+          it = set_map_.find(id);
+          assert(it != set_map_.end());
+          // cout << "Worker thread --> [" << id << "] Received set.\n";
+        }
+
+        set.buf.AppendBuffer(it->second.data(), it->second.size());
+        mu_.Unlock();
+
+        ClusterSet cs(set, sequences_);
+        Cluster c(cluster, sequences_);
+
+        // same code as Partial Merge
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
           MarshalledRequest rq;
@@ -339,7 +462,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       if (!result_queue_->pop(response)) {
         continue;
       }
-
       bool success = zmq_send_socket_->send(std::move(response.msg));
       if (!success) {
         cout << "Thread failed to send response over zmq!\n";
@@ -351,7 +473,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
   incomplete_request_queue_thread_ = thread([this, &params]() {
     auto free_func = [](void* data, void* hint) {
-      delete [] reinterpret_cast<char*>(data);
+      delete[] reinterpret_cast<char*>(data);
     };
     while (!(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;
@@ -371,8 +493,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Incomplete request queue thread ending.\n";
   });
 
-  timestamps_.reserve(100000);
-  queue_sizes_.reserve(100000);
+  /*timestamps_.reserve(100000);
+  queue_sizes_.reserve(100000);*/
 
   // queue_measure_thread_ = std::thread([this](){
   //     // get timestamp, queue size
@@ -394,15 +516,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));
   }
   cout << "Response [signal_num] value change received.\n";
-  SignalHandler(*signal_num);
+  return SignalHandler(*signal_num);
 
-  cout << "Worker running, press button to exit\n";
+  /*cout << "Worker running, press button to exit\n";
   // std::cin.get();
 
   cout << "joining threads ...\n";
 
-  incomplete_request_queue_thread_.join();
-  result_queue_thread_.join();
+  // incomplete_request_queue_thread_.join();
+  // result_queue_thread_.join();
 
   // queue size stats
   std::vector<std::pair<size_t, size_t>> values;
@@ -415,7 +537,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   std::cout << "dumping queue sizes ...\n";
   std::ofstream o("queue.json");
 
-  o << std::setw(2) << j << std::endl;
+  o << std::setw(2) << j << std::endl;*/
 
   return agd::Status::OK();
 }

@@ -1,3 +1,4 @@
 {
-  "controller":"localhost"
+  "controller":"localhost",
+  "max_set_size":500
 }

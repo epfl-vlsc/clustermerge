@@ -202,6 +202,7 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
         }
         c_other.SetFullyMerged();
         c_other.Unlock();
+        break;
       } else {
         // add c_other_rep into c
         // for each sequence in c_other, add if it matches c rep
@@ -317,12 +318,13 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
 
   ProteinAligner::Alignment alignment;
   agd::Status s;
+  bool fully_merged = false;
   for (auto& c : clusters_) {
     if (worker_signal_) {
       std::cout << "Breaking partial merge.\n";
       break;
     }
-    if (!c_other.IsFullyMerged() && c.PassesThreshold(c_other, aligner)) {
+    if (!fully_merged && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);
 
@@ -348,6 +350,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
           c_other.AddSequence(seq);
         }
         c.SetFullyMerged();
+        fully_merged = true;
       } else if (c_other_num_uncovered <
                      aligner->Params()->max_n_aa_not_covered &&
                  alignment.score > aligner->Params()->min_full_merge_score) {
@@ -357,6 +360,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
           c.AddSequence(seq);
         }
         c_other.SetFullyMerged();
+        fully_merged = true;
       } else {
         // add c_other_rep into c
         // for each sequence in c_other, add if it matches c rep

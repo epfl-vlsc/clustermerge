@@ -19,7 +19,7 @@ proc = subprocess.Popen(
         "40",
         "-x",
         "-i",
-        "bacteria_datasets.json",
+        "bacteria_fa_full.json",
     ]
 )
 """

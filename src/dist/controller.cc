@@ -276,7 +276,7 @@ agd::Status Controller::Run(const Params& params,
         if (!success) {
           cout << "Thread failed to send cluster set over zmq!\n";
         }
-        cout << "Set sent with id: [" << id << "] \n";
+        //cout << "Set sent with id: [" << id << "] \n";
       }
     }
   });

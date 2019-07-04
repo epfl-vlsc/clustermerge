@@ -324,6 +324,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
       std::cout << "Breaking partial merge.\n";
       break;
     }
+    Cluster c_standin;    //stand in cluster holding diffs
     if (!fully_merged && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);
@@ -340,7 +341,6 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
           c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
       auto c_other_num_uncovered = c_other.Rep().Seq().size() -
                                    (alignment.seq2_max - alignment.seq2_min);
-
       if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
           alignment.score > aligner->Params()->min_full_merge_score) {
         // they are _almost_ overlapped, merge completely
@@ -349,7 +349,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         for (const auto& seq : c.Sequences()) {
           c_other.AddSequence(seq);
         }
-        c.SetFullyMerged();
+        //c.SetFullyMerged();
+        c_standin.SetFullyMerged();
         fully_merged = true;
       } else if (c_other_num_uncovered <
                      aligner->Params()->max_n_aa_not_covered &&
@@ -357,7 +358,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         // std::cout << "Nearly complete overlap, merging c_other into c,
         // score is " << alignment.score << "\n";
         for (const auto& seq : c_other.Sequences()) {
-          c.AddSequence(seq);
+          c_standin.AddSequence(seq);
         }
         c_other.SetFullyMerged();
         fully_merged = true;
@@ -366,11 +367,19 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         // for each sequence in c_other, add if it matches c rep
         // keep both clusters
         // std::cout << "merging and keeping both clusters\n";
+        int num_old_seqs = c.Sequences().size();
         c.Merge(&c_other, aligner);
+        auto seqs = c.Sequences();
+        std::list<Sequence>::iterator it = seqs.begin();
+        std::advance(it, num_old_seqs);
+        while(it != seqs.end()) {
+          c_standin.AddSequence(*it);
+          it++;
+        }
       }
     }  // if passes threshold
 
-    new_cluster_set.clusters_.push_back(std::move(c));
+    new_cluster_set.clusters_.push_back(std::move(c_standin));
   }
 
   // we can leave out without confusing the controller

@@ -94,15 +94,8 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set) {
     if (cluster.IsFullyMerged()) {
       clusters_[i].SetFullyMerged();
     }
-    auto num_seqs = cluster.NumSeqs();
-    // only do new seqs, orig seqs are already present and can be skipped
-    // auto orig_seqs = clusters_[i].NumOrigSeqs();
-    // if (orig_seqs > num_seqs) {
-    //   std::cout << "error num seqs " << num_seqs << " < " << orig_seqs
-    //             << " orig seqs, cluster " << i << "\n";
-    //   exit(0);
-    // }
-    for (uint32_t x = 0; x < num_seqs; x++) {
+    // cluster has only diffs, push them directly
+    for (uint32_t x = 0; x < cluster.NumSeqs(); x++) {
       clusters_[i].Insert(cluster.SeqIndex(x));
     }
   }

@@ -14,13 +14,15 @@
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) { delete [] reinterpret_cast<char*>(data); }
+void free_func(void* data, void* hint) {
+  delete[] reinterpret_cast<char*>(data);
+}
 
 void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
   // calculate buffer size for a single alloc
   size_t buf_size = sizeof(int) + sizeof(ClusterSetHeader);
   for (const auto& c : clusters_) {
-    buf_size += sizeof(ClusterHeader) + c.Sequences().size()*sizeof(int);
+    buf_size += sizeof(ClusterHeader) + c.Sequences().size() * sizeof(int);
   }
   agd::Buffer buf(buf_size);
   buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
@@ -324,7 +326,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
       std::cout << "Breaking partial merge.\n";
       break;
     }
-    Cluster c_standin;    //stand in cluster holding diffs
+    Cluster c_standin;  // stand in cluster which holds diffs
     if (!fully_merged && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);
@@ -349,7 +351,6 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         for (const auto& seq : c.Sequences()) {
           c_other.AddSequence(seq);
         }
-        //c.SetFullyMerged();
         c_standin.SetFullyMerged();
         fully_merged = true;
       } else if (c_other_num_uncovered <
@@ -371,8 +372,9 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         c.Merge(&c_other, aligner);
         auto seqs = c.Sequences();
         std::list<Sequence>::iterator it = seqs.begin();
+        // push only newly added sequences
         std::advance(it, num_old_seqs);
-        while(it != seqs.end()) {
+        while (it != seqs.end()) {
           c_standin.AddSequence(*it);
           it++;
         }

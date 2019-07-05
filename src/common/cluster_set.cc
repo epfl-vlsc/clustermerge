@@ -371,7 +371,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
         int num_old_seqs = c.Sequences().size();
         c.Merge(&c_other, aligner);
         auto seqs = c.Sequences();
-        std::list<Sequence>::iterator it = seqs.begin();
+        auto it = seqs.begin();
         // push only newly added sequences
         std::advance(it, num_old_seqs);
         while (it != seqs.end()) {

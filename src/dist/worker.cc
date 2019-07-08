@@ -20,7 +20,7 @@ void Worker::print_and_killall(int signal_num)  {
   cout << "Max partial merge time: " << max_time_ << " s\n";
   cout << "Min partial merge time: " << min_time_ << " s\n";
   std::ofstream outfile;
-  outfile.open("pm_times.csv");
+  outfile.open("pm_times.csv", std::ios::app);
   cout << "Written to pm_times.csv\n";
   outfile << "time(secs)" << std::endl;
   for(auto s: pm_times_)  {

@@ -17,8 +17,8 @@ using std::string;
 using std::thread;
 
 void Worker::print_and_killall(int signal_num)  {
-  cout << "Max partial merge time: " << max_time_ << " ms\n";
-  cout << "Min partial merge time: " << min_time_ << " ms\n";
+  cout << "Max partial merge time: " << max_time_ << " s\n";
+  cout << "Min partial merge time: " << min_time_ << " s\n";
   std::ofstream outfile;
   outfile.open("pm_times.csv");
   cout << "Written to pm_times.csv\n";

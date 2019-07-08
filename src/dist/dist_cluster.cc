@@ -371,7 +371,7 @@ int main(int argc, char* argv[]) {
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.set_request_port = set_request_port;
     signal(SIGUSR1, signal_notifier);
-    // signal(SIGINT, signal_notifier);
+    signal(SIGINT, signal_notifier);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {

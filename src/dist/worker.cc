@@ -393,12 +393,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         auto t1 = std::chrono::high_resolution_clock::now();
         auto duration = t1 - t0;
         auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        mu_pm_times_.Lock();
         pm_times_.push_back(secs);
         if(secs > max_time_)
           max_time_ = secs;
         if(min_time_ == -1 || secs < min_time_)
           min_time_ = secs;  
-        
+        mu_pm_times_.Unlock();
+
         if (worker_signal_) {
           MarshalledRequest rq;
           rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
@@ -453,11 +455,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         auto t1 = std::chrono::high_resolution_clock::now();
         auto duration = t1 - t0;
         auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        mu_pm_times_.Lock();
         pm_times_.push_back(secs);
         if(secs > max_time_)
           max_time_ = secs;
         if(min_time_ == -1 || secs < min_time_)
           min_time_ = secs;
+        mu_pm_times_.Unlock();
 
         if (worker_signal_) {
           MarshalledRequest rq;

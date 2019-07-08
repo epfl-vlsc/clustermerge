@@ -94,4 +94,5 @@ class Worker {
   long min_time_ = -1;
   long max_time_ = 0;
   std::vector<long> pm_times_;
+  absl::Mutex mu_pm_times_; // for syncing partial merge times
 };

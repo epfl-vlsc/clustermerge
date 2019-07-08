@@ -37,6 +37,9 @@ class Worker {
   // signal handler
   agd::Status SignalHandler(int signal_num);
 
+  // just for quick measurements
+  void print_and_killall(int signal_num);
+
  private:
   zmq::context_t context_;
   std::unique_ptr<zmq::socket_t> zmq_recv_socket_;

@@ -16,6 +16,12 @@ using std::cout;
 using std::string;
 using std::thread;
 
+void Worker::print_and_killall(int signal_num)  {
+  cout << "Max partial merge time: " << max_time_ << "\n";
+  cout << "Min partial merge time: " << min_time_ << "\n";
+  exit(0);
+}
+
 agd::Status Worker::SignalHandler(int signal_num) {
   zmq::message_t msg;
 
@@ -90,8 +96,6 @@ agd::Status Worker::SignalHandler(int signal_num) {
                                  incomplete_request_queue_address);
   }
 
-  cout << "Max partial merge time: " << max_time_ << "\n";
-  cout << "Min partial merge time: " << min_time_ << "\n";
   cout << "Zmq's disconnected.\n";
 
   cout << "Quitting nicely..!\n";
@@ -537,7 +541,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));
   }
   cout << "Response [signal_num] value change received.\n";
-  return SignalHandler(*signal_num);
+  print_and_killall(*signal_num);
+  //return SignalHandler(*signal_num);
 
   /*cout << "Worker running, press button to exit\n";
   // std::cin.get();

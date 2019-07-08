@@ -19,6 +19,14 @@ using std::thread;
 void Worker::print_and_killall(int signal_num)  {
   cout << "Max partial merge time: " << max_time_ << " ms\n";
   cout << "Min partial merge time: " << min_time_ << " ms\n";
+  std::ofstream outfile;
+  outfile.open("pm_times.csv");
+  cout << "Written to pm_times.csv\n";
+  outfile << "time(secs)" << std::endl;
+  for(auto s: pm_times_)  {
+      outfile << s << std::endl;
+  }
+  outfile.close();
   exit(0);
 }
 
@@ -384,7 +392,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         auto t1 = std::chrono::high_resolution_clock::now();
         auto duration = t1 - t0;
-        auto secs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        pm_times_.push_back(secs);
         if(secs > max_time_)
           max_time_ = secs;
         if(min_time_ == -1 || secs < min_time_)
@@ -443,7 +452,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         //update time
         auto t1 = std::chrono::high_resolution_clock::now();
         auto duration = t1 - t0;
-        auto secs = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        pm_times_.push_back(secs);
         if(secs > max_time_)
           max_time_ = secs;
         if(min_time_ == -1 || secs < min_time_)

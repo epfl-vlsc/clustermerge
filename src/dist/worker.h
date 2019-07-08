@@ -86,4 +86,8 @@ class Worker {
   std::string request_queue_address;
   std::string incomplete_request_queue_address;
   std::string set_request_queue_address;
+  
+  //just for some measurements
+  long min_time_ = -1;
+  long max_time_ = 0;
 };

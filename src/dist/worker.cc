@@ -90,9 +90,12 @@ agd::Status Worker::SignalHandler(int signal_num) {
                                  incomplete_request_queue_address);
   }
 
+  cout << "Max partial merge time: " << max_time_ << "\n";
+  cout << "Min partial merge time: " << min_time_ << "\n";
   cout << "Zmq's disconnected.\n";
 
   cout << "Quitting nicely..!\n";
+  
   // exit(signal_num);
   return agd::Status::OK();
 }
@@ -373,7 +376,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         Cluster c(cluster, sequences_);
 
         // cout << "merging cluster set with cluster\n";
+        auto t0 = std::chrono::high_resolution_clock::now();
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        auto duration = t1 - t0;
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        if(secs > max_time_)
+          max_time_ = secs;
+        if(min_time_ == -1 || secs < min_time_)
+          min_time_ = secs;  
+        
         if (worker_signal_) {
           MarshalledRequest rq;
           rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
@@ -421,8 +433,18 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         ClusterSet cs(set, sequences_);
         Cluster c(cluster, sequences_);
 
+        auto t0 = std::chrono::high_resolution_clock::now();
         // same code as Partial Merge
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+        //update time
+        auto t1 = std::chrono::high_resolution_clock::now();
+        auto duration = t1 - t0;
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        if(secs > max_time_)
+          max_time_ = secs;
+        if(min_time_ == -1 || secs < min_time_)
+          min_time_ = secs;
+
         if (worker_signal_) {
           MarshalledRequest rq;
           rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),

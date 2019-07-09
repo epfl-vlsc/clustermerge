@@ -73,6 +73,23 @@ ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
   }
 }
 
+ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set, vector<size_t>& set_offsets, 
+  int start_index, int end_index, const std::vector<Sequence>& sequences) {
+    MarshalledClusterView cluster;
+    for (int i = start_index; i <= end_index; i++) {
+      marshalled_set.ClusterAtOffset(&cluster, set_offsets[i]);
+      Cluster c(sequences[cluster.SeqIndex(0)]);
+      uint32_t num_seqs = cluster.NumSeqs();
+      for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
+        c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+      }
+      if (cluster.IsFullyMerged()) {
+        c.SetFullyMerged();
+      }
+      clusters_.push_back(std::move(c));
+    }    
+}
+
 ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
                        const std::vector<Sequence>& sequences) {
   // yeah its copied from above idc

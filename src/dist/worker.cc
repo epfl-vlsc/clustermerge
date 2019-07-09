@@ -293,8 +293,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // copy to put in the map
         agd::Buffer buf(msg.size());
         buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
+        
+        //build the offset vector
+        MarshalledClusterSetView set(buf.data());
+        std::vector<size_t> offsets;
+        set.Offsets(offsets);
+        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets  = {std::move(buf), offsets};
+
         mu_.Lock();
-        set_map_[id] = std::move(buf);
+        set_map_[id] = std::move(set_and_offsets);
         mu_.Unlock();
         cout << "Fetched set: [" << id << "]\n";
       } else {
@@ -415,7 +422,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
           // cout << "Worker thread --> [" << id << "] Received set.\n";
         }
 
-        set.buf.AppendBuffer(it->second.data(), it->second.size());
+        set.buf.AppendBuffer(it->second.first.data(), it->second.first.size());
         mu_.Unlock();
 
         ClusterSet cs(set, sequences_);
@@ -434,6 +441,56 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
+        MarshalledResponse response;
+        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        assert(response.Set().NumClusters() == new_cs.Size());
+        result_queue_->push(std::move(response));
+
+      } else if(request.Type() == RequestType::SubLargePartial) {
+        int start_index, end_index, cluster_index, id;
+        id = request.ID();
+        MarshalledClusterView cluster;
+        request.IndexesAndCluster(&start_index, &end_index, &cluster_index, &cluster);
+        cout << "Got request with: " << start_index << " " << end_index << " " << cluster_index << " \n";      
+
+        // search in map
+        mu_.Lock();
+        auto it = set_map_.find(id);
+        if (it == set_map_.end()) {
+          mu_.Unlock();
+          MultiNotification n;
+          // cout << "Worker thread --> [" << id << "] Set not cached.
+          // Requesting...\n";
+          set_request_queue_->push(std::make_pair(id, &n));
+          n.SetMinNotifies(1);
+          n.WaitForNotification();
+          mu_.Lock();
+          it = set_map_.find(id);
+          assert(it != set_map_.end());
+          // cout << "Worker thread --> [" << id << "] Received set.\n";
+        }
+
+        MarshalledClusterSetView set(it->second.first.data());
+        ClusterSet cs(set, it->second.second, start_index, end_index, sequences_);
+        mu_.Unlock();
+
+        Cluster c(cluster, sequences_);
+
+        // same code as Partial Merge
+        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
+        if (worker_signal_) {
+          MarshalledRequest rq;
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+                              msg.size());
+          incomplete_request_queue_->push(std::move(rq));
+          std ::cout << "Pushing into incomplete queue with ID: "
+                     << request.ID() << std::endl;
+          continue;
+        }
+        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
+        assert(set.NumClusters() <= new_cs.Size());
+        
+        //this stuff needs some change, we need to a way to know what response it is
         MarshalledResponse response;
         new_cs.BuildMarshalledResponse(request.ID(), &response);
         assert(response.Set().NumClusters() == new_cs.Size());

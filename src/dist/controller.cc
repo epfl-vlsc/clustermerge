@@ -565,28 +565,31 @@ agd::Status Controller::Run(const Params& params,
       MarshalledClusterView cluster;
       // cout << "pushing id " << outstanding_merges_ << "\n";
       uint32_t total_cluster = sets[0].NumClusters();
-      uint32_t i = 0;
+      uint32_t cluster_index = 0;
 
       while (sets[0].NextCluster(&cluster)) {
-        i++;
         MarshalledRequest request;
         if (isLarge) {
           request.CreateLargePartialRequest(outstanding_merges_, cluster);
         } else {
           request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
         }
-        // cout << "pushing partial request with " <<
-        // partial_request->set().clusters_size() << " clusters in set and ID: "
-        // << request.id() << "\n";
-        // cout << "Pushing partial merge request " << "\n";
+
+        //create a subLargePartialRequest
+        MarshalledRequest request_test;
+        request_test.CreateSubLargePartialRequest(outstanding_merges_, cluster, 
+         10, 15, cluster_index);
+        
         request_queue_->push(std::move(request));
+        request_queue_->push(std::move(request_test));
+        cluster_index++;
       }
       outstanding_requests++;
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";
       }
-      assert(i == total_cluster);
+      assert(cluster_index == total_cluster);
       // set partial outstanding
       // outstanding_partial_ = true;
     }

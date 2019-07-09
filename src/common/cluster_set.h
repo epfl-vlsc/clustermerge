@@ -31,6 +31,9 @@ class ClusterSet {
   ClusterSet(MarshalledClusterSetView& marshalled_set,
              const std::vector<Sequence>& sequences);
 
+  ClusterSet(MarshalledClusterSetView& marshalled_set, std::vector<size_t>& set_offsets, 
+    int start_index, int end_index, const std::vector<Sequence>& sequences);
+
   void BuildMarshalledResponse(int id, MarshalledResponse* response);
 
   // void ConstructProto(cmproto::ClusterSet* set_proto);

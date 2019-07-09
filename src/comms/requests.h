@@ -3,7 +3,7 @@
 #include "src/agd/buffer.h"
 #include "zmq.hpp"
 
-enum RequestType { Batch = 0, Partial, LargePartial };
+enum RequestType { Batch = 0, Partial, LargePartial, SubLargePartial };
 
 struct __attribute__((packed)) BatchRequestHeader {
   int id;
@@ -82,6 +82,30 @@ struct MarshalledClusterSetView {
       *cluster = MarshalledClusterView(cur_cluster_ptr);
       return true;
     }
+  }
+
+  void Offsets(std::vector<size_t>& offsets)  {
+    // for cluster at index zero
+    size_t offset = sizeof(ClusterSetHeader);
+    offsets.push_back(offset);
+    const char* cluster_ptr = data + offset;
+    
+    uint32_t cluster_index = 1;
+    while(cluster_index < NumClusters())  {
+      uint32_t cluster_size = 
+        reinterpret_cast<const ClusterHeader*>(cluster_ptr)->num_seqs;
+      offset += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;   
+      offsets.push_back(offset);
+      cluster_ptr = data + offset;
+      cluster_index++;
+    }
+  } 
+
+  // relies on user to make sure offset is correct (within bounds)
+  bool ClusterAtOffset(MarshalledClusterView* cluster, size_t offset) {
+    const char* cluster_ptr = data + offset;
+    *cluster = MarshalledClusterView(cluster_ptr);
+    return true;
   }
 };
 
@@ -211,6 +235,19 @@ struct MarshalledRequest {
     assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));
   }
 
+  void CreateSubLargePartialRequest(int id, MarshalledClusterView cluster, 
+    int start_index, int end_index, int cluster_index)  {
+    PartialRequestHeader h;
+    h.id = id;
+    h.type = RequestType::SubLargePartial;
+    buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
+    buf.AppendBuffer(reinterpret_cast<char*>(&start_index), sizeof(int));
+    buf.AppendBuffer(reinterpret_cast<char*>(&end_index), sizeof(int));
+    buf.AppendBuffer(reinterpret_cast<char*>(&cluster_index), sizeof(int));
+    buf.AppendBuffer(cluster.data, cluster.TotalSize());
+    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader) + 3*sizeof(int));  
+  }
+
   agd::Buffer buf;
 };
 
@@ -249,6 +286,16 @@ struct MarshalledRequestView {
   // for Large Partial requests
   void Cluster(MarshalledClusterView* cluster) {
     const char* cluster_ptr = data + sizeof(PartialRequestHeader);
+    *cluster = MarshalledClusterView(cluster_ptr);
+  }
+
+  // relies on user to call Type and ensure this is correct
+  void IndexesAndCluster(int* start_index, int* end_index, int* cluster_index, MarshalledClusterView* cluster) {
+    const char* ptr = data + sizeof(PartialRequestHeader);
+    *start_index = *reinterpret_cast<const int*>(ptr);
+    *end_index = *reinterpret_cast<const int*>(ptr + sizeof(int));
+    *cluster_index = *reinterpret_cast<const int*>(ptr + 2*sizeof(int));
+    const char* cluster_ptr = ptr + 3*sizeof(int);
     *cluster = MarshalledClusterView(cluster_ptr);
   }
 

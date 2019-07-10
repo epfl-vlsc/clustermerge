@@ -385,6 +385,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   ProteinAligner::Alignment alignment;
   agd::Status s;
   bool fully_merged = false;
+  int c_other_old_nseqs = c_other.Sequences().size();
   for (auto& c : clusters_) {
     if (worker_signal_) {
       std::cout << "Breaking partial merge.\n";
@@ -449,8 +450,20 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   }
 
   // we can leave out without confusing the controller
-  if (!c_other.IsFullyMerged())
-    new_cluster_set.clusters_.push_back(std::move(c_other));
+  // adding only diffs
+  if (!c_other.IsFullyMerged()) {
+    Cluster c_standin;
+    auto seqs = c_other.Sequences();
+    auto it = seqs.begin();
+    // push only newly added sequences
+    std::advance(it, c_other_old_nseqs);
+    while (it != seqs.end()) {
+      c_standin.AddSequence(*it);
+      it++;
+    }
+    new_cluster_set.clusters_.push_back(std::move(c_standin));
+  }
+
 
   return new_cluster_set;
 }

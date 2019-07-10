@@ -364,95 +364,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
         // cout << "Pushed to result queue.\n";
-      } else if (request.Type() == RequestType::Partial) {
-        nPartial++;
-        // cout << "Its a partial request\n";
-        // auto& partial = request.partial();
-        // execute a partial merge, merge cluster into cluster set
-        // do not remove any clusters, simply mark fully merged so
-        // the controller can merge other partial merge requests
-        MarshalledClusterSetView set;
-        MarshalledClusterView cluster;
-        request.ClusterAndSet(&set, &cluster);
-
-        // cout << "set has " << set.NumClusters() << " clusters\n";
-        ClusterSet cs(set, sequences_);
-        Cluster c(cluster, sequences_);
-
-        // cout << "merging cluster set with cluster\n";
-        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
-        if (worker_signal_) {
-          MarshalledRequest rq;
-          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
-                              msg.size());
-          incomplete_request_queue_->push(std::move(rq));
-          std ::cout << "Pushing into incomplete queue with ID: "
-                     << request.ID() << std::endl;
-          continue;
-        }
-        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
-        assert(set.NumClusters() <= new_cs.Size());
-        MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), request.Type(), &response);
-        assert(response.Set().NumClusters() == new_cs.Size());
-        result_queue_->push(std::move(response));
-
-      } else if (request.Type() == RequestType::LargePartial) {
-        // extract id and cluster
-        int id = request.ID();
-        // cout << "Received a large partial request with id " << id << "\n";
-        MarshalledClusterView cluster;
-        request.Cluster(&cluster);
-
-        MarshalledClusterSet set;
-        // search in map
-        mu_.Lock();
-        auto it = set_map_.find(id);
-        if (it == set_map_.end()) {
-          mu_.Unlock();
-          MultiNotification n;
-          // cout << "Worker thread --> [" << id << "] Set not cached.
-          // Requesting...\n";
-          set_request_queue_->push(std::make_pair(id, &n));
-          n.SetMinNotifies(1);
-          n.WaitForNotification();
-          mu_.Lock();
-          it = set_map_.find(id);
-          assert(it != set_map_.end());
-          // cout << "Worker thread --> [" << id << "] Received set.\n";
-        }
-
-        set.buf.AppendBuffer(it->second.first.data(), it->second.first.size());
-        mu_.Unlock();
-
-        ClusterSet cs(set, sequences_);
-        Cluster c(cluster, sequences_);
-
-        // same code as Partial Merge
-        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
-        if (worker_signal_) {
-          MarshalledRequest rq;
-          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
-                              msg.size());
-          incomplete_request_queue_->push(std::move(rq));
-          std ::cout << "Pushing into incomplete queue with ID: "
-                     << request.ID() << std::endl;
-          continue;
-        }
-        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
-        assert(set.NumClusters() <= new_cs.Size());
-        MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), request.Type(), &response);
-        assert(response.Set().NumClusters() == new_cs.Size());
-        result_queue_->push(std::move(response));
-
       } else if(request.Type() == RequestType::SubLargePartial) {
         int start_index, end_index, cluster_index, id;
         id = request.ID();
         MarshalledClusterView cluster;
         request.IndexesAndCluster(&start_index, &end_index, &cluster_index, &cluster);
-        cout << "Got request with: " << start_index << " " << end_index << " " << cluster_index << " \n";      
-
+        
         // search in map
         mu_.Lock();
         auto it = set_map_.find(id);

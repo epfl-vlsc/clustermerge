@@ -358,47 +358,45 @@ agd::Status Controller::Run(const Params& params,
         MarshalledClusterSet new_set(response);
         sets_to_merge_queue_->push(std::move(new_set));
         outstanding_requests--;
-      } else if (type == RequestType::Partial || type == RequestType::LargePartial)  {
-          {
-            absl::MutexLock l(&mu_);
-            auto partial_it = partial_merge_map_.find(id);
-            if (partial_it == partial_merge_map_.end()) {
-              cout << "error thing in map was not -1, was " << id << "\n";
-              exit(0);
-            }  
-            partial_item = &partial_it->second;
-          }
+      
+      } else if(type == RequestType::SubLargePartial) {  
+        {
+          absl::MutexLock l(&mu_);
+          auto partial_it = partial_merge_map_.find(id);
+          if (partial_it == partial_merge_map_.end()) {
+            cout << "error thing in map was not -1, was " << id << "\n";
+            exit(0);
+          }  
+          partial_item = &partial_it->second;
+        }
 
-          // update the state
-          partial_item->partial_set.MergeClusterSet(response.Set());
-          auto val = partial_item->num_received++;
+        auto indexes = response.Indexes();
+        int start_index = std::get<0>(indexes);
+        int end_index = std::get<1>(indexes);
+        int cluster_index = std::get<2>(indexes);
+        partial_item->partial_set.MergeClusterSet(response.Set(), start_index, end_index, cluster_index);
+        auto val = partial_item->num_received++;
+
+        //check if all have been received
+        if (partial_item->num_expected - 1 == val) {
           
-          // check if all requests have been received
-          if (partial_item->num_expected - 1 == val) {
-            // TODO are we sure that all other potential threads are finished
-            // merging their partials with this one?
-
-            // go through  and delete any fully merged clusters
-            // do this when constructing the new full set
-            // partial_item->partial_set.RemoveFullyMerged();
-
-            MarshalledClusterSet set;
-            partial_item->partial_set.BuildMarshalledSet(&set);
-            
-            {
-              if (outstanding_merges_ == 1) {
-                cout << "last request complete, 1 merge left, time: "
-                    << static_cast<long int>(std::time(0)) << "\n";
-              }
-              absl::MutexLock l(&mu_);
-              partial_merge_map_.erase(id);
+          MarshalledClusterSet set;
+          partial_item->partial_set.BuildMarshalledSet(&set);
+          
+          {
+            if (outstanding_merges_ == 1) {
+              cout << "last request complete, 1 merge left, time: "
+                  << static_cast<long int>(std::time(0)) << "\n";
             }
-            sets_to_merge_queue_->push(std::move(set));
-            outstanding_requests--;
+            absl::MutexLock l(&mu_);
+            partial_merge_map_.erase(id);
           }
-
-      } else {  //SubLargePartial
-
+          sets_to_merge_queue_->push(std::move(set));
+          outstanding_requests--;
+        }   
+      } else {
+        cout << "Response was not of any type!!!!\n";
+        exit(0);
       }
 
     } // end while
@@ -457,7 +455,6 @@ agd::Status Controller::Run(const Params& params,
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
-  std::vector<float> sizes;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
   while (outstanding_merges_ > 0) {
@@ -522,8 +519,8 @@ agd::Status Controller::Run(const Params& params,
       request_queue_->push(std::move(request));
       outstanding_requests++;
 
-    } else if(true) {
-      int threshold = 1000;
+    } else {
+      uint32_t threshold = 1000;
       //Based on number of sequences, split cluster sets
       outstanding_merges_--;
       PartialMergeItem item;
@@ -580,11 +577,11 @@ agd::Status Controller::Run(const Params& params,
           if(num_seqs > threshold)  {
             MarshalledRequest request;
             if(ci == pi+1)  {
-              request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);
+              request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);
               pi = ci;
               num_seqs = 0;
             } else {
-              request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
+              request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
               pi = ci-1;
               num_seqs = cluster2.NumSeqs();
             }
@@ -595,7 +592,7 @@ agd::Status Controller::Run(const Params& params,
           
         // form the request for the last chunk
         MarshalledRequest request;
-        request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
+        request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
         request_queue_->push(std::move(request));
         
         cluster_index++;
@@ -608,69 +605,6 @@ agd::Status Controller::Run(const Params& params,
              << static_cast<long int>(std::time(0)) << "\n";
       }
       
-    } else {
-      // either set is large enough, split the computation into multiple
-      // requests
-      // cout << "splitting merger of two large sets into partial mergers\n";
-      outstanding_merges_--;
-      PartialMergeItem item;
-      item.num_received = 0;
-      // use the outstanding merges as id
-      if (sets[0].NumClusters() < sets[1].NumClusters()) {
-        std::swap(sets[0], sets[1]);
-      }
-      // each work item does a partial merge of one cluster in sets[0] to
-      // all clusters in sets[1]
-      item.num_expected = sets[0].NumClusters();
-      item.partial_set.Init(sets[1]);
-
-      bool isLarge = false;
-      sizes.push_back(sets[1].TotalSize());
-      // add to params
-      if (sets[1].TotalSize() > params.max_set_size) {
-        isLarge = true;
-        // cout << "Its a large partial set. Id = " << outstanding_merges_ <<
-        // "\n";
-        item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
-                                             sets[1].buf.size());
-      }
-
-      {
-        absl::MutexLock l(&mu_);
-        // cout << "pushing id " << outstanding_merges_ << " to map\n";
-        partial_merge_map_.insert_or_assign(outstanding_merges_,
-                                            std::move(item));
-      }
-
-      MarshalledClusterView cluster;
-      // cout << "pushing id " << outstanding_merges_ << "\n";
-      uint32_t total_cluster = sets[0].NumClusters();
-      uint32_t cluster_index = 0;
-
-      while (sets[0].NextCluster(&cluster)) {
-        MarshalledRequest request;
-        if (isLarge) {
-          request.CreateLargePartialRequest(outstanding_merges_, cluster);
-        } else {
-          request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
-        }
-
-        //create a subLargePartialRequest
-        MarshalledRequest request_test;
-        request_test.CreateSubLargePartialRequest(outstanding_merges_, cluster, 
-         10, 15, cluster_index);
-        
-        request_queue_->push(std::move(request));
-        cluster_index++;
-      }
-      outstanding_requests++;
-      if (outstanding_merges_ == 1) {
-        cout << "last request sent, 1 merge left, time: "
-             << static_cast<long int>(std::time(0)) << "\n";
-      }
-      assert(cluster_index == total_cluster);
-      // set partial outstanding
-      // outstanding_partial_ = true;
     }
     // cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }
@@ -694,12 +628,6 @@ agd::Status Controller::Run(const Params& params,
   auto duration = t1 - t0;
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
   cout << "Clustering execution time: " << sec.count() << " seconds.\n";
-
-  std::ofstream set_sizes("size_stats.csv", std::ofstream::out);
-  for (auto v : sizes) {
-    set_sizes << v << std::endl;
-  }
-  set_sizes.close();
 
   std::ofstream timing_file("dist_timing.txt", std::ofstream::out);
   timing_file << sec.count() << "\n";

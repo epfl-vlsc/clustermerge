@@ -18,14 +18,18 @@ void free_func(void* data, void* hint) {
   delete[] reinterpret_cast<char*>(data);
 }
 
-void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
+void ClusterSet::BuildMarshalledResponse(int id, RequestType type, MarshalledResponse* response) {
   // calculate buffer size for a single alloc
-  size_t buf_size = sizeof(int) + sizeof(ClusterSetHeader);
+  size_t buf_size = sizeof(ResponseHeader) + sizeof(ClusterSetHeader);
   for (const auto& c : clusters_) {
     buf_size += sizeof(ClusterHeader) + c.Sequences().size() * sizeof(int);
   }
   agd::Buffer buf(buf_size);
-  buf.AppendBuffer(reinterpret_cast<char*>(&id), sizeof(int));
+  
+  ResponseHeader rh;
+  rh.id = id;
+  rh.type = type;
+  buf.AppendBuffer(reinterpret_cast<char*>(&rh), sizeof(ResponseHeader));
 
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value
@@ -41,6 +45,49 @@ void ClusterSet::BuildMarshalledResponse(int id, MarshalledResponse* response) {
       uint32_t i = s.ID();
       buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
     }
+  }
+
+  char* data = buf.mutable_data() + sizeof(int);
+  ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
+  hp->num_clusters = clusters_.size();
+  // hand the buf pointer to the message
+  response->msg =
+      zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
+}
+
+// RequestType is implicit in the call
+void ClusterSet::BuildMarshalledResponse(int id, int start_index, 
+  int end_index, int cluster_index, MarshalledResponse* response) {
+    // calculate buffer size for a single alloc
+    size_t buf_size = sizeof(ResponseHeader) + 3*sizeof(int) + sizeof(ClusterSetHeader);
+    for (const auto& c : clusters_) {
+      buf_size += sizeof(ClusterHeader) + c.Sequences().size() * sizeof(int);
+    }
+    agd::Buffer buf(buf_size);
+    ResponseHeader rh;
+    rh.id = id;
+    rh.type = RequestType::SubLargePartial;
+
+    // buf contains response header - three integers - cluster set
+    buf.AppendBuffer(reinterpret_cast<char*>(&rh), sizeof(ResponseHeader));
+    buf.AppendBuffer(reinterpret_cast<char*>(&start_index), sizeof(int));
+    buf.AppendBuffer(reinterpret_cast<char*>(&end_index), sizeof(int));
+    buf.AppendBuffer(reinterpret_cast<char*>(&cluster_index), sizeof(int));
+
+    ClusterSetHeader h;
+    h.num_clusters = 0;  // set after once we know the value
+    buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
+
+    for (const auto& c : clusters_) {
+      // keep the fully merged for controller to remove
+      ClusterHeader ch;
+      ch.fully_merged = c.IsFullyMerged();
+      ch.num_seqs = c.Sequences().size();
+      buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
+      for (const auto& s : c.Sequences()) {
+        uint32_t i = s.ID();
+        buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
+      }
   }
 
   char* data = buf.mutable_data() + sizeof(int);

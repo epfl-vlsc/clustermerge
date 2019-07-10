@@ -355,7 +355,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         // final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
-        final_set.BuildMarshalledResponse(request.ID(), &response);
+        final_set.BuildMarshalledResponse(request.ID(), request.Type(), &response);
         MarshalledClusterSetView view;
         view = response.Set();
         // cout << "final set has " << view.NumClusters() << " clusters.\n";
@@ -393,7 +393,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
         MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        new_cs.BuildMarshalledResponse(request.ID(), request.Type(), &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
@@ -442,7 +442,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
         MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        new_cs.BuildMarshalledResponse(request.ID(), request.Type(), &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
@@ -492,7 +492,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         
         //this stuff needs some change, we need to a way to know what response it is
         MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        new_cs.BuildMarshalledResponse(request.ID(), start_index, end_index, cluster_index, &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 

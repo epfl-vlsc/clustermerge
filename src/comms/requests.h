@@ -2,6 +2,8 @@
 
 #include "src/agd/buffer.h"
 #include "zmq.hpp"
+#include <iostream>
+#include <tuple>
 
 enum RequestType { Batch = 0, Partial, LargePartial, SubLargePartial };
 
@@ -25,6 +27,11 @@ struct __attribute__((packed)) ClusterSetHeader {
 struct __attribute__((packed)) ClusterHeader {
   char fully_merged;
   uint32_t num_seqs;
+};
+
+struct __attribute__((packed)) ResponseHeader {
+  int id;
+  RequestType type;
 };
 
 struct MarshalledClusterView {
@@ -116,10 +123,39 @@ struct MarshalledResponse {
   MarshalledResponse() = default;
   MarshalledResponse(MarshalledResponse&&) = default;
   MarshalledResponse& operator=(MarshalledResponse&&) = default;
-  int ID() { return *reinterpret_cast<int*>(msg.data()); }
+  int ID() { 
+    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+    return rh->id;
+  }
+  RequestType Type()  {
+    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+    return rh->type;
+  }
+
   MarshalledClusterSetView Set() {
-    const char* data = reinterpret_cast<const char*>(msg.data()) + sizeof(int);
+    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+    const char* data;
+    if(rh->type == RequestType::SubLargePartial)  {
+      data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader) + 3*sizeof(int);
+    } else {
+      data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader);
+    }
     return MarshalledClusterSetView(data);
+  }
+  
+  std::tuple<int, int, int> Indexes() {
+    std::tuple<int, int, int> indexes;
+    if(this->Type() != RequestType::SubLargePartial)  {
+      std::cout << "Function called on incorrect reponse type.\n";
+      exit(0);
+    }  else {
+      const char* data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader);
+      int start_index = *reinterpret_cast<const int*>(data);
+      int end_index = *reinterpret_cast<const int*>(data + sizeof(int));
+      int cluster_index = *reinterpret_cast<const int*>(data + 2*sizeof(int));
+      indexes = {start_index, end_index, cluster_index};
+    }
+    return indexes;
   }
 };
 
@@ -142,12 +178,13 @@ struct MarshalledClusterSet {
     buf.AppendBuffer(reinterpret_cast<char*>(&idx), sizeof(uint32_t));
   }
 
+  //only called for batch requests, assumes user has checked response type
   MarshalledClusterSet(MarshalledResponse& response)
       : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {
     // a response buffer is an int id and a marshalled clusterset
     char* data = reinterpret_cast<char*>(response.msg.data());
-    data += sizeof(uint32_t);
-    auto data_size = response.msg.size() - sizeof(uint32_t);
+    data += sizeof(ResponseHeader);
+    auto data_size = response.msg.size() - sizeof(ResponseHeader);
     // buf.reserve(data_size);
     buf.AppendBuffer(data, data_size);
   }

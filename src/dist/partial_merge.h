@@ -120,20 +120,18 @@ class IndexedCluster {
 class PartialMergeSet {
  public:
   PartialMergeSet& operator=(PartialMergeSet&& other) {
-    clusters_ = std::move(other.clusters_);
-    new_clusters_ = std::move(other.new_clusters_);
+    clusters_set1_ = std::move(clusters_set1_);
+    clusters_set2_ = std::move(clusters_set2_);
     return *this;
   };
-  void MergeClusterSet(MarshalledClusterSetView set);
+  void MergeClusterSet(MarshalledClusterSetView set, int start_index, int end_index, int cluster_index);
   // build final set, not including fully merged clusters
   void BuildMarshalledSet(MarshalledClusterSet* set);
-  void Init(MarshalledClusterSet& set);
+  void Init(MarshalledClusterSet& set1, MarshalledClusterSet& set2);
   // void RemoveFullyMerged();
-  const std::vector<IndexedCluster>& Clusters() const { return clusters_; }
+  const std::vector<IndexedCluster>& Clusters() const { return clusters_set2_; }
 
  private:
-  std::vector<IndexedCluster> clusters_;  // does not change after construction
-  std::vector<MarshalledCluster> new_clusters_;
-  // lock to add new clusters
-  absl::Mutex mu_;
+  std::vector<IndexedCluster> clusters_set1_;
+  std::vector<IndexedCluster> clusters_set2_;  // does not change after construction
 };

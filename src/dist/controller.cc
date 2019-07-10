@@ -350,64 +350,58 @@ agd::Status Controller::Run(const Params& params,
       }
 
       auto id = response.ID();
+      auto type = response.Type();
       // cout << "repsonse id is " << id << "\n";
       PartialMergeItem* partial_item;
 
-      {
-        absl::MutexLock l(&mu_);
-        auto partial_it = partial_merge_map_.find(id);
-        if (partial_it == partial_merge_map_.end()) {
-          if (id != -1) {
-            cout << "error thing in map was not -1, was " << id << "\n";
-            exit(0);
-          }
-          // cout << "pushing full result \n";
-          /*if (response.set().clusters_size() > params.dup_removal_thresh) {
-            RemoveDuplicates(*response.mutable_set());
-          }*/
-          MarshalledClusterSet new_set(response);
-
-          sets_to_merge_queue_->push(std::move(new_set));
-          outstanding_requests--;
-          continue;
-        } else {
-          // do assign
-          partial_item = &partial_it->second;
-        }
-      }
-
-      partial_item->partial_set.MergeClusterSet(response.Set());
-      // cout << "done\n";
-      // check if this was the last one
-      auto val = partial_item->num_received++;
-      if (partial_item->num_expected - 1 == val) {
-        // TODO are we sure that all other potential threads are finished
-        // merging their partials with this one?
-
-        // go through  and delete any fully merged clusters
-        // do this when constructing the new full set
-        // partial_item->partial_set.RemoveFullyMerged();
-
-        MarshalledClusterSet set;
-        partial_item->partial_set.BuildMarshalledSet(&set);
-        /*if (set.clusters_size() >
-            params.dup_removal_thresh) {
-          RemoveDuplicates(set);
-        }*/
-        {
-          if (outstanding_merges_ == 1) {
-            cout << "last request complete, 1 merge left, time: "
-                 << static_cast<long int>(std::time(0)) << "\n";
-          }
-          absl::MutexLock l(&mu_);
-          partial_merge_map_.erase(id);
-        }
-        sets_to_merge_queue_->push(std::move(set));
+      if(type == RequestType::Batch) {
+        MarshalledClusterSet new_set(response);
+        sets_to_merge_queue_->push(std::move(new_set));
         outstanding_requests--;
-        // set partial not outstanding
-        // outstanding_partial_ = false;
+      } else if (type == RequestType::Partial || type == RequestType::LargePartial)  {
+          {
+            absl::MutexLock l(&mu_);
+            auto partial_it = partial_merge_map_.find(id);
+            if (partial_it == partial_merge_map_.end()) {
+              cout << "error thing in map was not -1, was " << id << "\n";
+              exit(0);
+            }  
+            partial_item = &partial_it->second;
+          }
+
+          // update the state
+          partial_item->partial_set.MergeClusterSet(response.Set());
+          auto val = partial_item->num_received++;
+          
+          // check if all requests have been received
+          if (partial_item->num_expected - 1 == val) {
+            // TODO are we sure that all other potential threads are finished
+            // merging their partials with this one?
+
+            // go through  and delete any fully merged clusters
+            // do this when constructing the new full set
+            // partial_item->partial_set.RemoveFullyMerged();
+
+            MarshalledClusterSet set;
+            partial_item->partial_set.BuildMarshalledSet(&set);
+            
+            {
+              if (outstanding_merges_ == 1) {
+                cout << "last request complete, 1 merge left, time: "
+                    << static_cast<long int>(std::time(0)) << "\n";
+              }
+              absl::MutexLock l(&mu_);
+              partial_merge_map_.erase(id);
+            }
+            sets_to_merge_queue_->push(std::move(set));
+            outstanding_requests--;
+          }
+
+      } else {  //SubLargePartial
+
       }
-    }
+
+    } // end while
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -528,6 +522,92 @@ agd::Status Controller::Run(const Params& params,
       request_queue_->push(std::move(request));
       outstanding_requests++;
 
+    } else if(true) {
+      int threshold = 1000;
+      //Based on number of sequences, split cluster sets
+      outstanding_merges_--;
+      PartialMergeItem item;
+      item.num_received = 0;
+
+      if(sets[0].NumClusters() < sets[1].NumClusters()) {
+        std::swap(sets[0], sets[1]);  
+      }
+
+      //iterate through the second cluster set to determine num_expected
+      MarshalledClusterView cluster;
+      
+      uint32_t num_chunks = 0, num_seqs = 0;
+      uint32_t pi = -1, ci = 0; //ci: current index, pi: previous index
+      sets[1].Reset();
+      while(sets[1].NextCluster(&cluster)) {
+        num_seqs += cluster.NumSeqs();
+        if(num_seqs > threshold)  {
+          if(ci == pi+1)  {
+            pi = ci;
+            num_seqs = 0;
+          } else {
+            pi = ci-1;
+            num_seqs = cluster.NumSeqs();
+          }
+          num_chunks++;
+        } 
+        ci++;    
+      }
+      num_chunks += 1;
+      
+      item.num_expected = num_chunks * sets[0].NumClusters();
+      item.partial_set.Init(sets[0], sets[1]);
+
+      item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
+
+      {
+        absl::MutexLock l(&mu_);
+        partial_merge_map_.insert_or_assign(outstanding_merges_, std::move(item));
+      }
+
+      uint32_t total_cluster = sets[0].NumClusters();
+      uint32_t cluster_index = 0; 
+      
+      sets[0].Reset();
+      while(sets[0].NextCluster(&cluster))  {
+        MarshalledClusterView cluster2;
+        
+        sets[1].Reset();
+        num_seqs = 0;
+        pi = -1, ci = 0; //ci: current index, pi: previous index
+        while(sets[1].NextCluster(&cluster2)) {
+          num_seqs += cluster2.NumSeqs();
+          if(num_seqs > threshold)  {
+            MarshalledRequest request;
+            if(ci == pi+1)  {
+              request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);
+              pi = ci;
+              num_seqs = 0;
+            } else {
+              request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
+              pi = ci-1;
+              num_seqs = cluster2.NumSeqs();
+            }
+            request_queue_->push(std::move(request));
+          } 
+          ci++;    
+        }
+          
+        // form the request for the last chunk
+        MarshalledRequest request;
+        request.CreateSubPartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
+        request_queue_->push(std::move(request));
+        
+        cluster_index++;
+      }
+      assert(cluster_index == total_cluster);
+      
+      outstanding_requests++;
+      if (outstanding_merges_ == 1) {
+        cout << "last request sent, 1 merge left, time: "
+             << static_cast<long int>(std::time(0)) << "\n";
+      }
+      
     } else {
       // either set is large enough, split the computation into multiple
       // requests
@@ -581,7 +661,6 @@ agd::Status Controller::Run(const Params& params,
          10, 15, cluster_index);
         
         request_queue_->push(std::move(request));
-        request_queue_->push(std::move(request_test));
         cluster_index++;
       }
       outstanding_requests++;

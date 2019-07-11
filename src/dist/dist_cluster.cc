@@ -162,7 +162,7 @@ int main(int argc, char* argv[]) {
 
   uint32_t nseqs_threshold = 100000;
   if (nseqs_threshold_arg)  {
-    nseqs_threshold = nseqs_threshold_arg;
+    nseqs_threshold = args::get(nseqs_threshold_arg);
   }
 
   json server_config_json;

@@ -44,7 +44,7 @@ agd::Status Controller::Run(const Params& params,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   checkpoint_timer_ = timestamp();
   std::atomic_int_fast32_t outstanding_requests{0};
-
+  cout << "Num seqs threshold: " << params.nseqs_threshold << "\n";
   // index all sequences
   agd::Status s = Status::OK();
   const char* data;

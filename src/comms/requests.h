@@ -153,7 +153,7 @@ struct MarshalledResponse {
       int start_index = *reinterpret_cast<const int*>(data);
       int end_index = *reinterpret_cast<const int*>(data + sizeof(int));
       int cluster_index = *reinterpret_cast<const int*>(data + 2*sizeof(int));
-      indexes = {start_index, end_index, cluster_index};
+      indexes = std::make_tuple(start_index, end_index, cluster_index);
     }
     return indexes;
   }

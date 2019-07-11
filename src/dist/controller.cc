@@ -524,7 +524,7 @@ agd::Status Controller::Run(const Params& params,
       outstanding_requests++;
 
     } else {
-      uint32_t threshold = 1000;
+      //uint32_t threshold = 5000;
       //Based on number of sequences, split cluster sets
       outstanding_merges_--;
       PartialMergeItem item;
@@ -542,7 +542,7 @@ agd::Status Controller::Run(const Params& params,
       sets[1].Reset();
       while(sets[1].NextCluster(&cluster)) {
         num_seqs += cluster.NumSeqs();
-        if(num_seqs > threshold)  {
+        if(num_seqs > params.nseqs_threshold)  {
           if(ci == pi+1)  {
             pi = ci;
             num_seqs = 0;
@@ -579,7 +579,7 @@ agd::Status Controller::Run(const Params& params,
         pi = -1, ci = 0; //ci: current index, pi: previous index
         while(sets[1].NextCluster(&cluster2)) {
           num_seqs += cluster2.NumSeqs();
-          if(num_seqs > threshold)  {
+          if(num_seqs > params.nseqs_threshold)  {
             MarshalledRequest request;
             if(ci == pi+1)  {
               request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);

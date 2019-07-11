@@ -120,8 +120,8 @@ class IndexedCluster {
 class PartialMergeSet {
  public:
   PartialMergeSet& operator=(PartialMergeSet&& other) {
-    clusters_set1_ = std::move(clusters_set1_);
-    clusters_set2_ = std::move(clusters_set2_);
+    clusters_set1_ = std::move(other.clusters_set1_);
+    clusters_set2_ = std::move(other.clusters_set2_);
     return *this;
   };
   void MergeClusterSet(MarshalledClusterSetView set, int start_index, int end_index, int cluster_index);

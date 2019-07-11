@@ -3,6 +3,8 @@
 
 void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set2) {
   MarshalledClusterView cluster;
+  set1.Reset();
+  set2.Reset();
   while (set1.NextCluster(&cluster)) {
     IndexedCluster ic(cluster);
     clusters_set1_.push_back(std::move(ic));
@@ -11,6 +13,7 @@ void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set
     IndexedCluster ic(cluster);
     clusters_set2_.push_back(std::move(ic));
   }
+  //std::cout << "Set sizes: " << clusters_set1_.size() << " " << clusters_set2_.size() << '\n';
 }
 
 void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
@@ -88,6 +91,7 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
 
 void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_index, 
   int end_index, int cluster_index) {
+  //std::cout << "Merging cluster set " << clusters_set2_.size() << "\n";
   MarshalledClusterView cluster;
   uint32_t clusters_in_chunk = end_index - start_index + 1;
   assert(set.NumClusters() >= clusters_in_chunk);
@@ -103,8 +107,11 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_in
     if (cluster.IsFullyMerged()) {
       clusters_set2_[i].SetFullyMerged();
     } else {
+      //std::cout << "Running for loop " << cluster.NumSeqs() << "\n";
       // cluster has only diffs, push them directly
       for (uint32_t x = 0; x < cluster.NumSeqs(); x++) {
+        //std::cout << "For loop: " <<  x  << " " << cluster.NumSeqs() << "\n";
+        //std::cout << x << " " << cluster.SeqIndex(x) << "\n";
         clusters_set2_[i].Insert(cluster.SeqIndex(x));
       }
     }

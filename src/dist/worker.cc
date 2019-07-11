@@ -298,7 +298,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         MarshalledClusterSetView set(buf.data());
         std::vector<size_t> offsets;
         set.Offsets(offsets);
-        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets  = {std::move(buf), offsets};
+        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets  = {std::move(buf), std::move(offsets)};
 
         mu_.Lock();
         set_map_[id] = std::move(set_and_offsets);
@@ -369,7 +369,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         id = request.ID();
         MarshalledClusterView cluster;
         request.IndexesAndCluster(&start_index, &end_index, &cluster_index, &cluster);
-        
+        //cout << "Request " << id << " " << start_index << " " << end_index << " " << cluster_index << "\n";
         // search in map
         mu_.Lock();
         auto it = set_map_.find(id);

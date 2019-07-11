@@ -47,7 +47,7 @@ void ClusterSet::BuildMarshalledResponse(int id, RequestType type, MarshalledRes
     }
   }
 
-  char* data = buf.mutable_data() + sizeof(int);
+  char* data = buf.mutable_data() + sizeof(ResponseHeader);
   ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
   hp->num_clusters = clusters_.size();
   // hand the buf pointer to the message
@@ -90,7 +90,7 @@ void ClusterSet::BuildMarshalledResponse(int id, int start_index,
       }
   }
 
-  char* data = buf.mutable_data() + sizeof(int);
+  char* data = buf.mutable_data() + sizeof(ResponseHeader) + 3*sizeof(int);
   ClusterSetHeader* hp = reinterpret_cast<ClusterSetHeader*>(data);
   hp->num_clusters = clusters_.size();
   // hand the buf pointer to the message

@@ -108,7 +108,7 @@ struct MarshalledClusterSetView {
     }
   } 
 
-  // relies on user to make sure offset is correct (within bounds)
+  // no check on offset, assumed correct
   bool ClusterAtOffset(MarshalledClusterView* cluster, size_t offset) {
     const char* cluster_ptr = data + offset;
     *cluster = MarshalledClusterView(cluster_ptr);
@@ -182,7 +182,7 @@ struct MarshalledClusterSet {
   MarshalledClusterSet(MarshalledResponse& response)
       : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {
     // a response buffer is an int id and a marshalled clusterset
-    char* data = reinterpret_cast<char*>(response.msg.data());
+    const char* data = reinterpret_cast<const char*>(response.msg.data());
     data += sizeof(ResponseHeader);
     auto data_size = response.msg.size() - sizeof(ResponseHeader);
     // buf.reserve(data_size);

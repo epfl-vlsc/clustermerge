@@ -276,7 +276,7 @@ agd::Status Controller::Run(const Params& params,
         if (!success) {
           cout << "Thread failed to send cluster set over zmq!\n";
         }
-        //cout << "Set sent with id: [" << id << "] \n";
+        cout << "Set sent with id: [" << id << "] \n";
       }
     }
   });
@@ -351,7 +351,6 @@ agd::Status Controller::Run(const Params& params,
 
       auto id = response.ID();
       auto type = response.Type();
-      // cout << "repsonse id is " << id << "\n";
       PartialMergeItem* partial_item;
 
       if(type == RequestType::Batch) {
@@ -360,6 +359,7 @@ agd::Status Controller::Run(const Params& params,
         outstanding_requests--;
       
       } else if(type == RequestType::SubLargePartial) {  
+        
         {
           absl::MutexLock l(&mu_);
           auto partial_it = partial_merge_map_.find(id);
@@ -374,6 +374,9 @@ agd::Status Controller::Run(const Params& params,
         int start_index = std::get<0>(indexes);
         int end_index = std::get<1>(indexes);
         int cluster_index = std::get<2>(indexes);
+        
+        //cout << "Response " << id << " " << start_index << " " << end_index << " " << cluster_index << "\n";
+        
         partial_item->partial_set.MergeClusterSet(response.Set(), start_index, end_index, cluster_index);
         auto val = partial_item->num_received++;
 
@@ -516,6 +519,7 @@ agd::Status Controller::Run(const Params& params,
         request.AddSetToBatch(sets[0]);
         outstanding_merges_--;
       }
+      //cout << "Sending a batch request -1\n";
       request_queue_->push(std::move(request));
       outstanding_requests++;
 
@@ -553,6 +557,7 @@ agd::Status Controller::Run(const Params& params,
       num_chunks += 1;
       
       item.num_expected = num_chunks * sets[0].NumClusters();
+      // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
 
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
@@ -585,6 +590,7 @@ agd::Status Controller::Run(const Params& params,
               pi = ci-1;
               num_seqs = cluster2.NumSeqs();
             }
+            //cout << "Sending a SubLargePartialRequest " << id << " " << cluster_index << "\n";
             request_queue_->push(std::move(request));
           } 
           ci++;    

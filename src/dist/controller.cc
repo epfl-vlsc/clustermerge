@@ -575,6 +575,7 @@ agd::Status Controller::Run(const Params& params,
       num_chunks += 1;
       
       item.num_expected = num_chunks * sets[0].NumClusters();
+      std::cout << "Num expected: " << item.num_expected << " " << " set1 clusters: " << sets[0].NumClusters() << "\n";
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());

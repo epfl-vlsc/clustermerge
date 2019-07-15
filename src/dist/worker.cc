@@ -472,15 +472,15 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   queue_measure_thread_ = std::thread([this](){
       // get timestamp, queue size
       //cout << "queue measure thread starting ...\n";
-      while(worker_signal_) {
+      while(!worker_signal_) {
         time_t result = std::time(nullptr);
         //timestamps_.push_back(static_cast<long int>(result));
         //queue_sizes_.push_back(work_queue_->size());
         cout << static_cast<long int>(result) << ": " << work_queue_->size() << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if (queue_sizes_.size() >= 1000000) {
-          break;  // dont run forever ...
-        }
+        // if (queue_sizes_.size() >= 1000000) {
+        //  break;  // dont run forever ...
+        // }
       }
       cout << "queue measure thread finished\n";
     }

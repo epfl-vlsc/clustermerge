@@ -466,24 +466,28 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Incomplete request queue thread ending.\n";
   });
 
-  /*timestamps_.reserve(100000);
-  queue_sizes_.reserve(100000);*/
+  // timestamps_.reserve(100000);
+  // queue_sizes_.reserve(100000);
 
-  // queue_measure_thread_ = std::thread([this](){
-  //     // get timestamp, queue size
-  //     //cout << "queue measure thread starting ...\n";
-  //     while(run_) {
-  //       time_t result = std::time(nullptr);
-  //       timestamps_.push_back(static_cast<long int>(result));
-  //       queue_sizes_.push_back(work_queue_->size());
-  //       std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  //       if (queue_sizes_.size() >= 1000000) {
-  //         break;  // dont run forever ...
-  //       }
-  //     }
-  //     cout << "queue measure thread finished\n";
-  //   }
-  // );
+  queue_measure_thread_ = std::thread([this](){
+      // get timestamp, queue size
+      //cout << "queue measure thread starting ...\n";
+      std::ofstream outfile;
+      outfile.open("queue_sizes.csv", std::ios::out);
+      while(worker_signal_) {
+        time_t result = std::time(nullptr);
+        //timestamps_.push_back(static_cast<long int>(result));
+        //queue_sizes_.push_back(work_queue_->size());
+        outfile << static_cast<long int>(result) << "," << work_queue_->size() << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        if (queue_sizes_.size() >= 1000000) {
+          break;  // dont run forever ...
+        }
+      }
+      outfile.close();
+      cout << "queue measure thread finished\n";
+    }
+  );
 
   while (!(*signal_num)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));

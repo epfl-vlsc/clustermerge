@@ -13,7 +13,6 @@ void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set
     IndexedCluster ic(cluster);
     clusters_set2_.push_back(std::move(ic));
   }
-  //std::cout << "Set sizes: " << clusters_set1_.size() << " " << clusters_set2_.size() << '\n';
 }
 
 void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {

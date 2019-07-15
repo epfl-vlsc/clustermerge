@@ -74,7 +74,7 @@ class Controller {
 
   // thread to send partial merge sets
   std::thread set_request_thread_;
-
+  
   std::vector<Sequence> sequences_;  // abs indexable sequences
 
   long int checkpoint_timer_;

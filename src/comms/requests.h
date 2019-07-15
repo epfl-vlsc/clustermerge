@@ -277,6 +277,7 @@ struct MarshalledRequest {
     PartialRequestHeader h;
     h.id = id;
     h.type = RequestType::SubLargePartial;
+    buf.reserve(sizeof(PartialRequestHeader) + sizeof(int)*3 + cluster.TotalSize());
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
     buf.AppendBuffer(reinterpret_cast<char*>(&start_index), sizeof(int));
     buf.AppendBuffer(reinterpret_cast<char*>(&end_index), sizeof(int));

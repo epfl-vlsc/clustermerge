@@ -355,6 +355,7 @@ agd::Status Controller::Run(const Params& params,
 
       if(type == RequestType::Batch) {
         MarshalledClusterSet new_set(response);
+        //new_set.SortSet();
         sets_to_merge_queue_->push(std::move(new_set));
         outstanding_requests--;
       
@@ -385,7 +386,7 @@ agd::Status Controller::Run(const Params& params,
           
           MarshalledClusterSet set;
           partial_item->partial_set.BuildMarshalledSet(&set);
-          
+          //set.SortSet();
           {
             if (outstanding_merges_ == 1) {
               cout << "last request complete, 1 merge left, time: "
@@ -557,6 +558,7 @@ agd::Status Controller::Run(const Params& params,
       num_chunks += 1;
       
       item.num_expected = num_chunks * sets[0].NumClusters();
+      cout << "Num expected: " << item.num_expected << " " << "Set2 size: " << sets[0].NumClusters() << "\n"; 
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
 
@@ -570,6 +572,17 @@ agd::Status Controller::Run(const Params& params,
       uint32_t total_cluster = sets[0].NumClusters();
       uint32_t cluster_index = 0; 
       
+      if(outstanding_merges_ == 0)  {
+        sets[1].Reset();
+        MarshalledClusterView cluster1;
+        std::ofstream outfile;
+        outfile.open("num_seqs.csv", std::ios::out);
+        while(sets[1].NextCluster(&cluster1)) {
+          outfile << cluster1.NumSeqs() << "\n";
+        }
+        outfile.close();
+      }
+
       sets[0].Reset();
       while(sets[0].NextCluster(&cluster))  {
         MarshalledClusterView cluster2;

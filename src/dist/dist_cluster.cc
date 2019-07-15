@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
     dup_removal_threshold = args::get(dup_removal_threshold_arg);
   }
 
-  uint32_t nseqs_threshold = 100000;
+  uint32_t nseqs_threshold = UINT_MAX;
   if (nseqs_threshold_arg)  {
     nseqs_threshold = args::get(nseqs_threshold_arg);
   }

@@ -180,13 +180,45 @@ struct MarshalledClusterSet {
 
   //only called for batch requests, assumes user has checked response type
   MarshalledClusterSet(MarshalledResponse& response)
-      : buf(agd::Buffer(response.msg.size() - sizeof(uint32_t), 128)) {
+      : buf(agd::Buffer(response.msg.size() - sizeof(ResponseHeader), 128)) {
     // a response buffer is an int id and a marshalled clusterset
     const char* data = reinterpret_cast<const char*>(response.msg.data());
     data += sizeof(ResponseHeader);
     auto data_size = response.msg.size() - sizeof(ResponseHeader);
     // buf.reserve(data_size);
     buf.AppendBuffer(data, data_size);
+  }
+
+  void SortSet()  {
+    std::vector<std::pair<uint32_t, size_t>> clusters;
+    uint32_t num_clusters = 0, total_clusters = NumClusters();
+    size_t offset = sizeof(ClusterSetHeader);
+    const char* cur_cluster_ptr = buf.data() + offset;
+    
+    while(num_clusters < total_clusters) {
+      uint32_t cluster_size = 
+        reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
+      clusters.push_back({cluster_size, offset});
+      offset += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;
+      cur_cluster_ptr = buf.data() + offset;
+      num_clusters++;  
+    }
+
+    std::sort(clusters.begin(), clusters.end(), 
+      [](std::pair<uint32_t, size_t> p1, std::pair<uint32_t, size_t> p2) {
+        return p1.first >= p2.first;
+    });
+    
+    agd::Buffer new_buf(buf.size());
+    const char* data = buf.data();
+    new_buf.AppendBuffer(data, sizeof(ClusterSetHeader));
+    for(const auto& pr: clusters)  {
+      data = buf.data() + pr.second;
+      new_buf.AppendBuffer(data, sizeof(ClusterHeader) + pr.first * sizeof(uint32_t));  
+    }
+    assert(new_buf.size() == buf.size());
+    buf = std::move(new_buf);
+    Reset();  
   }
 
   uint32_t NumClusters() const {

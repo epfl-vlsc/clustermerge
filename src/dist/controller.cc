@@ -411,6 +411,24 @@ agd::Status Controller::Run(const Params& params,
     worker_threads_.push_back(std::thread(worker_func));
   }
 
+  queue_measure_thread_ = std::thread([this](){
+      // get timestamp, queue size
+      //cout << "queue measure thread starting ...\n";
+      while(run_) {
+        time_t result = std::time(nullptr);
+        //timestamps_.push_back(static_cast<long int>(result));
+        //queue_sizes_.push_back(work_queue_->size());
+        cout << static_cast<long int>(result) << ": " << response_queue->size() << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // if (queue_sizes_.size() >= 1000000) {
+        //  break;  // dont run forever ...
+        // }
+      }
+      cout << "queue measure thread finished\n";
+    }
+  );
+
+
   cout << "loading to marshalled sets\n";
   // dump all sequences in single cluster sets into the queue
   // for now assumes all of this will fit in memory

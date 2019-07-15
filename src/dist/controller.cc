@@ -235,22 +235,22 @@ agd::Status Controller::Run(const Params& params,
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
 
-  std::thread queue_measure_thread = std::thread([this](){
-      // get timestamp, queue size
-      //cout << "queue measure thread starting ...\n";
-      while(run_) {
-        time_t result = std::time(nullptr);
-        //timestamps_.push_back(static_cast<long int>(result));
-        //queue_sizes_.push_back(work_queue_->size());
-        std::cout << static_cast<long int>(result) << ": " << response_queue_->size() << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        // if (queue_sizes_.size() >= 1000000) {
-        //  break;  // dont run forever ...
-        // }
-      }
-      cout << "queue measure thread finished\n";
-    }
-  );
+  // std::thread queue_measure_thread = std::thread([this](){
+  //     // get timestamp, queue size
+  //     //cout << "queue measure thread starting ...\n";
+  //     while(run_) {
+  //       time_t result = std::time(nullptr);
+  //       //timestamps_.push_back(static_cast<long int>(result));
+  //       //queue_sizes_.push_back(work_queue_->size());
+  //       std::cout << static_cast<long int>(result) << ": " << response_queue_->size() << std::endl;
+  //       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  //       // if (queue_sizes_.size() >= 1000000) {
+  //       //  break;  // dont run forever ...
+  //       // }
+  //     }
+  //     cout << "queue measure thread finished\n";
+  //   }
+  // );
 
   set_request_thread_ = thread([this]() {
     // receive requests from worker and send them cluster sets
@@ -575,10 +575,8 @@ agd::Status Controller::Run(const Params& params,
       num_chunks += 1;
       
       item.num_expected = num_chunks * sets[0].NumClusters();
-      cout << "Num expected: " << item.num_expected << " " << "Set2 size: " << sets[0].NumClusters() << "\n"; 
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
-
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
 
       {
@@ -588,17 +586,6 @@ agd::Status Controller::Run(const Params& params,
 
       uint32_t total_cluster = sets[0].NumClusters();
       uint32_t cluster_index = 0; 
-      
-      if(outstanding_merges_ == 0)  {
-        sets[1].Reset();
-        MarshalledClusterView cluster1;
-        std::ofstream outfile;
-        outfile.open("num_seqs.csv", std::ios::out);
-        while(sets[1].NextCluster(&cluster1)) {
-          outfile << cluster1.NumSeqs() << "\n";
-        }
-        outfile.close();
-      }
 
       sets[0].Reset();
       while(sets[0].NextCluster(&cluster))  {

@@ -9,6 +9,7 @@
 #include "src/common/sequence.h"
 #include "src/comms/requests.h"
 #include "src/dataset/dataset.h"
+#include "absl/container/node_hash_map.h"
 #include "zmq.hpp"
 
 // interface to manage local worker
@@ -66,7 +67,7 @@ class Worker {
   bool irqt_signal_ = false;
 
   // cache for partial merge sets, buf is the buf of MarshalledClusterSet
-  std::unordered_map<int, std::pair<agd::Buffer, std::vector<size_t>>> set_map_;
+  absl::node_hash_map<int, std::pair<agd::Buffer, std::vector<size_t>>> set_map_;
   absl::Mutex mu_;  // for locking set_map_
 
   // queue to hold set requests

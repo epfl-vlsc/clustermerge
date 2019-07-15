@@ -301,7 +301,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets  = {std::move(buf), std::move(offsets)};
 
         mu_.Lock();
-        set_map_[id] = std::move(set_and_offsets);
+        set_map_.insert_or_assign(id, std::move(set_and_offsets));
         mu_.Unlock();
         cout << "Fetched set: [" << id << "]\n";
       } else {
@@ -386,10 +386,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
           assert(it != set_map_.end());
           // cout << "Worker thread --> [" << id << "] Received set.\n";
         }
-
+        mu_.Unlock();
+        
         MarshalledClusterSetView set(it->second.first.data());
         ClusterSet cs(set, it->second.second, start_index, end_index, sequences_);
-        mu_.Unlock();
+        
 
         Cluster c(cluster, sequences_);
 
@@ -466,8 +467,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Incomplete request queue thread ending.\n";
   });
 
-  // timestamps_.reserve(100000);
-  // queue_sizes_.reserve(100000);
+  /* timestamps_.reserve(100000);
+  queue_sizes_.reserve(100000);
 
   queue_measure_thread_ = std::thread([this](){
       // get timestamp, queue size
@@ -484,7 +485,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
       cout << "queue measure thread finished\n";
     }
-  );
+  ); */ 
 
   while (!(*signal_num)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));

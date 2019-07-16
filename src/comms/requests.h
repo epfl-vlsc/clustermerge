@@ -204,10 +204,12 @@ struct MarshalledClusterSet {
       num_clusters++;  
     }
 
-    std::sort(clusters.begin(), clusters.end(), 
-      [](std::pair<uint32_t, size_t> p1, std::pair<uint32_t, size_t> p2) {
-        return p1.first >= p2.first;
-    });
+    // std::sort(clusters.begin(), clusters.end(), 
+    //   [](const std::pair<uint32_t, size_t>& p1, const std::pair<uint32_t, size_t>& p2) {
+    //     return p1.first >= p2.first;
+    // });
+
+    std::sort(clusters.begin(), clusters.end(), std::greater<std::pair<uint32_t, size_t>>());
     
     agd::Buffer new_buf(buf.size());
     const char* data = buf.data();

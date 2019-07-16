@@ -403,7 +403,7 @@ agd::Status Controller::Run(const Params& params,
           
           MarshalledClusterSet set;
           partial_item->partial_set.BuildMarshalledSet(&set);
-          //set.SortSet();
+          set.SortSet();
           {
             if (outstanding_merges_ == 1) {
               cout << "last request complete, 1 merge left, time: "

@@ -553,28 +553,35 @@ agd::Status Controller::Run(const Params& params,
       }
 
       //iterate through the second cluster set to determine num_expected
-      MarshalledClusterView cluster;
+      MarshalledClusterView cluster, cluster2;
       
       uint32_t num_chunks = 0, num_seqs = 0;
       uint32_t pi = -1, ci = 0; //ci: current index, pi: previous index
-      sets[1].Reset();
-      while(sets[1].NextCluster(&cluster)) {
-        num_seqs += cluster.NumSeqs();
-        if(num_seqs > params.nseqs_threshold)  {
-          if(ci == pi+1)  {
-            pi = ci;
-            num_seqs = 0;
-          } else {
-            pi = ci-1;
-            num_seqs = cluster.NumSeqs();
-          }
-          num_chunks++;
-        } 
-        ci++;    
+      sets[1].Reset();  sets[0].Reset();
+
+      while(sets[0].NextCluster(&cluster2)) {
+        
+        sets[1].Reset();
+        num_seqs = 0;
+        pi = -1, ci = 0; //ci: current index, pi: previous index
+        while(sets[1].NextCluster(&cluster)) {
+          num_seqs += cluster.NumSeqs();
+          if(num_seqs > params.nseqs_threshold - cluster2.NumSeqs())  {
+            if(ci == pi+1)  {
+              pi = ci;
+              num_seqs = 0;
+            } else {
+              pi = ci-1;
+              num_seqs = cluster.NumSeqs();
+            }
+            num_chunks++;
+          } 
+          ci++;    
+        }
+        num_chunks += 1;
       }
-      num_chunks += 1;
       
-      item.num_expected = num_chunks * sets[0].NumClusters();
+      item.num_expected = num_chunks;
       std::cout << "Num expected: " << item.num_expected << " " << " set1 clusters: " << sets[0].NumClusters() << "\n";
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
@@ -590,14 +597,14 @@ agd::Status Controller::Run(const Params& params,
 
       sets[0].Reset();
       while(sets[0].NextCluster(&cluster))  {
-        MarshalledClusterView cluster2;
+        //MarshalledClusterView cluster2;
         
         sets[1].Reset();
         num_seqs = 0;
         pi = -1, ci = 0; //ci: current index, pi: previous index
         while(sets[1].NextCluster(&cluster2)) {
           num_seqs += cluster2.NumSeqs();
-          if(num_seqs > params.nseqs_threshold)  {
+          if(num_seqs > params.nseqs_threshold - cluster.NumSeqs())  {
             MarshalledRequest request;
             if(ci == pi+1)  {
               request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);

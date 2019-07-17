@@ -152,7 +152,7 @@ agd::Status Controller::Run(const Params& params,
 
   // waits for timeout time and then returns with EAGAIN
   zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
-  val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
+  int val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
   cout << "recv timeout set to " << val << " ms \n";
 
   try {

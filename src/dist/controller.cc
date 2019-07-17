@@ -146,9 +146,9 @@ agd::Status Controller::Run(const Params& params,
 
   // zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
   // TODO make sendhwm a param
-  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
-  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  cout << "snd hwm value is " << val << " \n";
+  // zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
+  // int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  // cout << "snd hwm value is " << val << " \n";
 
   // waits for timeout time and then returns with EAGAIN
   zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);

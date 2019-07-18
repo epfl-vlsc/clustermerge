@@ -16,10 +16,25 @@ void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set
 }
 
 void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
+
+  size_t buf_size = sizeof(ClusterSetHeader);
+  for (const auto& c : clusters_set1_) {
+    if (c.IsFullyMerged()) {
+      continue;
+    }
+    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*c.SeqIndexes().size();
+  }
+  for (const auto& c : clusters_set2_) {
+    if (c.IsFullyMerged()) {
+      continue;
+    }
+    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*c.SeqIndexes().size();
+  }
+  
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value
   set->buf.reset();
-  set->buf.reserve(512);
+  set->buf.reserve(buf_size);
   set->buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(ClusterSetHeader));
 
   uint32_t total_not_merged = 0;

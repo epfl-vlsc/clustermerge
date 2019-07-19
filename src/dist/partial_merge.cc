@@ -22,13 +22,13 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     if (c.IsFullyMerged()) {
       continue;
     }
-    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*c.SeqIndexes().size();
+    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*(c.NumNewSeqs()+c.NumOrigSeqs());
   }
   for (const auto& c : clusters_set2_) {
     if (c.IsFullyMerged()) {
       continue;
     }
-    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*c.SeqIndexes().size();
+    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*(c.NumNewSeqs()+c.NumOrigSeqs());
   }
   
   ClusterSetHeader h;
@@ -47,26 +47,30 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     total_not_merged++;
 
     seq_set.clear();
-    for (auto s : c.SeqIndexes()) {
-      seq_set.insert(s);
-    }
-    c.AddNewSeqs(&seq_set);
+    c.AddNewSeqs(&seq_set); // create a hash set to remove duplicates
 
     ClusterHeader ch;
     ch.fully_merged = false;
-    ch.num_seqs = seq_set.size();
+    ch.num_seqs = c.NumOrigSeqs() + seq_set.size();
     set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     auto r = c.Representative();
     set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
-    // remove duplicates in new seqs using the set
     int i = 1;
+
+    for (auto s : c.SeqIndexes()) {
+      if (s != r) {
+        i++;
+        set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
+      }
+    }
+
     for (auto s : seq_set) {
       if (s != r) {
         i++;
         set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
       }
     }
-    assert(i == seq_set.size());
+    assert(i == c.NumOrigSeqs() + seq_set.size());
   }
 
   for (const auto& c : clusters_set2_) {
@@ -76,26 +80,30 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     total_not_merged++;
 
     seq_set.clear();
-    for (auto s : c.SeqIndexes()) {
-      seq_set.insert(s);
-    }
-    c.AddNewSeqs(&seq_set);
+    c.AddNewSeqs(&seq_set); // create a hash set to remove duplicates
 
     ClusterHeader ch;
     ch.fully_merged = false;
-    ch.num_seqs = seq_set.size();
+    ch.num_seqs = c.NumOrigSeqs() + seq_set.size();
     set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     auto r = c.Representative();
-    set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
-    // remove duplicates in new seqs using the set
+    set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t)); 
     int i = 1;
+
+    for (auto s : c.SeqIndexes()) {
+      if (s != r) {
+        i++;
+        set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
+      }
+    }
+
     for (auto s : seq_set) {
       if (s != r) {
         i++;
         set->buf.AppendBuffer(reinterpret_cast<char*>(&s), sizeof(uint32_t));
       }
     }
-    assert(i == seq_set.size());
+    assert(i == c.NumOrigSeqs() + seq_set.size());
   }
 
   char* data = set->buf.mutable_data();

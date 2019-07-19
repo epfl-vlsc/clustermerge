@@ -402,8 +402,16 @@ agd::Status Controller::Run(const Params& params,
         if (partial_item->num_expected - 1 == val) {
           
           MarshalledClusterSet set;
+          if (outstanding_merges_ == 0) {
+            cout << "building final marshalled set, time: "
+                << static_cast<long int>(std::time(0)) << "\n";
+          }
           partial_item->partial_set.BuildMarshalledSet(&set);
           set.SortSet();
+          if (outstanding_merges_ == 0) {
+            cout << "done, time: "
+                << static_cast<long int>(std::time(0)) << "\n";
+          }
           {
             if (outstanding_merges_ == 1) {
               cout << "last request complete, 1 merge left, time: "

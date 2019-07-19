@@ -9,7 +9,7 @@ namespace agd {
 class Buffer : public Data {
  private:
   std::unique_ptr<char[], std::default_delete<char[]>> buf_{nullptr};
-  std::size_t size_ = 0, allocation_ = 0, extend_extra_ = 0;
+  std::size_t size_ = 0, allocation_ = 0, extend_extra_ = 0, num_allocs_ = 0;
 
  public:
   ~Buffer() override = default;
@@ -50,5 +50,7 @@ class Buffer : public Data {
   virtual std::size_t size() const override;
   virtual char* mutable_data() override;
   std::size_t capacity() const;
+  // for diagnostics
+  std::size_t num_allocs() const;
 };
 }  // namespace agd

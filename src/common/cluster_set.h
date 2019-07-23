@@ -31,13 +31,15 @@ class ClusterSet {
   ClusterSet(MarshalledClusterSetView& marshalled_set,
              const std::vector<Sequence>& sequences);
 
-  ClusterSet(MarshalledClusterSetView& marshalled_set, std::vector<size_t>& set_offsets, 
-    int start_index, int end_index, const std::vector<Sequence>& sequences);
+  ClusterSet(MarshalledClusterSetView& marshalled_set,
+             const std::vector<size_t>& set_offsets, int start_index,
+             int end_index, const std::vector<Sequence>& sequences);
 
-  void BuildMarshalledResponse(int id, RequestType type, MarshalledResponse* response);
+  void BuildMarshalledResponse(int id, RequestType type,
+                               MarshalledResponse* response);
 
-  void BuildMarshalledResponse(int id, int start_index, int end_index, 
-    int cluster_index, MarshalledResponse* response);
+  void BuildMarshalledResponse(int id, int start_index, int end_index,
+                               int cluster_index, MarshalledResponse* response);
 
   // void ConstructProto(cmproto::ClusterSet* set_proto);
 
@@ -57,7 +59,7 @@ class ClusterSet {
   // merge two cluster sets by building a new one, in parallel (uses std::async)
   ClusterSet MergeClustersParallel(ClusterSet& other, MergeExecutor* executor);
 
-  //Add by akash
+  // Add by akash
   void AddCluster(Cluster& c) { clusters_.push_back(std::move(c)); }
 
   // merge `this` with `cluster`, called from parallel merge executor
@@ -70,7 +72,8 @@ class ClusterSet {
   void RemoveDuplicates();
 
   void DebugDump() const;
-  void DumpJson(const std::string& filename, std::vector <std::string>& dataset_file_names) const;
+  void DumpJson(const std::string& filename,
+                std::vector<std::string>& dataset_file_names) const;
 
   void MarshalToBuffer(agd::Buffer* buf);
 

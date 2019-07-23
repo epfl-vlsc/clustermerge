@@ -69,8 +69,6 @@ void Buffer::extend_size(size_t extend_size) {
 
 size_t Buffer::capacity() const { return allocation_; }
 
-std::size_t Buffer::num_allocs() const {
-  return num_allocs_;
-}
+std::size_t Buffer::num_allocs() const { return num_allocs_; }
 
 }  // namespace agd

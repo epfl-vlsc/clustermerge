@@ -144,12 +144,6 @@ agd::Status Controller::Run(const Params& params,
         "Could not create a zmp REP socket -- large_pm");
   }
 
-  // zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
-  // TODO make sendhwm a param
-  // zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
-  // int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  // cout << "snd hwm value is " << val << " \n";
-
   // waits for timeout time and then returns with EAGAIN
   zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
   int val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
@@ -242,7 +236,8 @@ agd::Status Controller::Run(const Params& params,
   //       time_t result = std::time(nullptr);
   //       //timestamps_.push_back(static_cast<long int>(result));
   //       //queue_sizes_.push_back(work_queue_->size());
-  //       std::cout << static_cast<long int>(result) << ": " << response_queue_->size() << std::endl;
+  //       std::cout << static_cast<long int>(result) << ": " <<
+  //       response_queue_->size() << std::endl;
   //       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   //       // if (queue_sizes_.size() >= 1000000) {
   //       //  break;  // dont run forever ...
@@ -370,21 +365,20 @@ agd::Status Controller::Run(const Params& params,
       auto type = response.Type();
       PartialMergeItem* partial_item;
 
-      if(type == RequestType::Batch) {
+      if (type == RequestType::Batch) {
         MarshalledClusterSet new_set(response);
-        //new_set.SortSet();
+        // no need to sort for batches
         sets_to_merge_queue_->push(std::move(new_set));
         outstanding_requests--;
-      
-      } else if(type == RequestType::SubLargePartial) {  
-        
+
+      } else if (type == RequestType::SubLargePartial) {
         {
           absl::MutexLock l(&mu_);
           auto partial_it = partial_merge_map_.find(id);
           if (partial_it == partial_merge_map_.end()) {
             cout << "error thing in map was not -1, was " << id << "\n";
             exit(0);
-          }  
+          }
           partial_item = &partial_it->second;
         }
 
@@ -392,43 +386,41 @@ agd::Status Controller::Run(const Params& params,
         int start_index = std::get<0>(indexes);
         int end_index = std::get<1>(indexes);
         int cluster_index = std::get<2>(indexes);
-        
-        //cout << "Response " << id << " " << start_index << " " << end_index << " " << cluster_index << "\n";
-        
-        partial_item->partial_set.MergeClusterSet(response.Set(), start_index, end_index, cluster_index);
+
+        partial_item->partial_set.MergeClusterSet(response.Set(), start_index,
+                                                  end_index, cluster_index);
         auto val = partial_item->num_received++;
 
-        //check if all have been received
+        // check if all have been received
         if (partial_item->num_expected - 1 == val) {
-          
           MarshalledClusterSet set;
           if (outstanding_merges_ == 0) {
             cout << "building final marshalled set, time: "
-                << static_cast<long int>(std::time(0)) << "\n";
+                 << static_cast<long int>(std::time(0)) << "\n";
           }
           partial_item->partial_set.BuildMarshalledSet(&set);
           set.SortSet();
           if (outstanding_merges_ == 0) {
-            cout << "done, time: "
-                << static_cast<long int>(std::time(0)) << "\n";
+            cout << "done, time: " << static_cast<long int>(std::time(0))
+                 << "\n";
           }
           {
             if (outstanding_merges_ == 1) {
               cout << "last request complete, 1 merge left, time: "
-                  << static_cast<long int>(std::time(0)) << "\n";
+                   << static_cast<long int>(std::time(0)) << "\n";
             }
             absl::MutexLock l(&mu_);
             partial_merge_map_.erase(id);
           }
           sets_to_merge_queue_->push(std::move(set));
           outstanding_requests--;
-        }   
+        }
       } else {
         cout << "Response was not of any type!!!!\n";
         exit(0);
       }
 
-    } // end while
+    }  // end while
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -545,105 +537,107 @@ agd::Status Controller::Run(const Params& params,
         request.AddSetToBatch(sets[0]);
         outstanding_merges_--;
       }
-      //cout << "Sending a batch request -1\n";
+      // cout << "Sending a batch request -1\n";
       request_queue_->push(std::move(request));
       outstanding_requests++;
 
     } else {
-      //uint32_t threshold = 5000;
-      //Based on number of sequences, split cluster sets
       outstanding_merges_--;
       PartialMergeItem item;
       item.num_received = 0;
 
-      if(sets[0].NumClusters() < sets[1].NumClusters()) {
-        std::swap(sets[0], sets[1]);  
+      // use outstanding merges as id
+      if (sets[0].NumClusters() < sets[1].NumClusters()) {
+        std::swap(sets[0], sets[1]);
       }
 
-      //iterate through the second cluster set to determine num_expected
+      // iterate through the second cluster set to determine num_expected
       MarshalledClusterView cluster, cluster2;
-      
-      uint32_t num_chunks = 0, num_seqs = 0;
-      uint32_t pi = -1, ci = 0; //ci: current index, pi: previous index
-      sets[1].Reset();  sets[0].Reset();
 
-      while(sets[0].NextCluster(&cluster2)) {
-        
+      uint32_t num_chunks = 0, num_seqs = 0;
+      uint32_t pi = -1, ci = 0;  // ci: current index, pi: previous index
+      sets[1].Reset();
+      sets[0].Reset();
+
+      while (sets[0].NextCluster(&cluster2)) {
         sets[1].Reset();
         num_seqs = 0;
-        pi = -1, ci = 0; //ci: current index, pi: previous index
-        while(sets[1].NextCluster(&cluster)) {
+        pi = -1, ci = 0;  // ci: current index, pi: previous index
+        while (sets[1].NextCluster(&cluster)) {
           num_seqs += cluster.NumSeqs();
-          if(num_seqs > params.nseqs_threshold - cluster2.NumSeqs())  {
-            if(ci == pi+1)  {
+          if (num_seqs > params.nseqs_threshold - cluster2.NumSeqs()) {
+            if (ci == pi + 1) {
               pi = ci;
               num_seqs = 0;
             } else {
-              pi = ci-1;
+              pi = ci - 1;
               num_seqs = cluster.NumSeqs();
             }
             num_chunks++;
-          } 
-          ci++;    
+          }
+          ci++;
         }
         num_chunks += 1;
       }
-      
+
       item.num_expected = num_chunks;
-      std::cout << "Num expected: " << item.num_expected << " " << " set1 clusters: " << sets[0].NumClusters() << "\n";
+      std::cout << "Num expected: " << item.num_expected << " "
+                << " set1 clusters: " << sets[0].NumClusters() << "\n";
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
-      item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(), sets[1].buf.size());
+      item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
+                                           sets[1].buf.size());
 
       {
         absl::MutexLock l(&mu_);
-        partial_merge_map_.insert_or_assign(outstanding_merges_, std::move(item));
+        partial_merge_map_.insert_or_assign(outstanding_merges_,
+                                            std::move(item));
       }
 
       uint32_t total_cluster = sets[0].NumClusters();
-      uint32_t cluster_index = 0; 
+      uint32_t cluster_index = 0;
 
       sets[0].Reset();
-      while(sets[0].NextCluster(&cluster))  {
-        //MarshalledClusterView cluster2;
-        
+      while (sets[0].NextCluster(&cluster)) {
         sets[1].Reset();
         num_seqs = 0;
-        pi = -1, ci = 0; //ci: current index, pi: previous index
-        while(sets[1].NextCluster(&cluster2)) {
+        pi = -1, ci = 0;  // ci: current index, pi: previous index
+
+        while (sets[1].NextCluster(&cluster2)) {
           num_seqs += cluster2.NumSeqs();
-          if(num_seqs > params.nseqs_threshold - cluster.NumSeqs())  {
+          if (num_seqs > params.nseqs_threshold - cluster.NumSeqs()) {
             MarshalledRequest request;
-            if(ci == pi+1)  {
-              request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci, cluster_index);
+            if (ci == pi + 1) {
+              request.CreateSubLargePartialRequest(outstanding_merges_, cluster,
+                                                   pi + 1, ci, cluster_index);
               pi = ci;
               num_seqs = 0;
             } else {
-              request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
-              pi = ci-1;
+              request.CreateSubLargePartialRequest(
+                  outstanding_merges_, cluster, pi + 1, ci - 1, cluster_index);
+              pi = ci - 1;
               num_seqs = cluster2.NumSeqs();
             }
-            //cout << "Sending a SubLargePartialRequest " << id << " " << cluster_index << "\n";
             request_queue_->push(std::move(request));
-          } 
-          ci++;    
+          }
+          ci++;
         }
-          
+
         // form the request for the last chunk
         MarshalledRequest request;
-        request.CreateSubLargePartialRequest(outstanding_merges_, cluster, pi+1, ci-1, cluster_index);
+        request.CreateSubLargePartialRequest(outstanding_merges_, cluster,
+                                             pi + 1, ci - 1, cluster_index);
         request_queue_->push(std::move(request));
-        
+
         cluster_index++;
       }
       assert(cluster_index == total_cluster);
-      
+
       outstanding_requests++;
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";
       }
-      
     }
     // cout << "outstanding merges: " << outstanding_merges_ << "\n";
   }

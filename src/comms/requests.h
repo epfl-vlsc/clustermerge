@@ -1,9 +1,9 @@
 #pragma once
 
-#include "src/agd/buffer.h"
-#include "zmq.hpp"
 #include <iostream>
 #include <tuple>
+#include "src/agd/buffer.h"
+#include "zmq.hpp"
 
 enum RequestType { Batch = 0, Partial, LargePartial, SubLargePartial };
 
@@ -91,22 +91,22 @@ struct MarshalledClusterSetView {
     }
   }
 
-  void Offsets(std::vector<size_t>& offsets)  {
+  void Offsets(std::vector<size_t>& offsets) {
     // for cluster at index zero
     size_t offset = sizeof(ClusterSetHeader);
     offsets.push_back(offset);
     const char* cluster_ptr = data + offset;
-    
+
     uint32_t cluster_index = 1;
-    while(cluster_index < NumClusters())  {
-      uint32_t cluster_size = 
-        reinterpret_cast<const ClusterHeader*>(cluster_ptr)->num_seqs;
-      offset += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;   
+    while (cluster_index < NumClusters()) {
+      uint32_t cluster_size =
+          reinterpret_cast<const ClusterHeader*>(cluster_ptr)->num_seqs;
+      offset += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;
       offsets.push_back(offset);
       cluster_ptr = data + offset;
       cluster_index++;
     }
-  } 
+  }
 
   // no check on offset, assumed correct
   bool ClusterAtOffset(MarshalledClusterView* cluster, size_t offset) {
@@ -123,36 +123,41 @@ struct MarshalledResponse {
   MarshalledResponse() = default;
   MarshalledResponse(MarshalledResponse&&) = default;
   MarshalledResponse& operator=(MarshalledResponse&&) = default;
-  int ID() { 
-    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+  int ID() {
+    const ResponseHeader* rh =
+        reinterpret_cast<const ResponseHeader*>(msg.data());
     return rh->id;
   }
-  RequestType Type()  {
-    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+  RequestType Type() {
+    const ResponseHeader* rh =
+        reinterpret_cast<const ResponseHeader*>(msg.data());
     return rh->type;
   }
 
   MarshalledClusterSetView Set() {
-    const ResponseHeader* rh = reinterpret_cast<const ResponseHeader*>(msg.data());
+    const ResponseHeader* rh =
+        reinterpret_cast<const ResponseHeader*>(msg.data());
     const char* data;
-    if(rh->type == RequestType::SubLargePartial)  {
-      data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader) + 3*sizeof(int);
+    if (rh->type == RequestType::SubLargePartial) {
+      data = reinterpret_cast<const char*>(msg.data()) +
+             sizeof(ResponseHeader) + 3 * sizeof(int);
     } else {
       data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader);
     }
     return MarshalledClusterSetView(data);
   }
-  
+
   std::tuple<int, int, int> Indexes() {
     std::tuple<int, int, int> indexes;
-    if(this->Type() != RequestType::SubLargePartial)  {
+    if (this->Type() != RequestType::SubLargePartial) {
       std::cout << "Function called on incorrect reponse type.\n";
       exit(0);
-    }  else {
-      const char* data = reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader);
+    } else {
+      const char* data =
+          reinterpret_cast<const char*>(msg.data()) + sizeof(ResponseHeader);
       int start_index = *reinterpret_cast<const int*>(data);
       int end_index = *reinterpret_cast<const int*>(data + sizeof(int));
-      int cluster_index = *reinterpret_cast<const int*>(data + 2*sizeof(int));
+      int cluster_index = *reinterpret_cast<const int*>(data + 2 * sizeof(int));
       indexes = std::make_tuple(start_index, end_index, cluster_index);
     }
     return indexes;
@@ -178,7 +183,7 @@ struct MarshalledClusterSet {
     buf.AppendBuffer(reinterpret_cast<char*>(&idx), sizeof(uint32_t));
   }
 
-  //only called for batch requests, assumes user has checked response type
+  // only called for batch requests, assumes user has checked response type
   MarshalledClusterSet(MarshalledResponse& response)
       : buf(agd::Buffer(response.msg.size() - sizeof(ResponseHeader), 128)) {
     // a response buffer is an int id and a marshalled clusterset
@@ -189,38 +194,35 @@ struct MarshalledClusterSet {
     buf.AppendBuffer(data, data_size);
   }
 
-  void SortSet()  {
+  void SortSet() {
     std::vector<std::pair<uint32_t, size_t>> clusters;
     uint32_t num_clusters = 0, total_clusters = NumClusters();
     size_t offset = sizeof(ClusterSetHeader);
     const char* cur_cluster_ptr = buf.data() + offset;
-    
-    while(num_clusters < total_clusters) {
-      uint32_t cluster_size = 
-        reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
+
+    while (num_clusters < total_clusters) {
+      uint32_t cluster_size =
+          reinterpret_cast<const ClusterHeader*>(cur_cluster_ptr)->num_seqs;
       clusters.push_back({cluster_size, offset});
       offset += sizeof(ClusterHeader) + sizeof(uint32_t) * cluster_size;
       cur_cluster_ptr = buf.data() + offset;
-      num_clusters++;  
+      num_clusters++;
     }
 
-    // std::sort(clusters.begin(), clusters.end(), 
-    //   [](const std::pair<uint32_t, size_t>& p1, const std::pair<uint32_t, size_t>& p2) {
-    //     return p1.first >= p2.first;
-    // });
+    std::sort(clusters.begin(), clusters.end(),
+              std::greater<std::pair<uint32_t, size_t>>());
 
-    std::sort(clusters.begin(), clusters.end(), std::greater<std::pair<uint32_t, size_t>>());
-    
     agd::Buffer new_buf(buf.size());
     const char* data = buf.data();
     new_buf.AppendBuffer(data, sizeof(ClusterSetHeader));
-    for(const auto& pr: clusters)  {
+    for (const auto& pr : clusters) {
       data = buf.data() + pr.second;
-      new_buf.AppendBuffer(data, sizeof(ClusterHeader) + pr.first * sizeof(uint32_t));  
+      new_buf.AppendBuffer(data,
+                           sizeof(ClusterHeader) + pr.first * sizeof(uint32_t));
     }
     assert(new_buf.size() == buf.size());
     buf = std::move(new_buf);
-    Reset();  
+    Reset();
   }
 
   uint32_t NumClusters() const {
@@ -306,18 +308,21 @@ struct MarshalledRequest {
     assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));
   }
 
-  void CreateSubLargePartialRequest(int id, MarshalledClusterView cluster, 
-    int start_index, int end_index, int cluster_index)  {
+  void CreateSubLargePartialRequest(int id, MarshalledClusterView cluster,
+                                    int start_index, int end_index,
+                                    int cluster_index) {
     PartialRequestHeader h;
     h.id = id;
     h.type = RequestType::SubLargePartial;
-    buf.reserve(sizeof(PartialRequestHeader) + sizeof(int)*3 + cluster.TotalSize());
+    buf.reserve(sizeof(PartialRequestHeader) + sizeof(int) * 3 +
+                cluster.TotalSize());
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
     buf.AppendBuffer(reinterpret_cast<char*>(&start_index), sizeof(int));
     buf.AppendBuffer(reinterpret_cast<char*>(&end_index), sizeof(int));
     buf.AppendBuffer(reinterpret_cast<char*>(&cluster_index), sizeof(int));
     buf.AppendBuffer(cluster.data, cluster.TotalSize());
-    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader) + 3*sizeof(int));  
+    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader) +
+                             3 * sizeof(int));
   }
 
   agd::Buffer buf;
@@ -362,12 +367,13 @@ struct MarshalledRequestView {
   }
 
   // relies on user to call Type and ensure this is correct
-  void IndexesAndCluster(int* start_index, int* end_index, int* cluster_index, MarshalledClusterView* cluster) {
+  void IndexesAndCluster(int* start_index, int* end_index, int* cluster_index,
+                         MarshalledClusterView* cluster) {
     const char* ptr = data + sizeof(PartialRequestHeader);
     *start_index = *reinterpret_cast<const int*>(ptr);
     *end_index = *reinterpret_cast<const int*>(ptr + sizeof(int));
-    *cluster_index = *reinterpret_cast<const int*>(ptr + 2*sizeof(int));
-    const char* cluster_ptr = ptr + 3*sizeof(int);
+    *cluster_index = *reinterpret_cast<const int*>(ptr + 2 * sizeof(int));
+    const char* cluster_ptr = ptr + 3 * sizeof(int);
     *cluster = MarshalledClusterView(cluster_ptr);
   }
 

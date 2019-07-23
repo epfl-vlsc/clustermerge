@@ -1,7 +1,8 @@
 
 #include "src/dist/partial_merge.h"
 
-void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set2) {
+void PartialMergeSet::Init(MarshalledClusterSet& set1,
+                           MarshalledClusterSet& set2) {
   MarshalledClusterView cluster;
   set1.Reset();
   set2.Reset();
@@ -16,21 +17,22 @@ void PartialMergeSet::Init(MarshalledClusterSet& set1, MarshalledClusterSet& set
 }
 
 void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
-
   size_t buf_size = sizeof(ClusterSetHeader);
   for (const auto& c : clusters_set1_) {
     if (c.IsFullyMerged()) {
       continue;
     }
-    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*(c.NumNewSeqs()+c.NumOrigSeqs());
+    buf_size += sizeof(ClusterHeader) +
+                sizeof(uint32_t) * (c.NumNewSeqs() + c.NumOrigSeqs());
   }
   for (const auto& c : clusters_set2_) {
     if (c.IsFullyMerged()) {
       continue;
     }
-    buf_size += sizeof(ClusterHeader) + sizeof(uint32_t)*(c.NumNewSeqs()+c.NumOrigSeqs());
+    buf_size += sizeof(ClusterHeader) +
+                sizeof(uint32_t) * (c.NumNewSeqs() + c.NumOrigSeqs());
   }
-  
+
   ClusterSetHeader h;
   h.num_clusters = 0;  // set after once we know the value
   set->buf.reset();
@@ -39,7 +41,7 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
 
   uint32_t total_not_merged = 0;
   absl::flat_hash_set<uint32_t> seq_set;
-  
+
   for (const auto& c : clusters_set1_) {
     if (c.IsFullyMerged()) {
       continue;
@@ -51,7 +53,7 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     for (auto s : c.SeqIndexes()) {
       seq_set.insert(s);
     }
-    c.AddNewSeqs(&seq_set); // create a hash set to remove duplicates
+    c.AddNewSeqs(&seq_set);  // create a hash set to remove duplicates
 
     ClusterHeader ch;
     ch.fully_merged = false;
@@ -81,14 +83,14 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
     for (auto s : c.SeqIndexes()) {
       seq_set.insert(s);
     }
-    c.AddNewSeqs(&seq_set); // create a hash set to remove duplicates
+    c.AddNewSeqs(&seq_set);  // create a hash set to remove duplicates
 
     ClusterHeader ch;
     ch.fully_merged = false;
     ch.num_seqs = seq_set.size();
     set->buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     auto r = c.Representative();
-    set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t)); 
+    set->buf.AppendBuffer(reinterpret_cast<char*>(&r), sizeof(uint32_t));
     int i = 1;
 
     for (auto s : seq_set) {
@@ -105,9 +107,9 @@ void PartialMergeSet::BuildMarshalledSet(MarshalledClusterSet* set) {
   hp->num_clusters = total_not_merged;
 }
 
-void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_index, 
-  int end_index, int cluster_index) {
-  //std::cout << "Merging cluster set " << clusters_set2_.size() << "\n";
+void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set,
+                                      int start_index, int end_index,
+                                      int cluster_index) {
   MarshalledClusterView cluster;
   uint32_t clusters_in_chunk = end_index - start_index + 1;
   assert(set.NumClusters() >= clusters_in_chunk);
@@ -123,11 +125,8 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_in
     if (cluster.IsFullyMerged()) {
       clusters_set2_[i].SetFullyMerged();
     } else {
-      //std::cout << "Running for loop " << cluster.NumSeqs() << "\n";
       // cluster has only diffs, push them directly
       for (uint32_t x = 0; x < cluster.NumSeqs(); x++) {
-        //std::cout << "For loop: " <<  x  << " " << cluster.NumSeqs() << "\n";
-        //std::cout << x << " " << cluster.SeqIndex(x) << "\n";
         clusters_set2_[i].Insert(cluster.SeqIndex(x));
       }
     }
@@ -137,8 +136,7 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_in
   // insert the new cluster, if there is one
   if (num_clusters > clusters_in_chunk) {
     assert(clusters_in_chunk == num_clusters - 1);
-    // IndexedCluster c;
-    // const auto& cluster = set.Cluster(num_clusters - 1);
+
     if (!set.NextCluster(&cluster)) {
       std::cout << "error next cluster returned false? second\n";
       exit(0);
@@ -148,6 +146,6 @@ void PartialMergeSet::MergeClusterSet(MarshalledClusterSetView set, int start_in
       clusters_set1_[cluster_index].Insert(cluster.SeqIndex(x));
     }
   } else {
-      clusters_set1_[cluster_index].SetFullyMerged();
+    clusters_set1_[cluster_index].SetFullyMerged();
   }
 }

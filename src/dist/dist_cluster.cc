@@ -71,7 +71,8 @@ int main(int argc, char* argv[]) {
       parser, "queue_depth", "Depth of the local work and response queue.",
       {'q', "queue_depth"});
   args::ValueFlag<unsigned int> nseqs_threshold_arg(
-      parser, "no. of seqs threshold", "Max number of total sequences in a cluster chunk.",
+      parser, "no. of seqs threshold",
+      "Max number of total sequences in a cluster chunk.",
       {'n', "nseqs_threshold"});
   args::ValueFlag<unsigned int> batch_size_arg(
       parser, "batch size",
@@ -161,7 +162,7 @@ int main(int argc, char* argv[]) {
   }
 
   uint32_t nseqs_threshold = UINT_MAX;
-  if (nseqs_threshold_arg)  {
+  if (nseqs_threshold_arg) {
     nseqs_threshold = args::get(nseqs_threshold_arg);
   }
 

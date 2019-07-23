@@ -93,7 +93,7 @@ agd::Status Worker::SignalHandler(int signal_num) {
   cout << "Zmq's disconnected.\n";
 
   cout << "Quitting nicely..!\n";
-  // exit(signal_num);
+
   return agd::Status::OK();
 }
 
@@ -231,10 +231,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                  incomplete_request_queue_address);
   }
 
-  // zmq_recv_socket_->setsockopt(ZMQ_SNDHWM, 5);
-  // int val = zmq_recv_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  // cout << "snd hwm value is " << val << " \n";
-
   work_queue_.reset(new ConcurrentQueue<zmq::message_t>(params.queue_depth));
   result_queue_.reset(
       new ConcurrentQueue<MarshalledResponse>(params.queue_depth));
@@ -293,12 +289,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // copy to put in the map
         agd::Buffer buf(msg.size());
         buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
-        
-        //build the offset vector
+
+        // build the offset vector
         MarshalledClusterSetView set(buf.data());
         std::vector<size_t> offsets;
         set.Offsets(offsets);
-        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets  = {std::move(buf), std::move(offsets)};
+        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets = {
+            std::move(buf), std::move(offsets)};
 
         mu_.Lock();
         set_map_.insert_or_assign(id, std::move(set_and_offsets));
@@ -355,7 +352,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         // final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
-        final_set.BuildMarshalledResponse(request.ID(), request.Type(), &response);
+        final_set.BuildMarshalledResponse(request.ID(), request.Type(),
+                                          &response);
         MarshalledClusterSetView view;
         view = response.Set();
         // cout << "final set has " << view.NumClusters() << " clusters.\n";
@@ -364,12 +362,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
         // cout << "Pushed to result queue.\n";
-      } else if(request.Type() == RequestType::SubLargePartial) {
+      } else if (request.Type() == RequestType::SubLargePartial) {
         int start_index, end_index, cluster_index, id;
         id = request.ID();
         MarshalledClusterView cluster;
-        request.IndexesAndCluster(&start_index, &end_index, &cluster_index, &cluster);
-        //cout << "Request " << id << " " << start_index << " " << end_index << " " << cluster_index << "\n";
+        request.IndexesAndCluster(&start_index, &end_index, &cluster_index,
+                                  &cluster);
+        // cout << "Request " << id << " " << start_index << " " << end_index <<
+        // " " << cluster_index << "\n";
         // search in map
         mu_.Lock();
         auto it = set_map_.find(id);
@@ -387,10 +387,10 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
           // cout << "Worker thread --> [" << id << "] Received set.\n";
         }
         mu_.Unlock();
-        
+
         MarshalledClusterSetView set(it->second.first.data());
-        ClusterSet cs(set, it->second.second, start_index, end_index, sequences_);
-        
+        ClusterSet cs(set, it->second.second, start_index, end_index,
+                      sequences_);
 
         Cluster c(cluster, sequences_);
 
@@ -407,10 +407,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
-        
-        //this stuff needs some change, we need to a way to know what response it is
+
+        // this stuff needs some change, we need to a way to know what response
+        // it is
         MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), start_index, end_index, cluster_index, &response);
+        new_cs.BuildMarshalledResponse(request.ID(), start_index, end_index,
+                                       cluster_index, &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
@@ -477,7 +479,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         time_t result = std::time(nullptr);
         //timestamps_.push_back(static_cast<long int>(result));
         //queue_sizes_.push_back(work_queue_->size());
-        cout << static_cast<long int>(result) << ": " << work_queue_->size() << " " << result_queue_->size() << std::endl;
+        cout << static_cast<long int>(result) << ": " << work_queue_->size() <<
+  " " << result_queue_->size() << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // if (queue_sizes_.size() >= 1000000) {
         //  break;  // dont run forever ...
@@ -485,7 +488,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
       cout << "queue measure thread finished\n";
     }
-  ); */ 
+  ); */
 
   while (!(*signal_num)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));

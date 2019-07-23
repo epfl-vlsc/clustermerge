@@ -124,7 +124,8 @@ class PartialMergeSet {
     clusters_set2_ = std::move(other.clusters_set2_);
     return *this;
   };
-  void MergeClusterSet(MarshalledClusterSetView set, int start_index, int end_index, int cluster_index);
+  void MergeClusterSet(MarshalledClusterSetView set, int start_index,
+                       int end_index, int cluster_index);
   // build final set, not including fully merged clusters
   void BuildMarshalledSet(MarshalledClusterSet* set);
   void Init(MarshalledClusterSet& set1, MarshalledClusterSet& set2);
@@ -133,5 +134,6 @@ class PartialMergeSet {
 
  private:
   std::vector<IndexedCluster> clusters_set1_;
-  std::vector<IndexedCluster> clusters_set2_;  // does not change after construction
+  std::vector<IndexedCluster>
+      clusters_set2_;  // does not change after construction
 };

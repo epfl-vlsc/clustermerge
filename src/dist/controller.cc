@@ -144,6 +144,12 @@ agd::Status Controller::Run(const Params& params,
         "Could not create a zmp REP socket -- large_pm");
   }
 
+  // zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
+  // TODO make sendhwm a param
+  // zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
+  // int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  // cout << "snd hwm value is " << val << " \n";
+
   // waits for timeout time and then returns with EAGAIN
   zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
   int val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);

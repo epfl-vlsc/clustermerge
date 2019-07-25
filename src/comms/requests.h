@@ -5,7 +5,7 @@
 #include "src/agd/buffer.h"
 #include "zmq.hpp"
 
-enum RequestType { Batch = 0, Partial, LargePartial, SubLargePartial };
+enum RequestType { Batch = 0, Partial };
 
 struct __attribute__((packed)) BatchRequestHeader {
   int id;
@@ -138,7 +138,7 @@ struct MarshalledResponse {
     const ResponseHeader* rh =
         reinterpret_cast<const ResponseHeader*>(msg.data());
     const char* data;
-    if (rh->type == RequestType::SubLargePartial) {
+    if (rh->type == RequestType::Partial) {
       data = reinterpret_cast<const char*>(msg.data()) +
              sizeof(ResponseHeader) + 3 * sizeof(int);
     } else {
@@ -149,7 +149,7 @@ struct MarshalledResponse {
 
   std::tuple<int, int, int> Indexes() {
     std::tuple<int, int, int> indexes;
-    if (this->Type() != RequestType::SubLargePartial) {
+    if (this->Type() != RequestType::Partial) {
       std::cout << "Function called on incorrect reponse type.\n";
       exit(0);
     } else {
@@ -285,35 +285,11 @@ struct MarshalledRequest {
   }
 
   void CreatePartialRequest(int id, MarshalledClusterView cluster,
-                            const MarshalledClusterSet& set) {
-    size_t total = cluster.TotalSize() + set.TotalSize();
-    buf.reserve(total + sizeof(PartialRequestHeader));
-    PartialRequestHeader h;
-    h.id = id;
-    h.type = RequestType::Partial;
-    buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
-    buf.AppendBuffer(cluster.data, cluster.TotalSize());
-    buf.AppendBuffer(set.buf.data(), set.buf.size());
-    assert(buf.size() == total + sizeof(PartialRequestHeader));
-  }
-
-  // Does not have a clusterset, but is still large :P
-  void CreateLargePartialRequest(int id, MarshalledClusterView cluster) {
-    buf.reserve(cluster.TotalSize() + sizeof(PartialRequestHeader));
-    PartialRequestHeader h;
-    h.id = id;
-    h.type = RequestType::LargePartial;
-    buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
-    buf.AppendBuffer(cluster.data, cluster.TotalSize());
-    assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader));
-  }
-
-  void CreateSubLargePartialRequest(int id, MarshalledClusterView cluster,
                                     int start_index, int end_index,
                                     int cluster_index) {
     PartialRequestHeader h;
     h.id = id;
-    h.type = RequestType::SubLargePartial;
+    h.type = RequestType::Partial;
     buf.reserve(sizeof(PartialRequestHeader) + sizeof(int) * 3 +
                 cluster.TotalSize());
     buf.AppendBuffer(reinterpret_cast<char*>(&h), sizeof(PartialRequestHeader));
@@ -360,13 +336,12 @@ struct MarshalledRequestView {
     *cluster_set = MarshalledClusterSetView(cluster_set_ptr);
   }
 
-  // for Large Partial requests
   void Cluster(MarshalledClusterView* cluster) {
     const char* cluster_ptr = data + sizeof(PartialRequestHeader);
     *cluster = MarshalledClusterView(cluster_ptr);
   }
 
-  // relies on user to call Type and ensure this is correct
+  // relies on user to call Type and ensure it's correct
   void IndexesAndCluster(int* start_index, int* end_index, int* cluster_index,
                          MarshalledClusterView* cluster) {
     const char* ptr = data + sizeof(PartialRequestHeader);

@@ -70,7 +70,7 @@ void ClusterSet::BuildMarshalledResponse(int id, int start_index, int end_index,
   agd::Buffer buf(buf_size);
   ResponseHeader rh;
   rh.id = id;
-  rh.type = RequestType::SubLargePartial;
+  rh.type = RequestType::Partial;
 
   // buf contains response header - three integers - cluster set
   buf.AppendBuffer(reinterpret_cast<char*>(&rh), sizeof(ResponseHeader));

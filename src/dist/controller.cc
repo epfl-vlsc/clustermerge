@@ -377,7 +377,7 @@ agd::Status Controller::Run(const Params& params,
         sets_to_merge_queue_->push(std::move(new_set));
         outstanding_requests--;
 
-      } else if (type == RequestType::SubLargePartial) {
+      } else if (type == RequestType::Partial) {
         {
           absl::MutexLock l(&mu_);
           auto partial_it = partial_merge_map_.find(id);
@@ -565,19 +565,19 @@ agd::Status Controller::Run(const Params& params,
       sets[1].Reset();
       sets[0].Reset();
 
-      while (sets[0].NextCluster(&cluster2)) {
+      while (sets[0].NextCluster(&cluster)) {
         sets[1].Reset();
         num_seqs = 0;
         pi = -1, ci = 0;  // ci: current index, pi: previous index
-        while (sets[1].NextCluster(&cluster)) {
-          num_seqs += cluster.NumSeqs();
-          if (num_seqs > params.nseqs_threshold - cluster2.NumSeqs()) {
+        while (sets[1].NextCluster(&cluster2)) {
+          num_seqs += cluster2.NumSeqs();
+          if (num_seqs > params.nseqs_threshold - cluster.NumSeqs()) {
             if (ci == pi + 1) {
               pi = ci;
               num_seqs = 0;
             } else {
               pi = ci - 1;
-              num_seqs = cluster.NumSeqs();
+              num_seqs = cluster2.NumSeqs();
             }
             num_chunks++;
           }
@@ -614,12 +614,12 @@ agd::Status Controller::Run(const Params& params,
           if (num_seqs > params.nseqs_threshold - cluster.NumSeqs()) {
             MarshalledRequest request;
             if (ci == pi + 1) {
-              request.CreateSubLargePartialRequest(outstanding_merges_, cluster,
+              request.CreatePartialRequest(outstanding_merges_, cluster,
                                                    pi + 1, ci, cluster_index);
               pi = ci;
               num_seqs = 0;
             } else {
-              request.CreateSubLargePartialRequest(
+              request.CreatePartialRequest(
                   outstanding_merges_, cluster, pi + 1, ci - 1, cluster_index);
               pi = ci - 1;
               num_seqs = cluster2.NumSeqs();
@@ -631,7 +631,7 @@ agd::Status Controller::Run(const Params& params,
 
         // form the request for the last chunk
         MarshalledRequest request;
-        request.CreateSubLargePartialRequest(outstanding_merges_, cluster,
+        request.CreatePartialRequest(outstanding_merges_, cluster,
                                              pi + 1, ci - 1, cluster_index);
         request_queue_->push(std::move(request));
 

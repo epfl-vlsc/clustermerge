@@ -315,9 +315,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     }
   });
 
-  int nPartial = 0;
-  int nJoined = 0;
-  auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
+  auto worker_func = [this, &envs, &aligner_params]() {
     ProteinAligner aligner(&envs, &aligner_params);
     // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
@@ -366,7 +364,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         result_queue_->push(std::move(response));
         sets_to_merge.clear();
         // cout << "Pushed to result queue.\n";
-      } else if (request.Type() == RequestType::SubLargePartial) {
+      } else if (request.Type() == RequestType::Partial) {
         int start_index, end_index, cluster_index, id;
         id = request.ID();
         MarshalledClusterView cluster;
@@ -398,7 +396,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         Cluster c(cluster, sequences_);
 
-        // same code as Partial Merge
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
           MarshalledRequest rq;
@@ -425,8 +422,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         return;
       }
     }
-    nJoined++;
-    cout << "Ending thread [" << nJoined << "]\n";
   };
 
   worker_threads_.reserve(params.num_threads);

@@ -13,12 +13,14 @@ Buffer::Buffer(size_t initial_size, size_t extend_extra)
     : size_(0), allocation_(initial_size), extend_extra_(extend_extra) {
   // FIXME in an ideal world, allocation_ should be checked to be positive
   buf_ = std::make_unique<char[]>(allocation_);
+  num_allocs_++;
 }
 
 Status Buffer::WriteBuffer(const char* content, size_t content_size) {
   if (allocation_ < content_size) {
     allocation_ = content_size + extend_extra_;
     buf_.reset(new char[allocation_]());  // reset() -> old buf will be deleted
+    num_allocs_++;
   }
   memcpy(buf_.get(), content, content_size);
   size_ = content_size;
@@ -48,6 +50,7 @@ void Buffer::reserve(size_t capacity) {
     decltype(buf_) a = std::make_unique<char[]>(allocation_);
     memcpy(a.get(), buf_.get(), size_);
     buf_.swap(a);
+    num_allocs_++;
   }
 }
 
@@ -65,5 +68,7 @@ void Buffer::extend_size(size_t extend_size) {
 }
 
 size_t Buffer::capacity() const { return allocation_; }
+
+std::size_t Buffer::num_allocs() const { return num_allocs_; }
 
 }  // namespace agd

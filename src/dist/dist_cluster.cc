@@ -70,6 +70,10 @@ int main(int argc, char* argv[]) {
   args::ValueFlag<unsigned int> queue_depth_arg(
       parser, "queue_depth", "Depth of the local work and response queue.",
       {'q', "queue_depth"});
+  args::ValueFlag<unsigned int> nseqs_threshold_arg(
+      parser, "no. of seqs threshold",
+      "Max number of total sequences in a cluster chunk.",
+      {'n', "nseqs_threshold"});
   args::ValueFlag<unsigned int> batch_size_arg(
       parser, "batch size",
       "How many small clusters should be batched together.",
@@ -155,6 +159,11 @@ int main(int argc, char* argv[]) {
   uint32_t dup_removal_threshold = UINT_MAX;
   if (dup_removal_threshold_arg) {
     dup_removal_threshold = args::get(dup_removal_threshold_arg);
+  }
+
+  uint32_t nseqs_threshold = UINT_MAX;
+  if (nseqs_threshold_arg) {
+    nseqs_threshold = args::get(nseqs_threshold_arg);
   }
 
   json server_config_json;
@@ -334,6 +343,7 @@ int main(int argc, char* argv[]) {
     Controller controller;
     Controller::Params params;
     params.batch_size = batch_size;
+    params.nseqs_threshold = nseqs_threshold;
     params.controller_ip = controller_ip;
     params.data_dir_path = json_dir_path;
     params.num_threads = threads;

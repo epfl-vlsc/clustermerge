@@ -93,7 +93,7 @@ agd::Status Worker::SignalHandler(int signal_num) {
   cout << "Zmq's disconnected.\n";
 
   cout << "Quitting nicely..!\n";
-  // exit(signal_num);
+
   return agd::Status::OK();
 }
 
@@ -293,8 +293,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         // copy to put in the map
         agd::Buffer buf(msg.size());
         buf.AppendBuffer(reinterpret_cast<char*>(msg.data()), msg.size());
+
+        // build the offset vector
+        MarshalledClusterSetView set(buf.data());
+        std::vector<size_t> offsets;
+        set.Offsets(offsets);
+        std::pair<agd::Buffer, std::vector<size_t>> set_and_offsets = {
+            std::move(buf), std::move(offsets)};
+
         mu_.Lock();
-        set_map_[id] = std::move(buf);
+        set_map_.insert_or_assign(id, std::move(set_and_offsets));
         mu_.Unlock();
         cout << "Fetched set: [" << id << "]\n";
       } else {
@@ -307,9 +315,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     }
   });
 
-  int nPartial = 0;
-  int nJoined = 0;
-  auto worker_func = [this, &envs, &aligner_params, &nPartial, &nJoined]() {
+  auto worker_func = [this, &envs, &aligner_params]() {
     ProteinAligner aligner(&envs, &aligner_params);
     // cmproto::MergeRequest request;
     std::deque<ClusterSet> sets_to_merge;
@@ -348,7 +354,8 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         // final_set.ConstructProto(new_cs_proto);
         MarshalledResponse response;
-        final_set.BuildMarshalledResponse(request.ID(), &response);
+        final_set.BuildMarshalledResponse(request.ID(), request.Type(),
+                                          &response);
         MarshalledClusterSetView view;
         view = response.Set();
         // cout << "final set has " << view.NumClusters() << " clusters.\n";
@@ -358,46 +365,13 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         sets_to_merge.clear();
         // cout << "Pushed to result queue.\n";
       } else if (request.Type() == RequestType::Partial) {
-        nPartial++;
-        // cout << "Its a partial request\n";
-        // auto& partial = request.partial();
-        // execute a partial merge, merge cluster into cluster set
-        // do not remove any clusters, simply mark fully merged so
-        // the controller can merge other partial merge requests
-        MarshalledClusterSetView set;
+        int start_index, end_index, cluster_index, id;
+        id = request.ID();
         MarshalledClusterView cluster;
-        request.ClusterAndSet(&set, &cluster);
-
-        // cout << "set has " << set.NumClusters() << " clusters\n";
-        ClusterSet cs(set, sequences_);
-        Cluster c(cluster, sequences_);
-
-        // cout << "merging cluster set with cluster\n";
-        auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
-        if (worker_signal_) {
-          MarshalledRequest rq;
-          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
-                              msg.size());
-          incomplete_request_queue_->push(std::move(rq));
-          std ::cout << "Pushing into incomplete queue with ID: "
-                     << request.ID() << std::endl;
-          continue;
-        }
-        // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
-        assert(set.NumClusters() <= new_cs.Size());
-        MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
-        assert(response.Set().NumClusters() == new_cs.Size());
-        result_queue_->push(std::move(response));
-
-      } else if (request.Type() == RequestType::LargePartial) {
-        // extract id and cluster
-        int id = request.ID();
-        // cout << "Received a large partial request with id " << id << "\n";
-        MarshalledClusterView cluster;
-        request.Cluster(&cluster);
-
-        MarshalledClusterSet set;
+        request.IndexesAndCluster(&start_index, &end_index, &cluster_index,
+                                  &cluster);
+        // cout << "Request " << id << " " << start_index << " " << end_index <<
+        // " " << cluster_index << "\n";
         // search in map
         mu_.Lock();
         auto it = set_map_.find(id);
@@ -414,14 +388,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
           assert(it != set_map_.end());
           // cout << "Worker thread --> [" << id << "] Received set.\n";
         }
-
-        set.buf.AppendBuffer(it->second.data(), it->second.size());
         mu_.Unlock();
 
-        ClusterSet cs(set, sequences_);
+        MarshalledClusterSetView set(it->second.first.data());
+        ClusterSet cs(set, it->second.second, start_index, end_index,
+                      sequences_);
+
         Cluster c(cluster, sequences_);
 
-        // same code as Partial Merge
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
           MarshalledRequest rq;
@@ -434,8 +408,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         // cout << "cluster set now has " << new_cs.Size() << " clusters\n";
         assert(set.NumClusters() <= new_cs.Size());
+
+        // this stuff needs some change, we need to a way to know what response
+        // it is
         MarshalledResponse response;
-        new_cs.BuildMarshalledResponse(request.ID(), &response);
+        new_cs.BuildMarshalledResponse(request.ID(), start_index, end_index,
+                                       cluster_index, &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
@@ -444,8 +422,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         return;
       }
     }
-    nJoined++;
-    cout << "Ending thread [" << nJoined << "]\n";
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -492,24 +468,26 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
     cout << "Incomplete request queue thread ending.\n";
   });
 
-  /*timestamps_.reserve(100000);
-  queue_sizes_.reserve(100000);*/
+  /* timestamps_.reserve(100000);
+  queue_sizes_.reserve(100000);
 
-  // queue_measure_thread_ = std::thread([this](){
-  //     // get timestamp, queue size
-  //     //cout << "queue measure thread starting ...\n";
-  //     while(run_) {
-  //       time_t result = std::time(nullptr);
-  //       timestamps_.push_back(static_cast<long int>(result));
-  //       queue_sizes_.push_back(work_queue_->size());
-  //       std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  //       if (queue_sizes_.size() >= 1000000) {
-  //         break;  // dont run forever ...
-  //       }
-  //     }
-  //     cout << "queue measure thread finished\n";
-  //   }
-  // );
+  queue_measure_thread_ = std::thread([this](){
+      // get timestamp, queue size
+      //cout << "queue measure thread starting ...\n";
+      while(!worker_signal_) {
+        time_t result = std::time(nullptr);
+        //timestamps_.push_back(static_cast<long int>(result));
+        //queue_sizes_.push_back(work_queue_->size());
+        cout << static_cast<long int>(result) << ": " << work_queue_->size() <<
+  " " << result_queue_->size() << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // if (queue_sizes_.size() >= 1000000) {
+        //  break;  // dont run forever ...
+        // }
+      }
+      cout << "queue measure thread finished\n";
+    }
+  ); */
 
   while (!(*signal_num)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10 * 100));

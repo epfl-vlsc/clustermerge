@@ -44,7 +44,7 @@ agd::Status Controller::Run(const Params& params,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   checkpoint_timer_ = timestamp();
   std::atomic_int_fast32_t outstanding_requests{0};
-
+  cout << "Num seqs threshold: " << params.nseqs_threshold << "\n";
   // index all sequences
   agd::Status s = Status::OK();
   const char* data;
@@ -146,13 +146,13 @@ agd::Status Controller::Run(const Params& params,
 
   // zmq_recv_socket_->setsockopt(ZMQ_RCVHWM, 2);
   // TODO make sendhwm a param
-  zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
-  int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
-  cout << "snd hwm value is " << val << " \n";
+  // zmq_send_socket_->setsockopt(ZMQ_SNDHWM, 3);
+  // int val = zmq_send_socket_->getsockopt<int>(ZMQ_SNDHWM);
+  // cout << "snd hwm value is " << val << " \n";
 
   // waits for timeout time and then returns with EAGAIN
   zmq_set_request_socket_->setsockopt(ZMQ_RCVTIMEO, 1000);
-  val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
+  int val = zmq_set_request_socket_->getsockopt<int>(ZMQ_RCVTIMEO);
   cout << "recv timeout set to " << val << " ms \n";
 
   try {
@@ -235,6 +235,24 @@ agd::Status Controller::Run(const Params& params,
     cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
   });
 
+  // std::thread queue_measure_thread = std::thread([this](){
+  //     // get timestamp, queue size
+  //     //cout << "queue measure thread starting ...\n";
+  //     while(run_) {
+  //       time_t result = std::time(nullptr);
+  //       //timestamps_.push_back(static_cast<long int>(result));
+  //       //queue_sizes_.push_back(work_queue_->size());
+  //       std::cout << static_cast<long int>(result) << ": " <<
+  //       response_queue_->size() << std::endl;
+  //       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  //       // if (queue_sizes_.size() >= 1000000) {
+  //       //  break;  // dont run forever ...
+  //       // }
+  //     }
+  //     cout << "queue measure thread finished\n";
+  //   }
+  // );
+
   set_request_thread_ = thread([this]() {
     // receive requests from worker and send them cluster sets
 
@@ -276,7 +294,7 @@ agd::Status Controller::Run(const Params& params,
         if (!success) {
           cout << "Thread failed to send cluster set over zmq!\n";
         }
-        //cout << "Set sent with id: [" << id << "] \n";
+        cout << "Set sent with id: [" << id << "] \n";
       }
     }
   });
@@ -350,64 +368,65 @@ agd::Status Controller::Run(const Params& params,
       }
 
       auto id = response.ID();
-      // cout << "repsonse id is " << id << "\n";
+      auto type = response.Type();
       PartialMergeItem* partial_item;
 
-      {
-        absl::MutexLock l(&mu_);
-        auto partial_it = partial_merge_map_.find(id);
-        if (partial_it == partial_merge_map_.end()) {
-          if (id != -1) {
+      if (type == RequestType::Batch) {
+        MarshalledClusterSet new_set(response);
+        // no need to sort for batches
+        sets_to_merge_queue_->push(std::move(new_set));
+        outstanding_requests--;
+
+      } else if (type == RequestType::Partial) {
+        {
+          absl::MutexLock l(&mu_);
+          auto partial_it = partial_merge_map_.find(id);
+          if (partial_it == partial_merge_map_.end()) {
             cout << "error thing in map was not -1, was " << id << "\n";
             exit(0);
           }
-          // cout << "pushing full result \n";
-          /*if (response.set().clusters_size() > params.dup_removal_thresh) {
-            RemoveDuplicates(*response.mutable_set());
-          }*/
-          MarshalledClusterSet new_set(response);
-
-          sets_to_merge_queue_->push(std::move(new_set));
-          outstanding_requests--;
-          continue;
-        } else {
-          // do assign
           partial_item = &partial_it->second;
         }
-      }
 
-      partial_item->partial_set.MergeClusterSet(response.Set());
-      // cout << "done\n";
-      // check if this was the last one
-      auto val = partial_item->num_received++;
-      if (partial_item->num_expected - 1 == val) {
-        // TODO are we sure that all other potential threads are finished
-        // merging their partials with this one?
+        auto indexes = response.Indexes();
+        int start_index = std::get<0>(indexes);
+        int end_index = std::get<1>(indexes);
+        int cluster_index = std::get<2>(indexes);
 
-        // go through  and delete any fully merged clusters
-        // do this when constructing the new full set
-        // partial_item->partial_set.RemoveFullyMerged();
+        partial_item->partial_set.MergeClusterSet(response.Set(), start_index,
+                                                  end_index, cluster_index);
+        auto val = partial_item->num_received++;
 
-        MarshalledClusterSet set;
-        partial_item->partial_set.BuildMarshalledSet(&set);
-        /*if (set.clusters_size() >
-            params.dup_removal_thresh) {
-          RemoveDuplicates(set);
-        }*/
-        {
-          if (outstanding_merges_ == 1) {
-            cout << "last request complete, 1 merge left, time: "
+        // check if all have been received
+        if (partial_item->num_expected - 1 == val) {
+          MarshalledClusterSet set;
+          if (outstanding_merges_ == 0) {
+            cout << "building final marshalled set, time: "
                  << static_cast<long int>(std::time(0)) << "\n";
           }
-          absl::MutexLock l(&mu_);
-          partial_merge_map_.erase(id);
+          partial_item->partial_set.BuildMarshalledSet(&set);
+          set.SortSet();
+          if (outstanding_merges_ == 0) {
+            cout << "done, time: " << static_cast<long int>(std::time(0))
+                 << "\n";
+          }
+          {
+            if (outstanding_merges_ == 1) {
+              cout << "last request complete, 1 merge left, time: "
+                   << static_cast<long int>(std::time(0)) << "\n";
+            }
+            absl::MutexLock l(&mu_);
+            partial_merge_map_.erase(id);
+          }
+          sets_to_merge_queue_->push(std::move(set));
+          outstanding_requests--;
         }
-        sets_to_merge_queue_->push(std::move(set));
-        outstanding_requests--;
-        // set partial not outstanding
-        // outstanding_partial_ = false;
+      } else {
+        cout << "Response was not of any type!!!!\n";
+        exit(0);
       }
-    }
+
+    }  // end while
   };
 
   worker_threads_.reserve(params.num_threads);
@@ -463,7 +482,6 @@ agd::Status Controller::Run(const Params& params,
   // just use 'this' thread to schedule outgoing work
   // take stuff from sets_to_merge_ and schedule the work in
   // batches or split partial merges for larger sets
-  std::vector<float> sizes;
   std::vector<MarshalledClusterSet> sets;
   sets.resize(2);
   while (outstanding_merges_ > 0) {
@@ -530,70 +548,107 @@ agd::Status Controller::Run(const Params& params,
         request.AddSetToBatch(sets[0]);
         outstanding_merges_--;
       }
+      // cout << "Sending a batch request -1\n";
       request_queue_->push(std::move(request));
       outstanding_requests++;
 
     } else {
-      // either set is large enough, split the computation into multiple
-      // requests
-      // cout << "splitting merger of two large sets into partial mergers\n";
       outstanding_merges_--;
       PartialMergeItem item;
       item.num_received = 0;
-      // use the outstanding merges as id
+
+      // use outstanding merges as id
       if (sets[0].NumClusters() < sets[1].NumClusters()) {
         std::swap(sets[0], sets[1]);
       }
-      // each work item does a partial merge of one cluster in sets[0] to
-      // all clusters in sets[1]
-      item.num_expected = sets[0].NumClusters();
-      item.partial_set.Init(sets[1]);
 
-      bool isLarge = false;
-      sizes.push_back(sets[1].TotalSize());
-      // add to params
-      if (sets[1].TotalSize() > params.max_set_size) {
-        isLarge = true;
-        // cout << "Its a large partial set. Id = " << outstanding_merges_ <<
-        // "\n";
-        item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
-                                             sets[1].buf.size());
+      // iterate through the second cluster set to determine num_expected
+      MarshalledClusterView cluster, cluster2;
+
+      uint32_t num_chunks = 0, num_seqs = 0;
+      uint32_t pi = -1, ci = 0;  // ci: current index, pi: previous index
+      sets[1].Reset();
+      sets[0].Reset();
+
+      while (sets[0].NextCluster(&cluster)) {
+        sets[1].Reset();
+        num_seqs = 0;
+        pi = -1, ci = 0;  // ci: current index, pi: previous index
+        while (sets[1].NextCluster(&cluster2)) {
+          num_seqs += cluster2.NumSeqs();
+          if (num_seqs > params.nseqs_threshold - cluster.NumSeqs()) {
+            if (ci == pi + 1) {
+              pi = ci;
+              num_seqs = 0;
+            } else {
+              pi = ci - 1;
+              num_seqs = cluster2.NumSeqs();
+            }
+            num_chunks++;
+          }
+          ci++;
+        }
+        num_chunks += 1;
       }
+
+      item.num_expected = num_chunks;
+      std::cout << "Num expected: " << item.num_expected << " "
+                << " set1 clusters: " << sets[0].NumClusters() << "\n";
+      // Reset calls done in function
+      item.partial_set.Init(sets[0], sets[1]);
+      item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
+                                           sets[1].buf.size());
 
       {
         absl::MutexLock l(&mu_);
-        // cout << "pushing id " << outstanding_merges_ << " to map\n";
         partial_merge_map_.insert_or_assign(outstanding_merges_,
                                             std::move(item));
       }
 
-      MarshalledClusterView cluster;
-      // cout << "pushing id " << outstanding_merges_ << "\n";
       uint32_t total_cluster = sets[0].NumClusters();
-      uint32_t i = 0;
+      uint32_t cluster_index = 0;
 
+      sets[0].Reset();
       while (sets[0].NextCluster(&cluster)) {
-        i++;
-        MarshalledRequest request;
-        if (isLarge) {
-          request.CreateLargePartialRequest(outstanding_merges_, cluster);
-        } else {
-          request.CreatePartialRequest(outstanding_merges_, cluster, sets[1]);
+        sets[1].Reset();
+        num_seqs = 0;
+        pi = -1, ci = 0;  // ci: current index, pi: previous index
+
+        while (sets[1].NextCluster(&cluster2)) {
+          num_seqs += cluster2.NumSeqs();
+          if (num_seqs > params.nseqs_threshold - cluster.NumSeqs()) {
+            MarshalledRequest request;
+            if (ci == pi + 1) {
+              request.CreatePartialRequest(outstanding_merges_, cluster,
+                                                   pi + 1, ci, cluster_index);
+              pi = ci;
+              num_seqs = 0;
+            } else {
+              request.CreatePartialRequest(
+                  outstanding_merges_, cluster, pi + 1, ci - 1, cluster_index);
+              pi = ci - 1;
+              num_seqs = cluster2.NumSeqs();
+            }
+            request_queue_->push(std::move(request));
+          }
+          ci++;
         }
-        // cout << "pushing partial request with " <<
-        // partial_request->set().clusters_size() << " clusters in set and ID: "
-        // << request.id() << "\n";
-        // cout << "Pushing partial merge request " << "\n";
+
+        // form the request for the last chunk
+        MarshalledRequest request;
+        request.CreatePartialRequest(outstanding_merges_, cluster,
+                                             pi + 1, ci - 1, cluster_index);
         request_queue_->push(std::move(request));
+
+        cluster_index++;
       }
+      assert(cluster_index == total_cluster);
+
       outstanding_requests++;
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
              << static_cast<long int>(std::time(0)) << "\n";
       }
-      assert(i == total_cluster);
-      // set partial outstanding
-      // outstanding_partial_ = true;
     }
     time_t now_time = std::time(0);
     cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] " 
@@ -619,12 +674,6 @@ agd::Status Controller::Run(const Params& params,
   auto duration = t1 - t0;
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
   cout << "Clustering execution time: " << sec.count() << " seconds.\n";
-
-  std::ofstream set_sizes("size_stats.csv", std::ofstream::out);
-  for (auto v : sizes) {
-    set_sizes << v << std::endl;
-  }
-  set_sizes.close();
 
   std::ofstream timing_file("dist_timing.txt", std::ofstream::out);
   timing_file << sec.count() << "\n";

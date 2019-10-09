@@ -279,7 +279,6 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       if (set_map_.find(id) == set_map_.end()) {
         mu_.Unlock();
 
-        cout << "Fetching set [ " << id << " ]\n";
         zmq::message_t msg(&id, sizeof(int));
         bool success = zmq_set_request_socket_->send(msg);
         if (!success) {

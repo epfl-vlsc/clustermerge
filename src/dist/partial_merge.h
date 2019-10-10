@@ -4,7 +4,7 @@
 #include "absl/synchronization/mutex.h"
 #include "src/comms/requests.h"
 
-template <typename T>
+/*template <typename T>
 struct Node {
   T t;
   Node* next;
@@ -49,7 +49,7 @@ class AtomicList {
   uint32_t Size() const { return size_.load(); }
   // this is bad practice but im in a hurry and too lazy to implement iterators
   Node<T>* Head() const { return head_.load(); }
-};
+};*/
 
 class IndexedCluster {
  public:
@@ -58,14 +58,14 @@ class IndexedCluster {
     seq_indexes_ = std::move(other.seq_indexes_);
     fully_merged_ = other.fully_merged_;
     respresentative_idx_ = other.respresentative_idx_;
-    new_seqs_ = std::move(other.new_seqs_);
+    new_seqs_hash_ = std::move(other.new_seqs_hash_);
     orig_seqs_ = other.orig_seqs_;
   }
   IndexedCluster& operator=(IndexedCluster&& other) {
     seq_indexes_ = std::move(other.seq_indexes_);
     fully_merged_ = other.fully_merged_;
     respresentative_idx_ = other.respresentative_idx_;
-    new_seqs_ = std::move(other.new_seqs_);
+    new_seqs_hash_ = std::move(other.new_seqs_hash_);
     orig_seqs_ = other.orig_seqs_;
     return *this;
   }
@@ -82,9 +82,10 @@ class IndexedCluster {
     }
   }
   void Insert(uint32_t seq_index) {
-    // absl::MutexLock l(&mu_);
+    absl::MutexLock l(&mu_);
+    new_seqs_hash_.insert(seq_index);
     // seq_indexes_.insert(seq_index);
-    new_seqs_.push_atomic(seq_index);
+    //new_seqs_.push_atomic(seq_index);
   }
   void SetFullyMerged() { fully_merged_ = true; }
   bool IsFullyMerged() const { return fully_merged_; }
@@ -92,29 +93,25 @@ class IndexedCluster {
   const std::vector<uint32_t>& SeqIndexes() const { return seq_indexes_; }
   uint32_t Representative() const { return respresentative_idx_; }
   uint32_t NumOrigSeqs() const { return orig_seqs_; }
-  uint32_t NumNewSeqs() const { return new_seqs_.Size(); }
+  uint32_t NumNewSeqs() const { return new_seqs_hash_.size(); }
 
   // add new seqs to set to facilitate duplicate removal
   void AddNewSeqs(absl::flat_hash_set<uint32_t>* set) const {
-    const auto* head = new_seqs_.Head();
-    int i = 0;
-    while (head != nullptr) {
-      i++;
-      set->insert(head->t);
-      head = head->next;
+    for (const auto& x : new_seqs_hash_) {
+      set->insert(x);
     }
-    assert(i == new_seqs_.Size());
   }
 
  private:
   std::vector<uint32_t> seq_indexes_;
-  AtomicList<uint32_t> new_seqs_;
+  //AtomicList<uint32_t> new_seqs_;
+  absl::flat_hash_set<uint32_t> new_seqs_hash_;
   bool fully_merged_ = false;
   uint32_t orig_seqs_;
   // track explicitly the rep because the set is not ordered
   uint32_t respresentative_idx_ = 0;
   // lock to insert new set indexes
-  // absl::Mutex mu_;
+  absl::Mutex mu_;
 };
 
 class PartialMergeSet {

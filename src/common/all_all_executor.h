@@ -16,21 +16,35 @@
 #include "concurrent_queue.h"
 #include "params.h"
 #include "sequence.h"
+#include "all_all_base.h"
 
-class AllAllExecutor {
+class AllAllExecutor : public AllAllBase {
  public:
   AllAllExecutor() = delete;
-  typedef std::tuple<const Sequence*, const Sequence*, size_t> WorkItem;
 
   AllAllExecutor(size_t num_threads, size_t capacity,
                  AlignmentEnvironments* envs, const Parameters* params);
 
-  void EnqueueAlignment(const WorkItem& item);
+  void EnqueueAlignment(const WorkItem& item) override;
 
   void FinishAndOutput(const std::string& output_dir);
 
   void Initialize();
+  
+  static bool PassesLengthConstraint(const ProteinAligner::Alignment& alignment,
+                              int seq1_len, int seq2_len) {
+    float min_alignment_len =
+        std::min(float(alignment.seq1_length), float(alignment.seq2_length));
+    float max_min_seq_len =
+        std::max(30.0f, 0.3f * float(std::min(seq1_len, seq2_len)));
+    return min_alignment_len >= max_min_seq_len;
+  }
 
+  static bool PassesScoreConstraint(const Parameters* params, int score) {
+    return score >= params->min_score;
+  }
+
+  
  private:
   std::unique_ptr<ConcurrentQueue<WorkItem>> work_queue_;
 
@@ -50,51 +64,12 @@ class AllAllExecutor {
   std::vector<long int> timestamps_;
   std::vector<size_t> queue_sizes_;
 
-  struct Match {
-    int seq1_min;
-    int seq1_max;
-    int seq2_min;
-    int seq2_max;
-    double score;
-    double distance;
-    double variance;
-    size_t cluster_size;
-    inline bool operator==(const Match& rhs) {
-      return seq1_min == rhs.seq1_min && seq1_max == rhs.seq1_max &&
-             seq2_min == rhs.seq2_min && seq2_max == rhs.seq2_max &&
-             score == rhs.score && distance == rhs.distance &&
-             variance == rhs.variance;
-    }
-    inline bool operator!=(const Match& rhs) { return !(*this == rhs); }
-
-    std::string ToString() {
-      std::ostringstream s;
-      s << "s1m: " << seq1_min << ", s1M: " << seq1_max << ", s2m: " << seq2_min
-        << ", s2M: " << seq2_max << ", score: " << score
-        << ", dist: " << distance << ", var: " << variance;
-      return s.str();
-    }
-  };
-
   typedef absl::flat_hash_map<GenomePair,
                               absl::flat_hash_map<SequencePair, Match>>
       ResultMap;
   // candidate map prevents dups, we store the actual matches here
   // each thread gets its own map, to avoid any sync here
   std::vector<ResultMap> matches_per_thread_;
-
-  bool PassesLengthConstraint(const ProteinAligner::Alignment& alignment,
-                              int seq1_len, int seq2_len) {
-    float min_alignment_len =
-        std::min(float(alignment.seq1_length), float(alignment.seq2_length));
-    float max_min_seq_len =
-        std::max(30.0f, 0.3f * float(std::min(seq1_len, seq2_len)));
-    return min_alignment_len >= max_min_seq_len;
-  }
-
-  bool PassesScoreConstraint(const Parameters* params, int score) {
-    return score >= params->min_score;
-  }
 
   int Worker() {
     int my_id = id_.fetch_add(1, std::memory_order_relaxed);

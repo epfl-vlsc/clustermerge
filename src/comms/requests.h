@@ -3,9 +3,10 @@
 #include <iostream>
 #include <tuple>
 #include "src/agd/buffer.h"
+#include "src/common/all_all_executor.h"
 #include "zmq.hpp"
 
-enum RequestType { Batch = 0, Partial };
+enum RequestType { Batch = 0, Partial, Alignment };
 
 struct __attribute__((packed)) BatchRequestHeader {
   int id;
@@ -18,6 +19,13 @@ struct __attribute__((packed)) PartialRequestHeader {
   RequestType type;
   // cluster
   // set
+};
+
+struct __attribute__((packed)) AlignmentRequestHeader {
+  int id;
+  RequestType type;
+  size_t num_alignments;
+  // followed by (int, int) pairs of seqs to align
 };
 
 struct __attribute__((packed)) ClusterSetHeader {
@@ -285,8 +293,7 @@ struct MarshalledRequest {
   }
 
   void CreatePartialRequest(int id, MarshalledClusterView cluster,
-                                    int start_index, int end_index,
-                                    int cluster_index) {
+                            int start_index, int end_index, int cluster_index) {
     PartialRequestHeader h;
     h.id = id;
     h.type = RequestType::Partial;
@@ -299,6 +306,26 @@ struct MarshalledRequest {
     buf.AppendBuffer(cluster.data, cluster.TotalSize());
     assert(buf.size() == cluster.TotalSize() + sizeof(PartialRequestHeader) +
                              3 * sizeof(int));
+  }
+
+  void CreateAlignmentRequest() {
+    AlignmentRequestHeader h;
+    h.id = 0;  // does not matter for alignment
+    h.type = RequestType::Alignment;
+    h.num_alignments = 0;
+    buf.AppendBuffer(reinterpret_cast<char*>(&h),
+                     sizeof(AlignmentRequestHeader));
+  }
+
+  void IncrNumAlignments() {
+    AlignmentRequestHeader* h =
+        reinterpret_cast<AlignmentRequestHeader*>(buf.mutable_data());
+    h->num_alignments++;
+  }
+
+  void AddAlignment(int abs1, int abs2) {
+    buf.AppendBuffer(reinterpret_cast<char*>(&abs1), sizeof(int));
+    buf.AppendBuffer(reinterpret_cast<char*>(&abs2), sizeof(int));
   }
 
   agd::Buffer buf;
@@ -376,5 +403,83 @@ struct MarshalledRequestView {
         return true;
       }
     }
+  }
+};
+
+// two abs indexes of seqs to align
+struct __attribute__((__packed__)) SeqPair {
+  uint32_t seq1;
+  uint32_t seq2;
+};
+
+// each can contain a list of seq pairs to align
+// [num_pairs | SeqPair ... SeqPair]
+struct AlignmentRequestView {
+  const char* data_;
+  size_t num_pairs;
+  size_t cur_num = 0;
+  const char* pair_arr_ptr_;
+
+  AlignmentRequestView(const char* data) : data_(data) {
+    pair_arr_ptr_ = data_ + sizeof(AlignmentRequestHeader);
+    const AlignmentRequestHeader* header = reinterpret_cast<const AlignmentRequestHeader*>(data_);
+    num_pairs = header->num_alignments;
+  }
+
+  bool GetNextPair(const SeqPair** pair_out) {
+    if (cur_num >= num_pairs) {
+      return false;
+    } else {
+      *pair_out = reinterpret_cast<const SeqPair*>(pair_arr_ptr_ +
+                                                   cur_num * sizeof(SeqPair));
+      cur_num++;
+      return true;
+    }
+  }
+};
+
+struct AlignmentResults {
+  agd::Buffer buf_;
+  // [ id | type | num_results | result ... result ]
+  // result [seq1begin | seq1end | seq2begin | seq2end | score | distance |
+  // variance | cluster_size] just a packed DistMatchResult
+
+  const static size_t ResultSize = sizeof(DistMatchResult);
+
+  void Init(size_t num_matches) {
+    buf_.reserve(sizeof(ResponseHeader) + sizeof(size_t) +
+                 ResultSize * num_matches);
+    ResponseHeader header;
+    header.id = 0;
+    header.type = RequestType::Alignment;
+    buf_.AppendBuffer(reinterpret_cast<const char*>(&header),
+                      sizeof(ResponseHeader));
+    size_t num_results = 0;
+    buf_.AppendBuffer(reinterpret_cast<const char*>(&num_results),
+                      sizeof(size_t));
+  }
+
+  size_t NumResults() {
+    
+    size_t* num =
+        reinterpret_cast<size_t*>(buf_.mutable_data() + sizeof(ResponseHeader));
+    return *num;
+  }
+
+  void SerializeResult(const DistMatchResult* match) {
+    buf_.AppendBuffer(reinterpret_cast<const char*>(match),
+                      ResultSize);
+    size_t* num =
+        reinterpret_cast<size_t*>(buf_.mutable_data() + sizeof(ResponseHeader));
+    *num += 1;
+  }
+
+  static void DeserializeResults(const DistMatchResult** matches_out,
+                                 size_t* num_matches, const char* buffer) {
+    *num_matches = *reinterpret_cast<const size_t*>(buffer + sizeof(ResponseHeader));
+
+    buffer += sizeof(size_t);
+
+    *matches_out = reinterpret_cast<const DistMatchResult*>(buffer);
   }
 };

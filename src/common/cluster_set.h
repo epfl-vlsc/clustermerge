@@ -66,7 +66,7 @@ class ClusterSet {
   void MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner);
 
   // schedule all-all alignments onto the executor threadpool
-  void ScheduleAlignments(AllAllExecutor* executor);
+  void ScheduleAlignments(AllAllBase* executor);
 
   // remove duplicate clusters from this set
   void RemoveDuplicates();

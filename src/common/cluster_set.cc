@@ -128,10 +128,12 @@ ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
                        const vector<size_t>& set_offsets, int start_index,
                        int end_index, const std::vector<Sequence>& sequences) {
   MarshalledClusterView cluster;
+  clusters_.reserve(end_index - start_index);
   for (int i = start_index; i <= end_index; i++) {
     marshalled_set.ClusterAtOffset(&cluster, set_offsets[i]);
     Cluster c(sequences[cluster.SeqIndex(0)]);
     uint32_t num_seqs = cluster.NumSeqs();
+    c.Reserve(num_seqs);
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
       c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
     }
@@ -472,7 +474,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   return new_cluster_set;
 }
 
-void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
+void ClusterSet::ScheduleAlignments(AllAllBase* executor) {
   // removing duplicate clusters (clusters with same sequences)
   // for some reason, absl::InlinedVector doesnt work here
   absl::flat_hash_set<std::vector<size_t>> set_map;
@@ -501,7 +503,7 @@ void ClusterSet::ScheduleAlignments(AllAllExecutor* executor) {
   });
   std::cout << "done sorting clusters.\n";
 
-  CandidateMap candidate_map(10000000);  // only a few MB
+  CandidateMap candidate_map(40000000);  // only a few MB
   int num_avoided = 0;
 
   for (const auto& cluster : clusters_) {

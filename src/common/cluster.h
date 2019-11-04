@@ -28,6 +28,7 @@ class Cluster {
   Cluster(const MarshalledClusterView& cluster, const std::vector<Sequence>& sequences) {
     // construct a cluster object from a protobuf representation
     uint32_t num_seqs = cluster.NumSeqs();
+    seqs_.reserve(num_seqs);
     for (size_t seq_i = 0; seq_i < num_seqs; seq_i++) {
       AddSequence(sequences[cluster.SeqIndex(seq_i)]);
     }
@@ -57,7 +58,11 @@ class Cluster {
   void SetDuplicate() { duplicate_ = true; }
   bool IsDuplicate() const { return duplicate_; }
 
-  const std::list<Sequence>& Sequences() const { return seqs_; }
+  void Reserve(size_t num_seqs) {
+    seqs_.reserve(num_seqs);
+  }
+
+  const std::vector<Sequence>& Sequences() const { return seqs_; }
 
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
@@ -69,7 +74,9 @@ class Cluster {
  private:
   // representative is first seq
   // use a list so refs aren't invalidated
-  std::list<Sequence> seqs_;
+  // NOTE testing vector here for dist version mem consumption
+  // TODO have a base cluster class and inherit versions for dist and local?
+  std::vector<Sequence> seqs_;
   bool fully_merged_ = false;
   bool duplicate_ = false;
 

@@ -33,8 +33,8 @@ struct __attribute__((__packed__)) Match {
 // dist needs to include which seqs were aligned
 struct __attribute__((__packed__)) DistMatchResult {
   Match m;
-  int abs_seq_1;
-  int abs_seq_2;
+  uint32_t abs_seq_1;
+  uint32_t abs_seq_2;
 };
 
 class AllAllBase {

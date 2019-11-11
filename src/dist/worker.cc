@@ -103,6 +103,7 @@ int Worker::ProcessAlignments(const char* seq_buf, ProteinAligner* aligner, Alig
   result->Init(500);
   size_t num = 0;
   while (reqs.GetNextPair(&abs_seq_pair)) {
+    //cout << "got seq pair\n";
     ProteinAligner::Alignment alignment;
 
     alignment.score = 0;  // 0 score will signify not to create candidate
@@ -127,6 +128,7 @@ int Worker::ProcessAlignments(const char* seq_buf, ProteinAligner* aligner, Alig
                                                  seq2->Seq().size()) &&
           AllAllExecutor::PassesScoreConstraint(aligner->Params(),
                                                 alignment.score)) {
+        //cout << "match between " << abs_seq_pair->seq1 << " and " << abs_seq_pair->seq2 << " \n";
         DistMatchResult new_match;
         new_match.m.seq1_min = alignment.seq1_min;
         new_match.m.seq1_max = alignment.seq1_max;
@@ -481,7 +483,12 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
       } else if (request.Type() == RequestType::Alignment) {
         AlignmentResults results;
+        //cout << "processing alignments!!\n";
         int res = ProcessAlignments(request.data, &aligner, &results);
+        MarshalledResponse resp;
+        resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), free_func, NULL);
+
+        result_queue_->push(std::move(resp));
       } else {
         cout << "request was not any type!!!!!!\n";
         return;
@@ -512,9 +519,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   });
 
   incomplete_request_queue_thread_ = thread([this, &params]() {
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
+
     while (!(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;
 

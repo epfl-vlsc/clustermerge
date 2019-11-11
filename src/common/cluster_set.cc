@@ -539,6 +539,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor) {
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
           AllAllExecutor::WorkItem item =
               std::make_tuple(seq1, seq2, cluster.Sequences().size());
+          //std::cout << "enqueueing alignment between " << seq2->ID() << " and " << seq2->ID() << "\n";
           executor->EnqueueAlignment(item);
         } else {
           num_avoided++;

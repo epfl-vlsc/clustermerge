@@ -6,6 +6,8 @@
 #include "cluster.h"
 #include "src/comms/requests.h"
 
+void free_func(void* data, void* hint); 
+
 class MergeExecutor;
 
 class ClusterSet {

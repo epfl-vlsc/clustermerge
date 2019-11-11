@@ -326,6 +326,7 @@ struct MarshalledRequest {
   void AddAlignment(int abs1, int abs2) {
     buf.AppendBuffer(reinterpret_cast<char*>(&abs1), sizeof(int));
     buf.AppendBuffer(reinterpret_cast<char*>(&abs2), sizeof(int));
+    IncrNumAlignments();
   }
 
   agd::Buffer buf;
@@ -478,8 +479,6 @@ struct AlignmentResults {
                                  size_t* num_matches, const char* buffer) {
     *num_matches = *reinterpret_cast<const size_t*>(buffer + sizeof(ResponseHeader));
 
-    buffer += sizeof(size_t);
-
-    *matches_out = reinterpret_cast<const DistMatchResult*>(buffer);
+    *matches_out = reinterpret_cast<const DistMatchResult*>(buffer + sizeof(ResponseHeader) + sizeof(size_t));
   }
 };

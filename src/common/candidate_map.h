@@ -24,8 +24,8 @@ class CandidateMap {
     map_.reserve(size);
   }
   ~CandidateMap() {
-    std::cout << "Candidate map was rehashed " << times_rehashed << " times.\n";
-    std::cout << "The longest insert time was: " << longest_ << " ms.\n";
+    //std::cout << "Candidate map was rehashed " << times_rehashed << " times.\n";
+    //std::cout << "The longest insert time was: " << longest_ << " ms.\n";
   }
   // do not copy or move
   CandidateMap(CandidateMap&& other) = delete;

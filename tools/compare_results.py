@@ -152,6 +152,7 @@ def fill_dictionary_nogz(folderpath, dictionary):
             )  # .split('.gz')[0]
             # print("genome 2 is {}".format(genome2))
             full_file_path = os.path.join(folder, compressed_file)
+            print("file path is {}".format(full_file_path))
             candidates = process_file(full_file_path)
             key = tuple([genome1.lower(), genome2.lower()])
             if key not in dictionary:
@@ -174,8 +175,9 @@ def main():
     #fill_dictionary(args.protclusterdir, data_dict)
 
     if set(ref_dict) != set(data_dict):
-        print(set(ref_dict))
-        print(set(data_dict))
+        print(sorted(set(ref_dict)))
+        print("\n")
+        print(sorted(set(data_dict)))
         print("Lengths: {} and {}".format(len(set(ref_dict)), len(set(data_dict))))
         print(set(ref_dict).symmetric_difference(set(data_dict)))
         raise ValueError("The dictionaries do not have the same keys (genomes)!")

@@ -1,8 +1,10 @@
 
 #pragma once
 
-#include <vector>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <fstream>
+#include <vector>
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -16,12 +18,40 @@
 #include "src/comms/requests.h"
 #include "zmq.hpp"
 
- // class to manage farming out alignments to remote workers
- // we use the existing zmq queues to send requests to existing workers
+// class to manage farming out alignments to remote workers
+// we use the existing zmq queues to send requests to existing workers
 class AllAllDist : public AllAllBase {
  public:
-  AllAllDist(ConcurrentQueue<MarshalledRequest>* req_queue, const std::vector<Sequence>& seqs, const std::string& output_dir)
-      : request_queue_(req_queue), sequences_(seqs), output_dir_(output_dir) {}
+  AllAllDist(ConcurrentQueue<MarshalledRequest>* req_queue,
+             const std::vector<Sequence>& seqs, const std::string& output_dir)
+      : request_queue_(req_queue), sequences_(seqs), output_dir_(output_dir) {
+  
+    struct stat info;
+    if (stat(output_dir_.c_str(), &info) != 0) {
+      // doesnt exist, create
+      std::cout << "creating dir " << output_dir << "\n";
+      int e = mkdir(output_dir_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+      if (e != 0) {
+        std::cout << "could not create output dir " << output_dir
+             << ", exiting ...\n";
+        exit(0);
+      }
+    } else if (!(info.st_mode & S_IFDIR)) {
+      // exists but not dir
+      std::cout << "output dir exists but is not dir, exiting ...\n";
+      exit(0);
+    } else {
+      // dir exists, nuke
+      // im too lazy to do this the proper way
+      std::string cmd = absl::StrCat("rm -rf ", output_dir, "/*");
+      std::cout << "dir " << output_dir << " exists, nuking ...\n";
+      int nuke_result = system(cmd.c_str());
+      if (nuke_result != 0) {
+        std::cout << "Could not nuke dir " << output_dir << "\n";
+        exit(0);
+      }
+    }
+  }
 
   // final set alignment scheduling is processed by a single thread
   void EnqueueAlignment(const WorkItem& item) override;
@@ -40,10 +70,11 @@ class AllAllDist : public AllAllBase {
   // to buffer alignments into groups before submitting
   MarshalledRequest req_;
   size_t cur_num_alignments_ = 0;
-  //agd::Buffer req_buf_;
+  // agd::Buffer req_buf_;
 
   // genome pair denotes unique file to write to
-  // we write results directly because storing them all in memory may be too much
+  // we write results directly because storing them all in memory may be too
+  // much
 
   struct LockedStream {
     LockedStream& operator=(LockedStream&& other) {
@@ -54,7 +85,7 @@ class AllAllDist : public AllAllBase {
     absl::Mutex mu;
   };
 
-  absl::node_hash_map<GenomePair, LockedStream> file_map;
+  absl::node_hash_map<std::string, std::unique_ptr<std::ofstream>> file_map_;
 
   // track outstanding alignment requests so we know when we are done
   std::atomic_uint_fast64_t outstanding_{0};
@@ -64,6 +95,8 @@ class AllAllDist : public AllAllBase {
   const std::vector<Sequence>& sequences_;
   std::string output_dir_;
 
-  // lock file map 
+  size_t num_opened = 0;
+
+  // lock file map
   absl::Mutex mu_;
 };

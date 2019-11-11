@@ -1,17 +1,19 @@
 
 #include "all_all_dist.h"
-#include "all_all_dist.h"
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fstream>
+#include <iostream>
+#include "all_all_dist.h"
 
-#define DEFAULT_ALIGNMENT_BATCH 500
+#define DEFAULT_ALIGNMENT_BATCH 5000
 
 using namespace std;
 
 void AllAllDist::EnqueueAlignment(const WorkItem& item) {
   if (cur_num_alignments_ == 0) {
     req_ = MarshalledRequest();
+    // cout << "creating alignment request\n";
     req_.CreateAlignmentRequest();
   }
 
@@ -35,50 +37,58 @@ void AllAllDist::EnqueueAlignment(const WorkItem& item) {
 }
 
 void AllAllDist::ProcessResult(const char* result_buf) {
-  cout << "processing result\n";
+  // cout << "processing result\n";
   const DistMatchResult* matches;
   size_t num_matches;
   AlignmentResults::DeserializeResults(&matches, &num_matches, result_buf);
+  // cout << "got " << num_matches << " matches\n";
 
   for (size_t i = 0; i < num_matches; i++) {
     const auto& match = matches[i];
+    // cout << "received match between " << match.abs_seq_1 << " and " <<
+    // match.abs_seq_2 << "\n";
     auto& seq1 = sequences_[match.abs_seq_1];
     auto& seq2 = sequences_[match.abs_seq_2];
-    auto genome_pair = std::make_pair(seq1.Seq(), seq2.Seq());
+    /*std::pair<absl::string_view, absl::string_view> genome_pair =
+        std::make_pair(seq1.Genome(), seq2.Genome());*/
+    auto genomepair = absl::StrCat(seq1.Genome(), seq2.Genome());
 
-    mu_.Lock();
-    if (file_map.find(genome_pair) == file_map.end()) {
-      // create the file
-      string path = absl::StrCat(output_dir_, "/", genome_pair.first);
-      struct stat info;
-      if (stat(path.c_str(), &info) != 0) {
-        // doesnt exist, create
-        // cout << "creating dir " << path << "\n";
-        int e = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-        if (e != 0) {
-          cout << "could not create output dir " << path << ", exiting ...\n";
+    std::ofstream* out_file = nullptr;
+    {
+      absl::MutexLock l(&mu_);
+
+      if (file_map_.find(genomepair) == file_map_.end()) {
+        // create the file
+        string path = absl::StrCat(output_dir_, "/", seq1.Genome());
+        struct stat info;
+        if (stat(path.c_str(), &info) != 0) {
+          // doesnt exist, create
+          // cout << "creating dir " << path << "\n";
+          int e = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+          if (e != 0) {
+            cout << "could not create output dir " << path << ", exiting ...\n";
+            exit(0);
+          }
+        } else if (!(info.st_mode & S_IFDIR)) {
+          // exists but not dir
+          cout << "output dir exists but is not dir, exiting ...\n";
           exit(0);
-        }
-      } else if (!(info.st_mode & S_IFDIR)) {
-        // exists but not dir
-        cout << "output dir exists but is not dir, exiting ...\n";
-        exit(0);
-      }  // else, dir exists,
+        }  // else, dir exists,
 
-      absl::StrAppend(&path, "/", genome_pair.second);
-      cout << "opening file " << path << "\n";
+        absl::StrAppend(&path, "/", seq2.Genome());
+        cout << "opening file " << path << "\n";
 
-      LockedStream ls;
-      ls.out_stream = std::ofstream(path);
-      file_map[genome_pair] = std::move(ls);
+        file_map_[genomepair] =
+            std::unique_ptr<std::ofstream>(new std::ofstream(path));
 
-      string line = absl::StrCat("# AllAll of ", genome_pair.first, " vs ",
-                                 genome_pair.second, ";\nRefinedMatches(\n[");
-      file_map[genome_pair].out_stream << line;
+        string line = absl::StrCat("# AllAll of ", seq1.Genome(), " vs ",
+                                   seq2.Genome(), ";\nRefinedMatches(\n[");
+        *file_map_[genomepair] << line;
+        num_opened++;
+      }
+
+      out_file = file_map_[genomepair].get();
     }
-
-    auto& out_file = file_map[genome_pair];
-    mu_.Unlock();
 
     // write the match to the file now that we have a file handle
 
@@ -107,8 +117,7 @@ void AllAllDist::ProcessResult(const char* result_buf) {
 
     {
       // is this lock necessary? are streams thread safe?
-      absl::MutexLock l(&out_file.mu);
-      out_file.out_stream << ss.str();
+      *out_file << ss.str();
     }
     total_matches_++;
   }
@@ -120,7 +129,10 @@ void AllAllDist::Finish() {
   // wait until all outstanding alignments are completed and written to the
   // files
 
+  cout << "opened " << num_opened << " files\n";
+  cout << "outstanding is " << outstanding_.load() << "\n";
   if (cur_num_alignments_ > 0) {
+    cout << "sending remaining alignments in buf \n";
     request_queue_->push(std::move(req_));
     if (req_.buf.data() != nullptr) {
       cout << "req buf was not null after move??\n";
@@ -129,17 +141,19 @@ void AllAllDist::Finish() {
     outstanding_++;
   }
 
-  while (outstanding_.load() > 0)
-    ;
+  cout << "Waiting for alignments to finish ... \n";
+  while (outstanding_.load() > 0) {
+    std::this_thread::sleep_for(1s);
+  }
+  cout << "Done.\n";
 
   // finalize output files
-  for (auto& v : file_map) {
-    auto& ls = v.second;
-
-    std::ofstream& of = ls.out_stream;
-    long pos = of.tellp();
-    of.seekp(pos - 2);
-    of << " ]):";
+  for (auto& v : file_map_) {
+    auto* of = v.second.get();
+    long pos = of->tellp();
+    of->seekp(pos - 2);
+    *of << " ]):";
+    of->close();
   }
 
   cout << "Total matches: " << total_matches_.load() << "\n";

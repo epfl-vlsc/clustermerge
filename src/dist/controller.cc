@@ -208,9 +208,6 @@ agd::Status Controller::Run(const Params& params,
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
@@ -256,10 +253,6 @@ agd::Status Controller::Run(const Params& params,
 
   set_request_thread_ = thread([this]() {
     // receive requests from worker and send them cluster sets
-
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
 
     while (run_) {
       zmq::message_t message;
@@ -425,6 +418,7 @@ agd::Status Controller::Run(const Params& params,
           outstanding_requests--;
         }
       } else if (type == RequestType::Alignment) {
+       //cout << "received matches\n";
         const char* matches_buf = reinterpret_cast<const char*>(response.msg.data());
         allalldist.ProcessResult(matches_buf);
 
@@ -663,7 +657,6 @@ agd::Status Controller::Run(const Params& params,
   cout << "done and waiting for final result...\n";
   // while (sets_to_merge_queue_->size() != 1);;
 
-  cout << "scheduling final alignments on controller...\n";
   MarshalledClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -685,14 +678,15 @@ agd::Status Controller::Run(const Params& params,
   set.DumpJson("dist_clusters.json", placeholder);
 
   if (!params.exclude_allall) {
-    //AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
-                            //&aligner_params);
+    cout << "scheduling all-all alignments on workers...\n";
+    /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
+                            &aligner_params);*/
 
     set.ScheduleAlignments(&allalldist);
     allalldist.Finish();
-    //executor.Initialize();
-    //set.ScheduleAlignments(&executor);
-    //executor.FinishAndOutput("dist_output_dir");
+    /*executor.Initialize();
+    set.ScheduleAlignments(&executor);
+    executor.FinishAndOutput("dist_output_dir");*/
   } else {
     cout << "Skipping all-all alignments ...\n";
   }

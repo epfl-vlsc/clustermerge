@@ -10,27 +10,29 @@
 class Cluster {
  public:
   Cluster() = default;  // an empty cluster
-  Cluster(const Sequence& seed) { seqs_.push_back(seed); }
+  Cluster(uint32_t seed, const std::vector<Sequence>& sequences) : all_seqs_(&sequences) { seqs_.push_back(seed); }
 
   Cluster(Cluster&& other) noexcept {
+    all_seqs_ = other.all_seqs_;
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
     duplicate_ = other.duplicate_;
   }
 
   Cluster& operator=(Cluster&& other) noexcept {
+    all_seqs_ = other.all_seqs_;
     seqs_ = std::move(other.seqs_);
     fully_merged_ = other.fully_merged_;
     duplicate_ = other.duplicate_;
     return *this;
   }
 
-  Cluster(const MarshalledClusterView& cluster, const std::vector<Sequence>& sequences) {
+  Cluster(const MarshalledClusterView& cluster, const std::vector<Sequence>& sequences) : all_seqs_(&sequences) {
     // construct a cluster object from a protobuf representation
     uint32_t num_seqs = cluster.NumSeqs();
     seqs_.reserve(num_seqs);
     for (size_t seq_i = 0; seq_i < num_seqs; seq_i++) {
-      AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+      AddSequence(seq_i);
     }
     fully_merged_ = cluster.IsFullyMerged();
   }
@@ -45,10 +47,12 @@ class Cluster {
 
   bool PassesThreshold(const Cluster& other, ProteinAligner* aligner);
 
-  const Sequence& Rep() { return seqs_.front(); }
+  uint32_t Rep() { return seqs_.front(); }
+  const Sequence& SeqRep() const { return all_seqs_->at(seqs_.front()); }
+  const Sequence& SeqAt(uint32_t idx) const { return all_seqs_->at(idx); }
 
   // add seq into seqs_
-  void AddSequence(const Sequence& seq);
+  void AddSequence(uint32_t seq);
 
   // mark that this cluster has been fully merged
   // with another, and will go away. seqs_ may not be valid anymore
@@ -62,12 +66,11 @@ class Cluster {
     seqs_.reserve(num_seqs);
   }
 
-  const std::vector<Sequence>& Sequences() const { return seqs_; }
+  const std::vector<uint32_t>& Sequences() const { return seqs_; }
 
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }
 
-  void MarshalToBuffer(agd::Buffer* buf);
   // marshalled cluster is [fully_merged, num_idx, (cluster indexes)]
   uint32_t ByteSize() { return sizeof(bool) + sizeof(int) + sizeof(int)*seqs_.size(); }
 
@@ -76,7 +79,8 @@ class Cluster {
   // use a list so refs aren't invalidated
   // NOTE testing vector here for dist version mem consumption
   // TODO have a base cluster class and inherit versions for dist and local?
-  std::vector<Sequence> seqs_;
+  std::vector<uint32_t> seqs_;
+  const std::vector<Sequence>* all_seqs_;
   bool fully_merged_ = false;
   bool duplicate_ = false;
 

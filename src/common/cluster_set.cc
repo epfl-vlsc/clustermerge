@@ -44,7 +44,7 @@ void ClusterSet::BuildMarshalledResponse(int id, RequestType type,
     ch.num_seqs = c.Sequences().size();
     buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     for (const auto& s : c.Sequences()) {
-      uint32_t i = s.ID();
+      uint32_t i = s;
       buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
     }
   }
@@ -89,7 +89,7 @@ void ClusterSet::BuildMarshalledResponse(int id, int start_index, int end_index,
     ch.num_seqs = c.Sequences().size();
     buf.AppendBuffer(reinterpret_cast<char*>(&ch), sizeof(ClusterHeader));
     for (const auto& s : c.Sequences()) {
-      uint32_t i = s.ID();
+      uint32_t i = s;
       buf.AppendBuffer(reinterpret_cast<char*>(&i), sizeof(int));
     }
   }
@@ -112,10 +112,10 @@ ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
     // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
     // std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << "
     // and num seqs = " << cluster.NumSeqs() << "\n";
-    Cluster c(sequences[cluster.SeqIndex(0)]);
+    Cluster c(cluster.SeqIndex(0), sequences);
     uint32_t num_seqs = cluster.NumSeqs();
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
-      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+      c.AddSequence(cluster.SeqIndex(seq_i));
     }
     if (cluster.IsFullyMerged()) {
       c.SetFullyMerged();
@@ -131,11 +131,11 @@ ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
   clusters_.reserve(end_index - start_index);
   for (int i = start_index; i <= end_index; i++) {
     marshalled_set.ClusterAtOffset(&cluster, set_offsets[i]);
-    Cluster c(sequences[cluster.SeqIndex(0)]);
+    Cluster c(cluster.SeqIndex(0), sequences);
     uint32_t num_seqs = cluster.NumSeqs();
     c.Reserve(num_seqs);
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
-      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+      c.AddSequence(cluster.SeqIndex(seq_i));
     }
     if (cluster.IsFullyMerged()) {
       c.SetFullyMerged();
@@ -155,10 +155,10 @@ ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
     // std::cout << "cluster has " << cluster_proto.indexes_size() << " seqs\n";
     // std::cout << "adding cluster with rep idx " << cluster.SeqIndex(0) << "
     // and num seqs = " << cluster.NumSeqs() << "\n";
-    Cluster c(sequences[cluster.SeqIndex(0)]);
+    Cluster c(cluster.SeqIndex(0), sequences);
     uint32_t num_seqs = cluster.NumSeqs();
     for (size_t seq_i = 1; seq_i < num_seqs; seq_i++) {
-      c.AddSequence(sequences[cluster.SeqIndex(seq_i)]);
+      c.AddSequence(cluster.SeqIndex(seq_i));
     }
     if (cluster.IsFullyMerged()) {
       c.SetFullyMerged();
@@ -166,16 +166,6 @@ ClusterSet::ClusterSet(MarshalledClusterSetView& marshalled_set,
     clusters_.push_back(std::move(c));
   }
 }
-
-/*void ClusterSet::ConstructProto(cmproto::ClusterSet* set_proto) {
-  for (const auto& c : clusters_) {
-    auto* c_proto = set_proto->add_clusters();
-    for (const auto& s : c.Sequences()) {
-      c_proto->add_indexes(s.ID());
-    }
-    c_proto->set_fully_merged(c.IsFullyMerged());
-  }
-}*/
 
 ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
                                              MergeExecutor* executor) {
@@ -208,7 +198,7 @@ ClusterSet ClusterSet::MergeClustersParallel(ClusterSet& other,
   // better scheduling overlap of work
   std::sort(new_cluster_set.clusters_.begin(), new_cluster_set.clusters_.end(),
             [](Cluster& a, Cluster& b) {
-              return a.Rep().Seq().size() > b.Rep().Seq().size();
+              return a.SeqRep().Seq().size() > b.SeqRep().Seq().size();
             });
 
   // new_cluster_set.RemoveDuplicates();
@@ -235,9 +225,9 @@ void ClusterSet::MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner) {
       // add matching seqs from one to the other
       // std::cout << "reps are partially overlapped\n";
 
-      auto c_num_uncovered = cluster->Rep().Seq().size() -
+      auto c_num_uncovered = cluster->SeqRep().Seq().size() -
                              (alignment.seq1_max - alignment.seq1_min);
-      auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+      auto c_other_num_uncovered = c_other.SeqRep().Seq().size() -
                                    (alignment.seq2_max - alignment.seq2_min);
 
       if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
@@ -320,8 +310,8 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
         // std::cout << "reps are partially overlapped\n";
 
         auto c_num_uncovered =
-            c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
-        auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+            c.SeqRep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
+        auto c_other_num_uncovered = c_other.SeqRep().Seq().size() -
                                      (alignment.seq2_max - alignment.seq2_min);
 
         if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
@@ -370,13 +360,13 @@ ClusterSet ClusterSet::MergeClusters(ClusterSet& other,
   return new_cluster_set;
 }
 
-void ClusterSet::DebugDump() const {
+void ClusterSet::DebugDump(const std::vector<Sequence>& sequences) const {
   std::cout << "Dumping " << clusters_.size() << " clusters in set... \n";
   for (const auto& cluster : clusters_) {
     std::cout << "\tCluster seqs:\n";
     for (const auto& seq : cluster.Sequences()) {
-      std::cout << "\t\tGenome: " << seq.Genome() << ", sequence: "
-                << PrintNormalizedProtein(seq.Seq().data(), seq.Seq().length())
+      std::cout << "\t\tGenome: " << sequences[seq].Genome() << ", sequence: "
+                << PrintNormalizedProtein(sequences[seq].Seq().data(), sequences[seq].Seq().length())
                 << "\n\n";
     }
   }
@@ -412,8 +402,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
       // std::cout << "reps are partially overlapped\n";
 
       auto c_num_uncovered =
-          c.Rep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
-      auto c_other_num_uncovered = c_other.Rep().Seq().size() -
+          c.SeqRep().Seq().size() - (alignment.seq1_max - alignment.seq1_min);
+      auto c_other_num_uncovered = c_other.SeqRep().Seq().size() -
                                    (alignment.seq2_max - alignment.seq2_min);
       if (c_num_uncovered < aligner->Params()->max_n_aa_not_covered &&
           alignment.score > aligner->Params()->min_full_merge_score) {
@@ -474,7 +464,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   return new_cluster_set;
 }
 
-void ClusterSet::ScheduleAlignments(AllAllBase* executor) {
+void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>& sequences) {
   // removing duplicate clusters (clusters with same sequences)
   // for some reason, absl::InlinedVector doesnt work here
   absl::flat_hash_set<std::vector<size_t>> set_map;
@@ -483,7 +473,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor) {
   for (auto& c : clusters_) {
     std::vector<size_t> cluster_set;
     for (const auto& s : c.Sequences()) {
-      cluster_set.push_back(s.ID());
+      cluster_set.push_back(s);
     }
     std::sort(cluster_set.begin(), cluster_set.end());
 
@@ -514,31 +504,31 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor) {
     for (auto it = cluster.Sequences().begin(); it != cluster.Sequences().end();
          it++) {
       for (auto itt = next(it); itt != cluster.Sequences().end(); itt++) {
-        auto* seq1 = &(*it);
-        auto* seq2 = &(*itt);
+        auto seq1 = *it;
+        auto seq2 = *itt;
 
-        if (seq1->Genome() == seq2->Genome() &&
-            seq1->GenomeIndex() == seq2->GenomeIndex()) {
+        if (sequences[seq1].Genome() == sequences[seq2].Genome() &&
+            sequences[seq1].GenomeIndex() == sequences[seq2].GenomeIndex()) {
           // not sure if this can actually happen yet, but no need to align
           // against self
           continue;
         }
 
-        if (seq1->GenomeSize() > seq2->GenomeSize() ||
-            ((seq1->GenomeSize() == seq2->GenomeSize()) &&
-             seq1->Genome() > seq2->Genome())) {
+        if (sequences[seq1].GenomeSize() > sequences[seq2].GenomeSize() ||
+            ((sequences[seq1].GenomeSize() == sequences[seq2].GenomeSize()) &&
+             sequences[seq1].Genome() > sequences[seq2].Genome())) {
           std::swap(seq1, seq2);
         }
 
-        if (seq1->Genome() == seq2->Genome() &&
-            seq1->GenomeIndex() > seq2->GenomeIndex()) {
+        if (sequences[seq1].Genome() == sequences[seq2].Genome() &&
+            sequences[seq1].GenomeIndex() > sequences[seq2].GenomeIndex()) {
           std::swap(seq1, seq2);
         }
 
-        auto abs_seq_pair = std::make_pair(seq1->ID(), seq2->ID());
+        auto abs_seq_pair = std::make_pair(seq1, seq2);
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
           AllAllExecutor::WorkItem item =
-              std::make_tuple(seq1, seq2, cluster.Sequences().size());
+              std::make_tuple(&sequences[seq1], &sequences[seq2], cluster.Sequences().size());
           //std::cout << "enqueueing alignment between " << seq2->ID() << " and " << seq2->ID() << "\n";
           executor->EnqueueAlignment(item);
         } else {
@@ -567,9 +557,9 @@ void ClusterSet::DumpJson(const std::string& filename,
 
     for (const auto& s : c.Sequences()) {
       nlohmann::json j_temp = json::object();
-      j_temp["Genome"] = s.Genome();
-      j_temp["Index"] = s.GenomeIndex();
-      j_temp["AbsoluteIndex"] = s.ID();
+      j_temp["Genome"] = c.SeqAt(s).Genome();
+      j_temp["Index"] = c.SeqAt(s).GenomeIndex();
+      j_temp["AbsoluteIndex"] = s;
       j["clusters"][counter].push_back(j_temp);
     }
 
@@ -590,7 +580,7 @@ void ClusterSet::RemoveDuplicates() {
     std::vector<size_t> cluster_set;
 
     for (const auto& s : cluster_it->Sequences()) {
-      cluster_set.push_back(s.ID());
+      cluster_set.push_back(s);
     }
     // std::sort(cluster_set.begin(), cluster_set.end());
 

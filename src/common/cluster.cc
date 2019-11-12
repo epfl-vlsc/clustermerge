@@ -8,8 +8,8 @@ agd::Status Cluster::AlignReps(const Cluster& other,
   const auto& this_rep = seqs_.front();
   const auto& other_rep = other.seqs_.front();
 
-  return aligner->AlignSingle(this_rep.Seq().data(), other_rep.Seq().data(),
-                              this_rep.Seq().size(), other_rep.Seq().size(),
+  return aligner->AlignSingle(all_seqs_->at(this_rep).Seq().data(), all_seqs_->at(other_rep).Seq().data(),
+                              all_seqs_->at(this_rep).Seq().size(), all_seqs_->at(other_rep).Seq().size(),
                               *alignment);
 }
 
@@ -17,16 +17,15 @@ bool Cluster::PassesThreshold(const Cluster& other, ProteinAligner* aligner) {
   const auto& this_rep = seqs_.front();
   const auto& other_rep = other.seqs_.front();
 
-  return aligner->PassesThreshold(this_rep.Seq().data(), other_rep.Seq().data(),
-                                  this_rep.Seq().size(),
-                                  other_rep.Seq().size());
+  return aligner->PassesThreshold(all_seqs_->at(this_rep).Seq().data(), all_seqs_->at(other_rep).Seq().data(),
+                              all_seqs_->at(this_rep).Seq().size(), all_seqs_->at(other_rep).Seq().size());
 }
 
-void Cluster::AddSequence(const Sequence& seq) {
+void Cluster::AddSequence(uint32_t seq) {
   // make sure we aren't adding duplicate
   bool found = false;
   for (const auto& s : seqs_) {
-    if (s.ID() == seq.ID()) {
+    if (s == seq){
       found = true;
       break;
     }
@@ -41,7 +40,7 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
   //seqs_.push_back(other_seqs.front());  // the rep matches, or we wouldnt be here
   bool found = false;
   for (const auto& s : seqs_) {
-    if (s.ID() == other_seqs.front().ID()) {
+    if (s == other_seqs.front()) {
       found = true;
       break;
     }
@@ -59,14 +58,14 @@ void Cluster::Merge(Cluster* other, ProteinAligner* aligner) {
     const auto& rep = seqs_.front();
     bool found = false;
     for (const auto& s : seqs_) {
-      if (s.ID() == seq.ID()) {
+      if (s == seq) {
         found = true;
         break;
       }
     }
     if (!found) {
-      if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
-                                   rep.Seq().size(), seq.Seq().size())) {
+      if (aligner->PassesThreshold(all_seqs_->at(rep).Seq().data(), all_seqs_->at(seq).Seq().data(),
+                                   all_seqs_->at(rep).Seq().size(), all_seqs_->at(seq).Seq().size())) {
         seqs_.push_back(seq);
       }
     }
@@ -79,7 +78,7 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
   const auto& other_seqs = other->Sequences();
   bool found = false;
   for (const auto& s : seqs_) {
-    if (s.ID() == other_seqs.front().ID()) {
+    if (s == other_seqs.front()) {
       found = true;
       break;
     }
@@ -97,14 +96,14 @@ void Cluster::MergeOther(Cluster* other, ProteinAligner* aligner) {
     const auto& rep = seqs_.front();
     bool found = false;
     for (const auto& s : seqs_) {
-      if (s.ID() == seq.ID()) {
+      if (s == seq) {
         found = true;
         break;
       }
     }
     if (!found) {
-      if (aligner->PassesThreshold(rep.Seq().data(), seq.Seq().data(),
-                                   rep.Seq().size(), seq.Seq().size())) {
+      if (aligner->PassesThreshold(all_seqs_->at(rep).Seq().data(), all_seqs_->at(seq).Seq().data(),
+                                   all_seqs_->at(rep).Seq().size(), all_seqs_->at(seq).Seq().size())) {
         seqs_.push_back(seq);
       }
     }

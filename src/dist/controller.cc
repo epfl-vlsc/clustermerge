@@ -682,7 +682,7 @@ agd::Status Controller::Run(const Params& params,
     /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
                             &aligner_params);*/
 
-    set.ScheduleAlignments(&allalldist);
+    set.ScheduleAlignments(&allalldist, sequences_);
     allalldist.Finish();
     /*executor.Initialize();
     set.ScheduleAlignments(&executor);

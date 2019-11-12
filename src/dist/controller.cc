@@ -553,13 +553,13 @@ agd::Status Controller::Run(const Params& params,
       PartialMergeItem item;
       item.num_received = 0;
 
-      cout << "Swapping\n";
+      //cout << "Swapping\n";
       // use outstanding merges as id
       if (sets[0].NumClusters() < sets[1].NumClusters()) {
         std::swap(sets[0], sets[1]);
       }
 
-      cout << "starting parse\n";
+      //cout << "starting parse\n";
       // iterate through the second cluster set to determine num_expected
       MarshalledClusterView cluster, cluster2;
 
@@ -590,8 +590,8 @@ agd::Status Controller::Run(const Params& params,
       }
 
       item.num_expected = num_chunks;
-      std::cout << "Num expected: " << item.num_expected << " "
-                << " set1 clusters: " << sets[0].NumClusters() << "\n";
+      /*std::cout << "Num expected: " << item.num_expected << " "
+                << " set1 clusters: " << sets[0].NumClusters() << "\n";*/
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),

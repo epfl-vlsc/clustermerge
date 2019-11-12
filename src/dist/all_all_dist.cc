@@ -6,7 +6,7 @@
 #include <iostream>
 #include "all_all_dist.h"
 
-#define DEFAULT_ALIGNMENT_BATCH 5000
+#define DEFAULT_ALIGNMENT_BATCH 1500
 
 using namespace std;
 
@@ -53,7 +53,7 @@ void AllAllDist::ProcessResult(const char* result_buf) {
         std::make_pair(seq1.Genome(), seq2.Genome());*/
     auto genomepair = absl::StrCat(seq1.Genome(), seq2.Genome());
 
-    std::ofstream* out_file = nullptr;
+    LockedStream* out_file = nullptr;
     {
       absl::MutexLock l(&mu_);
 
@@ -79,11 +79,11 @@ void AllAllDist::ProcessResult(const char* result_buf) {
         cout << "opening file " << path << "\n";
 
         file_map_[genomepair] =
-            std::unique_ptr<std::ofstream>(new std::ofstream(path));
+            std::unique_ptr<LockedStream>(new LockedStream(path));
 
         string line = absl::StrCat("# AllAll of ", seq1.Genome(), " vs ",
                                    seq2.Genome(), ";\nRefinedMatches(\n[");
-        *file_map_[genomepair] << line;
+        file_map_[genomepair]->out_stream << line;
         num_opened++;
       }
 
@@ -117,7 +117,8 @@ void AllAllDist::ProcessResult(const char* result_buf) {
 
     {
       // is this lock necessary? are streams thread safe?
-      *out_file << ss.str();
+      absl::MutexLock l(&out_file->mu);
+      out_file->out_stream << ss.str();
     }
     total_matches_++;
   }
@@ -150,10 +151,10 @@ void AllAllDist::Finish() {
   // finalize output files
   for (auto& v : file_map_) {
     auto* of = v.second.get();
-    long pos = of->tellp();
-    of->seekp(pos - 2);
-    *of << " ]):";
-    of->close();
+    long pos = of->out_stream.tellp();
+    of->out_stream.seekp(pos - 2);
+    of->out_stream << " ]):";
+    of->out_stream.close();
   }
 
   cout << "Total matches: " << total_matches_.load() << "\n";

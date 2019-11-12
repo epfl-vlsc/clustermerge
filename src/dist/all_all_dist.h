@@ -77,6 +77,9 @@ class AllAllDist : public AllAllBase {
   // much
 
   struct LockedStream {
+    LockedStream(const std::string& path) {
+      out_stream.open(path, std::ofstream::out);
+    }
     LockedStream& operator=(LockedStream&& other) {
       out_stream = std::move(other.out_stream);
       return *this;
@@ -85,7 +88,7 @@ class AllAllDist : public AllAllBase {
     absl::Mutex mu;
   };
 
-  absl::node_hash_map<std::string, std::unique_ptr<std::ofstream>> file_map_;
+  absl::flat_hash_map<std::string, std::unique_ptr<LockedStream>> file_map_;
 
   // track outstanding alignment requests so we know when we are done
   std::atomic_uint_fast64_t outstanding_{0};

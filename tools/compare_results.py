@@ -203,8 +203,8 @@ def main():
         additional_pairs_in_ref[ref_key] = list_comp.only_in_list1()
         additional_pairs_in_data[ref_key] = list_comp.only_in_list2()
 
-    print("additional in data:\n {}".format(additional_pairs_in_data))
     print("additional in ref:\n {}".format(additional_pairs_in_ref))
+    print("additional in data:\n {}".format(additional_pairs_in_data))
 
     missed_scores = []
     for key, value in additional_pairs_in_ref.iteritems():

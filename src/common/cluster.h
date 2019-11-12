@@ -32,7 +32,7 @@ class Cluster {
     uint32_t num_seqs = cluster.NumSeqs();
     seqs_.reserve(num_seqs);
     for (size_t seq_i = 0; seq_i < num_seqs; seq_i++) {
-      AddSequence(seq_i);
+      AddSequence(cluster.SeqIndex(seq_i));
     }
     fully_merged_ = cluster.IsFullyMerged();
   }

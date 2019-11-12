@@ -388,7 +388,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
       std::cout << "Breaking partial merge.\n";
       break;
     }
-    Cluster c_standin;  // stand in cluster which holds diffs
+    Cluster c_standin(c_other.AllSequences());  // stand in cluster which holds diffs
     if (!fully_merged && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);
@@ -449,7 +449,7 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   // we can leave out without confusing the controller
   // adding only diffs
   if (!c_other.IsFullyMerged()) {
-    Cluster c_standin;
+    Cluster c_standin(c_other.AllSequences());
     auto seqs = c_other.Sequences();
     auto it = seqs.begin();
     // push only newly added sequences

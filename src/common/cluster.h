@@ -9,7 +9,7 @@
 
 class Cluster {
  public:
-  Cluster() = default;  // an empty cluster
+  Cluster(const std::vector<Sequence>& sequences) : all_seqs_(&sequences) {};  // an empty cluster
   Cluster(uint32_t seed, const std::vector<Sequence>& sequences) : all_seqs_(&sequences) { seqs_.push_back(seed); }
 
   Cluster(Cluster&& other) noexcept {
@@ -67,6 +67,7 @@ class Cluster {
   }
 
   const std::vector<uint32_t>& Sequences() const { return seqs_; }
+  const std::vector<Sequence>& AllSequences() const { return *all_seqs_; }
 
   void Lock() { mu_.Lock(); }
   void Unlock() { mu_.Unlock(); }

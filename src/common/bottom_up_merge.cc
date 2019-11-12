@@ -74,7 +74,7 @@ BottomUpMerge::BottomUpMerge(
   }
 
   for (const auto& cluster : dataset_json_obj["clusters"]) {
-    Cluster c;
+    Cluster c(sequences_);
     for (const auto& seq : cluster) {
       int abs_index = seq["AbsoluteIndex"];
       c.AddSequence(abs_index);

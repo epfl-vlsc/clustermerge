@@ -81,7 +81,7 @@ class Cluster {
   // NOTE testing vector here for dist version mem consumption
   // TODO have a base cluster class and inherit versions for dist and local?
   std::vector<uint32_t> seqs_;
-  const std::vector<Sequence>* all_seqs_;
+  const std::vector<Sequence>* all_seqs_ = nullptr;
   bool fully_merged_ = false;
   bool duplicate_ = false;
 

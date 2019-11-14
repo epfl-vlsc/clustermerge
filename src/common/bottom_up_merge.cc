@@ -22,14 +22,20 @@ BottomUpMerge::BottomUpMerge(std::vector<std::unique_ptr<Dataset>>& datasets,
         cout << "over size " << size << "\n";
         exit(0);
       }
-      Sequence seq(absl::string_view(data, size),  // coverages_.back(),
+      Sequence seq(absl::string_view(data, size),
                    dataset->Name(), dataset->Size(), genome_index++, id++);
 
-      ClusterSet cs(seq);
+      sequences_.push_back(seq);
 
-      sets_.push_back(std::move(cs));
       s = dataset->GetNextRecord(&data, &size);
     }
+  }
+  
+  for (const auto& seq : sequences_) {
+
+      ClusterSet cs(seq.ID(), sequences_);
+
+      sets_.push_back(std::move(cs));
   }
 }
 
@@ -45,7 +51,7 @@ BottomUpMerge::BottomUpMerge(
   size_t size_old;
   uint32_t id_old = 0;
 
-  std::vector<Sequence> old_sequences;
+  //std::vector<Sequence> old_sequences;
 
   for (auto& dataset_old : datasets_old) {
     cout << "Parsing dataset " << dataset_old->Name() << " ...\n";
@@ -62,16 +68,16 @@ BottomUpMerge::BottomUpMerge(
       Sequence seq(absl::string_view(data_old, size_old), dataset_old->Name(),
                    dataset_old->Size(), genome_index_old++, id_old++);
 
-      old_sequences.push_back(std::move(seq));
+      sequences_.push_back(std::move(seq));
       s_old = dataset_old->GetNextRecord(&data_old, &size_old);
     }
   }
 
   for (const auto& cluster : dataset_json_obj["clusters"]) {
-    Cluster c;
+    Cluster c(sequences_);
     for (const auto& seq : cluster) {
       int abs_index = seq["AbsoluteIndex"];
-      c.AddSequence(old_sequences[abs_index]);
+      c.AddSequence(abs_index);
     }
     old_set_.AddCluster(c);
   }
@@ -100,18 +106,25 @@ BottomUpMerge::BottomUpMerge(
       Sequence seq(absl::string_view(data, size),  // coverages_.back(),
                    dataset->Name(), dataset->Size(), genome_index++, id++);
 
-      ClusterSet cs(seq);
+      sequences_.push_back(seq);
+      /*ClusterSet cs(seq);
 
-      sets_.push_back(std::move(cs));
+      sets_.push_back(std::move(cs));*/
       s = dataset->GetNextRecord(&data, &size);
     }
+  }
+
+  for (size_t i = id_old; i < sequences_.size(); i++) {
+      ClusterSet cs(i, sequences_);
+
+      sets_.push_back(std::move(cs));
   }
 }
 
 void BottomUpMerge::DebugDump() {
   cout << "Dumping merger ... \n";
   for (const auto& cs : sets_) {
-    cs.DebugDump();
+    cs.DebugDump(sequences_);
   }
 }
 
@@ -258,7 +271,7 @@ agd::Status BottomUpMerge::RunMulti(
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {
     cout << "Scheduling all-all alignments ...\n";
-    final_set.ScheduleAlignments(executor);
+    final_set.ScheduleAlignments(executor, sequences_);
     cout << "Finished alignment scheduling. \n";
   } else {
     cout << "Skipping all all computation ...\n";
@@ -307,7 +320,7 @@ agd::Status BottomUpMerge::Run(AllAllExecutor* executor,
 
   // for all clusters in final set, schedule all-all alignments with executor
   if (do_allall) {
-    final_set.ScheduleAlignments(executor);
+    final_set.ScheduleAlignments(executor, sequences_);
   } else {
     cout << "Skipping all all computation ...\n";
   }

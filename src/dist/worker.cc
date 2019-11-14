@@ -97,6 +97,62 @@ agd::Status Worker::SignalHandler(int signal_num) {
   return agd::Status::OK();
 }
 
+int Worker::ProcessAlignments(const char* seq_buf, ProteinAligner* aligner, AlignmentResults* result) {
+  AlignmentRequestView reqs(seq_buf);
+  const SeqPair* abs_seq_pair;
+  result->Init(500);
+  size_t num = 0;
+  while (reqs.GetNextPair(&abs_seq_pair)) {
+    //cout << "got seq pair\n";
+    ProteinAligner::Alignment alignment;
+
+    alignment.score = 0;  // 0 score will signify not to create candidate
+    auto* seq1 = &sequences_[abs_seq_pair->seq1];
+    auto* seq2 = &sequences_[abs_seq_pair->seq2];
+
+    if (aligner->LogPamPassesThreshold(seq1->Seq().data(), seq2->Seq().data(),
+                                       seq1->Seq().size(),
+                                       seq2->Seq().size())) {
+      // auto t0 = std::chrono::high_resolution_clock::now();
+      agd::Status s = aligner->AlignLocal(
+          seq1->Seq().data(), seq2->Seq().data(), seq1->Seq().size(),
+          seq2->Seq().size(), alignment);
+      /*auto t1 = std::chrono::high_resolution_clock::now();
+      auto duration = t1 - t0;
+      auto msec =
+          std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+      alignment_times.push_back(msec.count());*/
+      // num_full_alignments_++;
+
+      if (AllAllExecutor::PassesLengthConstraint(alignment, seq1->Seq().size(),
+                                                 seq2->Seq().size()) &&
+          AllAllExecutor::PassesScoreConstraint(aligner->Params(),
+                                                alignment.score)) {
+        //cout << "match between " << abs_seq_pair->seq1 << " and " << abs_seq_pair->seq2 << " \n";
+        DistMatchResult new_match;
+        new_match.m.seq1_min = alignment.seq1_min;
+        new_match.m.seq1_max = alignment.seq1_max;
+        new_match.m.seq2_min = alignment.seq2_min;
+        new_match.m.seq2_max = alignment.seq2_max;
+        new_match.m.score = alignment.score;
+        new_match.m.variance = alignment.pam_variance;
+        new_match.m.distance = alignment.pam_distance;
+        new_match.m.cluster_size = 0;  // not sending this right now
+        new_match.abs_seq_1 = abs_seq_pair->seq1;
+        new_match.abs_seq_2 = abs_seq_pair->seq2;
+        result->SerializeResult(&new_match);
+        num++;
+        // matches[genome_pair][seq_pair] = new_match;
+      }
+    }
+  }
+  if (num != result->NumResults()) {
+    cout << "num does not equal num result in matches\n";
+    exit(0);
+  }
+  return 0;
+}
+
 agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                         std::vector<std::unique_ptr<Dataset>>& datasets,
                         int* const signal_num) {
@@ -391,11 +447,19 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         mu_.Unlock();
 
+        cout << "got needed set\n";
+        auto start = std::chrono::high_resolution_clock::now();
         MarshalledClusterSetView set(it->second.first.data());
         ClusterSet cs(set, it->second.second, start_index, end_index,
                       sequences_);
 
         Cluster c(cluster, sequences_);
+        auto end = std::chrono::high_resolution_clock::now();
+        cout << "built set and cluster, took "
+             << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                      start)
+                    .count()
+             << " ms\n";
 
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
@@ -418,6 +482,14 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
 
+      } else if (request.Type() == RequestType::Alignment) {
+        AlignmentResults results;
+        //cout << "processing alignments!!\n";
+        int res = ProcessAlignments(request.data, &aligner, &results);
+        MarshalledResponse resp;
+        resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), free_func, NULL);
+
+        result_queue_->push(std::move(resp));
       } else {
         cout << "request was not any type!!!!!!\n";
         return;
@@ -448,9 +520,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
   });
 
   incomplete_request_queue_thread_ = thread([this, &params]() {
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
+
     while (!(irqt_signal_ && incomplete_request_queue_->size() == 0)) {
       MarshalledRequest request;
 

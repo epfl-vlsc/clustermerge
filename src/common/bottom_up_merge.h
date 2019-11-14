@@ -45,6 +45,9 @@ class BottomUpMerge {
   // aligner object
   ProteinAligner* aligner_;
 
+  // sequences
+  std::vector<Sequence> sequences_;
+
   // mutex and sync vars
   absl::Mutex queue_mu_;
   std::atomic<uint32_t> cluster_sets_left_;

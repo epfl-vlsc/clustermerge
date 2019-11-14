@@ -6,15 +6,17 @@
 #include "cluster.h"
 #include "src/comms/requests.h"
 
+void free_func(void* data, void* hint); 
+
 class MergeExecutor;
 
 class ClusterSet {
  public:
   ClusterSet() = default;
   ClusterSet(ClusterSet&& other) { clusters_ = std::move(other.clusters_); }
-  ClusterSet(Sequence& seed) {
+  ClusterSet(uint32_t seed, const std::vector<Sequence>& sequences) {
     // construct from a single sequence
-    Cluster c(seed);
+    Cluster c(seed, sequences);
     clusters_.push_back(std::move(c));
   }
   ClusterSet(Cluster& c) {
@@ -66,16 +68,14 @@ class ClusterSet {
   void MergeClusterLocked(Cluster* cluster, ProteinAligner* aligner);
 
   // schedule all-all alignments onto the executor threadpool
-  void ScheduleAlignments(AllAllExecutor* executor);
+  void ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>& sequences);
 
   // remove duplicate clusters from this set
   void RemoveDuplicates();
 
-  void DebugDump() const;
+  void DebugDump(const std::vector<Sequence>& sequences) const;
   void DumpJson(const std::string& filename,
                 std::vector<std::string>& dataset_file_names) const;
-
-  void MarshalToBuffer(agd::Buffer* buf);
 
   size_t Size() { return clusters_.size(); }
 

@@ -10,6 +10,7 @@
 #include "src/common/all_all_executor.h"
 #include "src/common/cluster_set.h"
 #include "src/dist/checkpoint.h"
+#include "src/dist/all_all_dist.h"
 
 using std::cout;
 using std::string;
@@ -207,9 +208,6 @@ agd::Status Controller::Run(const Params& params,
     // put in work queue zmq
     // repeat
     MarshalledRequest merge_request;
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
 
     while (run_) {
       if (!request_queue_->pop(merge_request)) {
@@ -256,10 +254,6 @@ agd::Status Controller::Run(const Params& params,
   set_request_thread_ = thread([this]() {
     // receive requests from worker and send them cluster sets
 
-    auto free_func = [](void* data, void* hint) {
-      delete[] reinterpret_cast<char*>(data);
-    };
-
     while (run_) {
       zmq::message_t message;
       bool success = zmq_set_request_socket_->recv(&message);
@@ -294,7 +288,7 @@ agd::Status Controller::Run(const Params& params,
         if (!success) {
           cout << "Thread failed to send cluster set over zmq!\n";
         }
-        cout << "Set sent with id: [" << id << "] \n";
+        //cout << "Set sent with id: [" << id << "] \n";
       }
     }
   });
@@ -352,8 +346,10 @@ agd::Status Controller::Run(const Params& params,
   // prevent bottlenecks. May be required to use a different structure for
   // tracking partial mergers rather than the current map, which needs to be
   // locked
+    
+  AllAllDist allalldist(request_queue_.get(), sequences_, "dist_output_dir");
 
-  auto worker_func = [this, &outstanding_requests]() {
+  auto worker_func = [this, &outstanding_requests, &allalldist]() {
     // read from result queue
     // if is a batch result and is small enough, push to WorkManager
     // if is partial result (ID will be
@@ -421,6 +417,11 @@ agd::Status Controller::Run(const Params& params,
           sets_to_merge_queue_->push(std::move(set));
           outstanding_requests--;
         }
+      } else if (type == RequestType::Alignment) {
+       //cout << "received matches\n";
+        const char* matches_buf = reinterpret_cast<const char*>(response.msg.data());
+        allalldist.ProcessResult(matches_buf);
+
       } else {
         cout << "Response was not of any type!!!!\n";
         exit(0);
@@ -557,11 +558,13 @@ agd::Status Controller::Run(const Params& params,
       PartialMergeItem item;
       item.num_received = 0;
 
+      //cout << "Swapping\n";
       // use outstanding merges as id
       if (sets[0].NumClusters() < sets[1].NumClusters()) {
         std::swap(sets[0], sets[1]);
       }
 
+      //cout << "starting parse\n";
       // iterate through the second cluster set to determine num_expected
       MarshalledClusterView cluster, cluster2;
 
@@ -592,8 +595,8 @@ agd::Status Controller::Run(const Params& params,
       }
 
       item.num_expected = num_chunks;
-      std::cout << "Num expected: " << item.num_expected << " "
-                << " set1 clusters: " << sets[0].NumClusters() << "\n";
+      /*std::cout << "Num expected: " << item.num_expected << " "
+                << " set1 clusters: " << sets[0].NumClusters() << "\n";*/
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
@@ -661,7 +664,6 @@ agd::Status Controller::Run(const Params& params,
   cout << "done and waiting for final result...\n";
   // while (sets_to_merge_queue_->size() != 1);;
 
-  cout << "scheduling final alignments on controller...\n";
   MarshalledClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -683,11 +685,15 @@ agd::Status Controller::Run(const Params& params,
   set.DumpJson("dist_clusters.json", placeholder);
 
   if (!params.exclude_allall) {
-    AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
-                            &aligner_params);
-    executor.Initialize();
+    cout << "scheduling all-all alignments on workers...\n";
+    /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
+                            &aligner_params);*/
+
+    set.ScheduleAlignments(&allalldist, sequences_);
+    allalldist.Finish();
+    /*executor.Initialize();
     set.ScheduleAlignments(&executor);
-    executor.FinishAndOutput("dist_output_dir");
+    executor.FinishAndOutput("dist_output_dir");*/
   } else {
     cout << "Skipping all-all alignments ...\n";
   }

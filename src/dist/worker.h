@@ -88,4 +88,6 @@ class Worker {
   std::string request_queue_address;
   std::string incomplete_request_queue_address;
   std::string set_request_queue_address;
+
+  int ProcessAlignments(const char* seq_buf, ProteinAligner* aligner, AlignmentResults* results);
 };

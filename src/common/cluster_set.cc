@@ -484,14 +484,14 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>&
     }
   }
 
-  std::cout << "Found " << num_dups_found << " duplicate clusters.\n";
+  std::cout << "Found " << num_dups_found << " duplicate clusters." << std::endl;
   // sort by residue total first
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
   std::sort(clusters_.begin(), clusters_.end(), [](Cluster& a, Cluster& b) {
     return a.Sequences().size() > b.Sequences().size();
   });
-  std::cout << "done sorting clusters.\n";
+  std::cout << "done sorting clusters." << std::endl;
 
   CandidateMap candidate_map(40000000);  // only a few MB
   int num_avoided = 0;
@@ -537,7 +537,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>&
       }
     }
   }
-  std::cout << "Avoided " << num_avoided << " alignments.\n";
+  std::cout << "Avoided " << num_avoided << " alignments." << std::endl;
 }
 
 void ClusterSet::DumpJson(const std::string& filename,

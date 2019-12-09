@@ -365,7 +365,7 @@ int main(int argc, char* argv[]) {
     }
     Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
-      cout << "Error: " << stat.error_message() << "\n";
+      cout << "Error: " << stat.error_message() << std::endl;
       return -1;
     }
   } else {
@@ -382,11 +382,12 @@ int main(int argc, char* argv[]) {
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.set_request_port = set_request_port;
     signal(SIGUSR1, signal_notifier);
+    signal(SIGUSR2, signal_notifier);
     // signal(SIGINT, signal_notifier);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {
-      cout << "Error: " << stat.error_message() << "\n";
+      cout << "Error: " << stat.error_message() << std::endl;
       return -1;
     }
   }

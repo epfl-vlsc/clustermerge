@@ -386,7 +386,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // merge (do work)
       // encode result, put in queue
       time_t now_time = std::time(0);
-      cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] Request received:\n";
+      cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] Request received:" << std::endl;
       if (request.Type() == RequestType::Batch) {
         cout << "its a batch, request ID is " << request.ID() << std::endl;
         //auto& batch = request.batch();

@@ -678,7 +678,9 @@ agd::Status Controller::Run(const Params& params,
   cout << "Clustering execution time: " << sec.count() << " seconds.\n";
 
   std::ofstream timing_file("dist_timing.txt", std::ofstream::out);
-  timing_file << sec.count() << "\n";
+  timing_file << sec.count() << std::endl;
+  timing_file.close();
+  
 
   ClusterSet set(final_set, sequences_);
   std::vector<string> placeholder = {"dist_placeholder"};

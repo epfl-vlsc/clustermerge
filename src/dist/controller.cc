@@ -447,12 +447,16 @@ agd::Status Controller::Run(const Params& params,
   char response = 'n';
   if (params.checkpoint_interval &&
       CheckpointFileExists(params.checkpoint_dir)) {
-    auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
-                               ". Do you want to load it? (y/n):");
-    while (PromptForChar(prompt, response)) {
-      if ((response == 'y') | (response == 'n')) {
-        break;
-      }
+    if (params.load_checkpoint_auto) {
+       response = 'y';
+    } else {
+       auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
+                                  ". Do you want to load it? (y/n):");
+       while (PromptForChar(prompt, response)) {
+         if ((response == 'y') | (response == 'n')) {
+           break;
+         }
+       }
     }
   }
 

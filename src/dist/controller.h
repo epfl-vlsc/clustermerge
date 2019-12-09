@@ -35,6 +35,7 @@ class Controller {
     bool exclude_allall;
     int dataset_limit;
     long int checkpoint_interval;
+    bool load_checkpoint_auto;
     absl::string_view checkpoint_dir;
   };
 

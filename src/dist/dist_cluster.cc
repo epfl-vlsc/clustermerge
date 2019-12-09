@@ -121,6 +121,13 @@ int main(int argc, char* argv[]) {
       "Recommended value 900s"
       " [0 (off)]",
       {'c', "checkpoint_interval"});
+  args::Flag load_checkpoint(
+      parser, "load_checkpoint", 
+      "In case a checkpoint file exists, this flag will turn auto-loading "
+      "(without asking on prompt) on. If no checkpoint exists, this flag "
+      "has no effect. If it is not set, the user is asked on the prompt "
+      "whether or not the checkpoint should be loaded",
+      {'l', "load_checkpoint"});
 
   try {
     parser.ParseCLI(argc, argv);
@@ -141,6 +148,11 @@ int main(int argc, char* argv[]) {
   if (checkpoint_interval_arg) {
     checkpoint_interval = args::get(checkpoint_interval_arg);
     cout << "checkpoint interval: " << checkpoint_interval << "\n";
+  }
+
+  bool load_checkpoint_auto = false;
+  if (load_checkpoint) {
+     load_checkpoint_auto = args::get(load_checkpoint);
   }
 
   // parse the server cluster config file to see if we are a worker or the
@@ -357,6 +369,7 @@ int main(int argc, char* argv[]) {
     params.max_set_size = max_set_size;
     params.exclude_allall = exclude_allall;
     params.checkpoint_interval = checkpoint_interval;
+    params.load_checkpoint_auto = load_checkpoint_auto;
     params.checkpoint_dir = absl::string_view(checkpoint_dir);
     if (dataset_limit_arg) {
       params.dataset_limit = args::get(dataset_limit_arg);

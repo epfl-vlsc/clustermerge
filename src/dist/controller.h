@@ -28,6 +28,7 @@ class Controller {
     int incomplete_request_queue_port;
     int set_request_port;
     absl::string_view data_dir_path;
+    absl::string_view output_dir;
     uint32_t batch_size;
     uint32_t nseqs_threshold;
     uint32_t dup_removal_thresh;

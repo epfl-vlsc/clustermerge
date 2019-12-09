@@ -347,7 +347,7 @@ agd::Status Controller::Run(const Params& params,
   // tracking partial mergers rather than the current map, which needs to be
   // locked
     
-  AllAllDist allalldist(request_queue_.get(), sequences_, "dist_output_dir");
+  AllAllDist allalldist(request_queue_.get(), sequences_, std::string(params.output_dir));
 
   auto worker_func = [this, &outstanding_requests, &allalldist]() {
     // read from result queue
@@ -682,7 +682,8 @@ agd::Status Controller::Run(const Params& params,
 
   ClusterSet set(final_set, sequences_);
   std::vector<string> placeholder = {"dist_placeholder"};
-  set.DumpJson("dist_clusters.json", placeholder);
+  string json_output_file = absl::StrCat(params.output_dir, "dist_clusters.json");
+  set.DumpJson(json_output_file, placeholder);
 
   if (!params.exclude_allall) {
     cout << "scheduling all-all alignments on workers...\n";

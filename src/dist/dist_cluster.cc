@@ -346,6 +346,7 @@ int main(int argc, char* argv[]) {
     params.nseqs_threshold = nseqs_threshold;
     params.controller_ip = controller_ip;
     params.data_dir_path = json_dir_path;
+    params.output_dir = dir;
     params.num_threads = threads;
     params.queue_depth = queue_depth;
     params.request_queue_port = request_queue_port;

@@ -45,7 +45,7 @@ agd::Status Controller::Run(const Params& params,
                             std::vector<std::unique_ptr<Dataset>>& datasets) {
   checkpoint_timer_ = timestamp();
   std::atomic_int_fast32_t outstanding_requests{0};
-  cout << "Num seqs threshold: " << params.nseqs_threshold << "\n";
+  cout << "Num seqs threshold: " << params.nseqs_threshold << std::endl;
   // index all sequences
   agd::Status s = Status::OK();
   const char* data;
@@ -66,7 +66,7 @@ agd::Status Controller::Run(const Params& params,
 
   if (params.checkpoint_interval) {
     cout << "controller will checkpoint with interval of "
-         << params.checkpoint_interval << "\n";
+         << params.checkpoint_interval << std::endl;
   }
 
   auto total_merges = sequences_.size() - 1;
@@ -74,8 +74,8 @@ agd::Status Controller::Run(const Params& params,
   if (params.dataset_limit > 0) {
     outstanding_merges_ = params.dataset_limit - 1;
   }
-  cout << "outstanding merges to complete: " << outstanding_merges_ << "\n";
-  cout << "dup removal thresh is " << params.dup_removal_thresh << "\n";
+  cout << "outstanding merges to complete: " << outstanding_merges_ << std::endl;
+  cout << "dup removal thresh is " << params.dup_removal_thresh << std::endl;
   cout << "Using " << params.num_threads << " threads to merge partials\n";
 
   // create envs, params
@@ -105,7 +105,7 @@ agd::Status Controller::Run(const Params& params,
 
   // initializing envs is expensive, so don't copy this
   cout << "Worker initializing environments from " << params.data_dir_path
-       << "\n";
+       << std::endl;
   envs.InitFromJSON(logpam_json, all_matrices_json, aligner_params.min_score);
   cout << "Done.\n";
 
@@ -221,7 +221,7 @@ agd::Status Controller::Run(const Params& params,
       zmq::message_t msg(merge_request.buf.release_raw(), size, free_func,
                          NULL);
       /*cout << "pushing request of size " << size << " of type "
-           << (merge_request.has_batch() ? "batch " : "partial ") << "\n";*/
+           << (merge_request.has_batch() ? "batch " : "partial ") << std::endl;*/
 
       bool success = zmq_send_socket_->send(std::move(msg));
       if (!success) {
@@ -230,7 +230,7 @@ agd::Status Controller::Run(const Params& params,
       total_sent++;
     }
 
-    cout << "Work queue thread ending. Total sent: " << total_sent << "\n";
+    cout << "Work queue thread ending. Total sent: " << total_sent << std::endl;
   });
 
   // std::thread queue_measure_thread = std::thread([this](){
@@ -316,7 +316,7 @@ agd::Status Controller::Run(const Params& params,
     }
 
     cout << "Work queue thread ending. Total received: " << total_received
-         << "\n";
+         << std::endl;
   });
 
   incomplete_request_queue_thread_ = thread([this, &total_received]() {
@@ -347,7 +347,7 @@ agd::Status Controller::Run(const Params& params,
   // tracking partial mergers rather than the current map, which needs to be
   // locked
     
-  AllAllDist allalldist(request_queue_.get(), sequences_, "dist_output_dir");
+  AllAllDist allalldist(request_queue_.get(), sequences_, std::string(params.output_dir));
 
   auto worker_func = [this, &outstanding_requests, &allalldist]() {
     // read from result queue
@@ -378,7 +378,7 @@ agd::Status Controller::Run(const Params& params,
           absl::MutexLock l(&mu_);
           auto partial_it = partial_merge_map_.find(id);
           if (partial_it == partial_merge_map_.end()) {
-            cout << "error thing in map was not -1, was " << id << "\n";
+            cout << "error thing in map was not -1, was " << id << std::endl;
             exit(0);
           }
           partial_item = &partial_it->second;
@@ -398,18 +398,18 @@ agd::Status Controller::Run(const Params& params,
           MarshalledClusterSet set;
           if (outstanding_merges_ == 0) {
             cout << "building final marshalled set, time: "
-                 << static_cast<long int>(std::time(0)) << "\n";
+                 << static_cast<long int>(std::time(0)) << std::endl;
           }
           partial_item->partial_set.BuildMarshalledSet(&set);
           set.SortSet();
           if (outstanding_merges_ == 0) {
             cout << "done, time: " << static_cast<long int>(std::time(0))
-                 << "\n";
+                 << std::endl;
           }
           {
             if (outstanding_merges_ == 1) {
               cout << "last request complete, 1 merge left, time: "
-                   << static_cast<long int>(std::time(0)) << "\n";
+                   << static_cast<long int>(std::time(0)) << std::endl;
             }
             absl::MutexLock l(&mu_);
             partial_merge_map_.erase(id);
@@ -447,12 +447,16 @@ agd::Status Controller::Run(const Params& params,
   char response = 'n';
   if (params.checkpoint_interval &&
       CheckpointFileExists(params.checkpoint_dir)) {
-    auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
-                               ". Do you want to load it? (y/n):");
-    while (PromptForChar(prompt, response)) {
-      if ((response == 'y') | (response == 'n')) {
-        break;
-      }
+    if (params.load_checkpoint_auto) {
+       response = 'y';
+    } else {
+       auto prompt = absl::StrCat("Checkpoint found at ", params.checkpoint_dir,
+                                  ". Do you want to load it? (y/n):");
+       while (PromptForChar(prompt, response)) {
+         if ((response == 'y') | (response == 'n')) {
+           break;
+         }
+       }
     }
   }
 
@@ -475,7 +479,7 @@ agd::Status Controller::Run(const Params& params,
     }
     outstanding_merges_ = sets_to_merge_queue_->size() - 1;
     cout << "Loaded checkpoint, outstanding merges: " << outstanding_merges_
-         << "\n";
+         << std::endl;
   }
   cout << "done\n";
 
@@ -493,13 +497,18 @@ agd::Status Controller::Run(const Params& params,
     if (params.checkpoint_interval > 0 &&
         timestamp() - checkpoint_timer_ > params.checkpoint_interval) {
       cout << "Checkpointing, waiting for outstanding requests...\n";
+      auto start_wait_checkpoint_time = std::chrono::high_resolution_clock::now();
 
       while (outstanding_requests.load() > 0) {
         cout << "Waiting to checkpoint, " << outstanding_requests.load()
              << " requests outstanding ...\n";
         std::this_thread::sleep_for(500ms);
       }
-      cout << "Writing checkpoint ...\n";
+      auto end_wait_checkpoint_time = std::chrono::high_resolution_clock::now();
+      auto wait_duration = end_wait_checkpoint_time - start_wait_checkpoint_time;
+      cout << "Writing checkpoint after " 
+           << std::chrono::duration_cast<std::chrono::seconds>(wait_duration).count()
+           << "sec waiting for outstanding requests ..." << std::endl;
       // write sets to merge queue
       agd::Status stat =
           WriteCheckpointFile(params.checkpoint_dir, sets_to_merge_queue_);
@@ -507,7 +516,7 @@ agd::Status Controller::Run(const Params& params,
         return stat;
       }
       checkpoint_timer_ = timestamp();
-      cout << "Checkpoint complete\n";
+      cout << "Checkpoint complete" << std::endl;
     }
 
     if (!sets_to_merge_queue_->pop(sets[0])) {
@@ -526,7 +535,7 @@ agd::Status Controller::Run(const Params& params,
       // cout << "two sets are small, batching ...\n";
 
       uint32_t total_clusters = sets[0].NumClusters() + sets[1].NumClusters();
-      // cout << "total clusters: " << total_clusters << "\n";
+      // cout << "total clusters: " << total_clusters << std::endl;
       MarshalledRequest request;
       request.CreateBatchRequest(-1);
       request.AddSetToBatch(sets[0]);
@@ -591,7 +600,7 @@ agd::Status Controller::Run(const Params& params,
 
       item.num_expected = num_chunks;
       /*std::cout << "Num expected: " << item.num_expected << " "
-                << " set1 clusters: " << sets[0].NumClusters() << "\n";*/
+                << " set1 clusters: " << sets[0].NumClusters() << std::endl;*/
       // Reset calls done in function
       item.partial_set.Init(sets[0], sets[1]);
       item.marshalled_set_buf.AppendBuffer(sets[1].buf.data(),
@@ -645,10 +654,12 @@ agd::Status Controller::Run(const Params& params,
       outstanding_requests++;
       if (outstanding_merges_ == 1) {
         cout << "last request sent, 1 merge left, time: "
-             << static_cast<long int>(std::time(0)) << "\n";
+             << static_cast<long int>(std::time(0)) << std::endl;
       }
     }
-    // cout << "outstanding merges: " << outstanding_merges_ << "\n";
+    time_t now_time = std::time(0);
+    cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] " 
+         << "outstanding merges: " << outstanding_merges_ << std::endl;
   }
 
   // we must now wait for the last results to come in
@@ -660,25 +671,28 @@ agd::Status Controller::Run(const Params& params,
   MarshalledClusterSet final_set;
   sets_to_merge_queue_->peek(final_set);
   auto t1 = std::chrono::high_resolution_clock::now();
-  cout << "final set size is " << final_set.NumClusters() << " clusters\n";
-  cout << "partial merge map size is " << partial_merge_map_.size() << "\n";
-  cout << "sets to merge size is " << sets_to_merge_queue_->size() << "\n";
-  cout << "request queue size " << request_queue_->size() << "\n";
-  cout << "response queue size " << response_queue_->size() << "\n";
+  cout << "final set size is " << final_set.NumClusters() << " clusters" << std::endl;
+  cout << "partial merge map size is " << partial_merge_map_.size() << std::endl;
+  cout << "sets to merge size is " << sets_to_merge_queue_->size() << std::endl;
+  cout << "request queue size " << request_queue_->size() << std::endl;
+  cout << "response queue size " << response_queue_->size() << std::endl;
 
   auto duration = t1 - t0;
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-  cout << "Clustering execution time: " << sec.count() << " seconds.\n";
+  cout << "Clustering execution time: " << sec.count() << " seconds." << std::endl;
 
   std::ofstream timing_file("dist_timing.txt", std::ofstream::out);
-  timing_file << sec.count() << "\n";
+  timing_file << sec.count() << std::endl;
+  timing_file.close();
+  
 
   ClusterSet set(final_set, sequences_);
   std::vector<string> placeholder = {"dist_placeholder"};
-  set.DumpJson("dist_clusters.json", placeholder);
+  string json_output_file = absl::StrCat(params.output_dir, "dist_clusters.json");
+  set.DumpJson(json_output_file, placeholder);
 
   if (!params.exclude_allall) {
-    cout << "scheduling all-all alignments on workers...\n";
+    cout << "scheduling all-all alignments on workers..." << std::endl;
     /*AllAllExecutor executor(std::thread::hardware_concurrency(), 500, &envs,
                             &aligner_params);*/
 
@@ -688,10 +702,10 @@ agd::Status Controller::Run(const Params& params,
     set.ScheduleAlignments(&executor);
     executor.FinishAndOutput("dist_output_dir");*/
   } else {
-    cout << "Skipping all-all alignments ...\n";
+    cout << "Skipping all-all alignments ..." << std::endl;
   }
 
-  cout << "clustering complete!! Joining threads ...\n";
+  cout << "clustering complete!! Joining threads ..." << std::endl;
 
   run_ = false;
   response_queue_->unblock();
@@ -706,7 +720,7 @@ agd::Status Controller::Run(const Params& params,
   incomplete_request_queue_thread_.join();
   set_request_thread_.join();
 
-  cout << "All threads joined.\n";
+  cout << "All threads joined." << std::endl;
 
   return agd::Status::OK();
 }

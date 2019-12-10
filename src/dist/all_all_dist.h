@@ -29,26 +29,26 @@ class AllAllDist : public AllAllBase {
     struct stat info;
     if (stat(output_dir_.c_str(), &info) != 0) {
       // doesnt exist, create
-      std::cout << "creating dir " << output_dir << "\n";
+      std::cout << "creating dir " << output_dir << std::endl;
       int e = mkdir(output_dir_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
       if (e != 0) {
         std::cout << "could not create output dir " << output_dir
-             << ", exiting ...\n";
-        exit(0);
+             << ", exiting ..." << std::endl;
+        exit(1);
       }
     } else if (!(info.st_mode & S_IFDIR)) {
       // exists but not dir
       std::cout << "output dir exists but is not dir, exiting ...\n";
-      exit(0);
+      exit(1);
     } else {
       // dir exists, nuke
       // im too lazy to do this the proper way
       std::string cmd = absl::StrCat("rm -rf ", output_dir, "/*");
-      std::cout << "dir " << output_dir << " exists, nuking ...\n";
+      std::cout << "dir " << output_dir << " exists, nuking ..." << std::endl;
       int nuke_result = system(cmd.c_str());
       if (nuke_result != 0) {
-        std::cout << "Could not nuke dir " << output_dir << "\n";
-        exit(0);
+        std::cout << "Could not nuke dir " << output_dir << std::endl;
+        exit(1);
       }
     }
   }

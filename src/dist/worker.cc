@@ -385,10 +385,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       // build cluster(s)
       // merge (do work)
       // encode result, put in queue
-      // cout << "Got a request: " << request.ID() << std::endl;
+      time_t now_time = std::time(0);
+      cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "] Request received:" << std::endl;
       if (request.Type() == RequestType::Batch) {
-        // cout << "its a batch, request ID is " << request.ID() << " \n";
-        // auto& batch = request.batch();
+        cout << "its a batch, request ID is " << request.ID() << std::endl;
+        //auto& batch = request.batch();
         MarshalledClusterSetView clusterset;
         while (request.NextClusterSet(&clusterset)) {
           // construct cluster set from proto
@@ -480,15 +481,24 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
                                        cluster_index, &response);
         assert(response.Set().NumClusters() == new_cs.Size());
         result_queue_->push(std::move(response));
+        auto end_send = std::chrono::high_resolution_clock::now();
+        cout << "Partial request processed. Took "
+             << std::chrono::duration_cast<std::chrono::milliseconds>(end_send - start).count() 
+             << "ms" << std::endl;
 
       } else if (request.Type() == RequestType::Alignment) {
         AlignmentResults results;
         //cout << "processing alignments!!\n";
+        auto start = std::chrono::high_resolution_clock::now();
         int res = ProcessAlignments(request.data, &aligner, &results);
         MarshalledResponse resp;
         resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), free_func, NULL);
 
         result_queue_->push(std::move(resp));
+        auto end = std::chrono::high_resolution_clock::now();
+        cout << "Alignment request processed. Took " 
+             << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() 
+             << "ms" << std::endl;
       } else {
         cout << "request was not any type!!!!!!\n";
         return;

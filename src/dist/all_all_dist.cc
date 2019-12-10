@@ -66,17 +66,17 @@ void AllAllDist::ProcessResult(const char* result_buf) {
           // cout << "creating dir " << path << "\n";
           int e = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
           if (e != 0) {
-            cout << "could not create output dir " << path << ", exiting ...\n";
-            exit(0);
+            cout << "could not create output dir " << path << ", exiting ..." << std::endl;
+            exit(1);
           }
         } else if (!(info.st_mode & S_IFDIR)) {
           // exists but not dir
-          cout << "output dir exists but is not dir, exiting ...\n";
-          exit(0);
+          cout << "output dir exists but is not dir, exiting ..." << std::endl;
+          exit(1);
         }  // else, dir exists,
 
         absl::StrAppend(&path, "/", seq2.Genome());
-        cout << "opening file " << path << "\n";
+        cout << "opening file " << path << std::endl;
 
         file_map_[genomepair] =
             std::unique_ptr<LockedStream>(new LockedStream(path));
@@ -142,11 +142,11 @@ void AllAllDist::Finish() {
     outstanding_++;
   }
 
-  cout << "Waiting for alignments to finish ... \n";
+  cout << "Waiting for alignments to finish ... " << std::endl;
   while (outstanding_.load() > 0) {
     std::this_thread::sleep_for(1s);
   }
-  cout << "Done.\n";
+  cout << "Done." << std::endl;
 
   // finalize output files
   for (auto& v : file_map_) {
@@ -158,5 +158,5 @@ void AllAllDist::Finish() {
   }
 
   cout << "Total matches: " << total_matches_.load() << "\n";
-  cout << "Total All-All full alignments: " << total_alignments_.load() << "\n";
+  cout << "Total All-All full alignments: " << total_alignments_.load() << std::endl;
 }

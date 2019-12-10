@@ -121,6 +121,13 @@ int main(int argc, char* argv[]) {
       "Recommended value 900s"
       " [0 (off)]",
       {'c', "checkpoint_interval"});
+  args::Flag load_checkpoint(
+      parser, "load_checkpoint", 
+      "In case a checkpoint file exists, this flag will turn auto-loading "
+      "(without asking on prompt) on. If no checkpoint exists, this flag "
+      "has no effect. If it is not set, the user is asked on the prompt "
+      "whether or not the checkpoint should be loaded",
+      {'l', "load_checkpoint"});
 
   try {
     parser.ParseCLI(argc, argv);
@@ -141,6 +148,11 @@ int main(int argc, char* argv[]) {
   if (checkpoint_interval_arg) {
     checkpoint_interval = args::get(checkpoint_interval_arg);
     cout << "checkpoint interval: " << checkpoint_interval << "\n";
+  }
+
+  bool load_checkpoint_auto = false;
+  if (load_checkpoint) {
+     load_checkpoint_auto = args::get(load_checkpoint);
   }
 
   // parse the server cluster config file to see if we are a worker or the
@@ -346,6 +358,7 @@ int main(int argc, char* argv[]) {
     params.nseqs_threshold = nseqs_threshold;
     params.controller_ip = controller_ip;
     params.data_dir_path = json_dir_path;
+    params.output_dir = dir;
     params.num_threads = threads;
     params.queue_depth = queue_depth;
     params.request_queue_port = request_queue_port;
@@ -356,6 +369,7 @@ int main(int argc, char* argv[]) {
     params.max_set_size = max_set_size;
     params.exclude_allall = exclude_allall;
     params.checkpoint_interval = checkpoint_interval;
+    params.load_checkpoint_auto = load_checkpoint_auto;
     params.checkpoint_dir = absl::string_view(checkpoint_dir);
     if (dataset_limit_arg) {
       params.dataset_limit = args::get(dataset_limit_arg);
@@ -364,7 +378,7 @@ int main(int argc, char* argv[]) {
     }
     Status stat = controller.Run(params, aligner_params, datasets);
     if (!stat.ok()) {
-      cout << "Error: " << stat.error_message() << "\n";
+      cout << "Error: " << stat.error_message() << std::endl;
       return -1;
     }
   } else {
@@ -381,11 +395,12 @@ int main(int argc, char* argv[]) {
     params.incomplete_request_queue_port = incomplete_request_queue_port;
     params.set_request_port = set_request_port;
     signal(SIGUSR1, signal_notifier);
+    signal(SIGUSR2, signal_notifier);
     // signal(SIGINT, signal_notifier);
     Status stat =
         worker.Run(params, aligner_params, datasets, (int*)&signal_num);
     if (!stat.ok()) {
-      cout << "Error: " << stat.error_message() << "\n";
+      cout << "Error: " << stat.error_message() << std::endl;
       return -1;
     }
   }

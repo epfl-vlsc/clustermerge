@@ -4,17 +4,19 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include "absl/container/flat_hash_set.h"
 #include "aligner.h"
 #include "candidate_map.h"
 #include "debug.h"
 #include "json.hpp"
 #include "merge_executor.h"
+#include "src/common/buffered_compressor.h"
 
 using std::make_tuple;
 using std::vector;
 
-void free_func(void* data, void* hint) {
+void cm_free_func(void* data, void* hint) {
   delete[] reinterpret_cast<char*>(data);
 }
 
@@ -54,7 +56,7 @@ void ClusterSet::BuildMarshalledResponse(int id, RequestType type,
   hp->num_clusters = clusters_.size();
   // hand the buf pointer to the message
   response->msg =
-      zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
+      zmq::message_t(buf.release_raw(), buf.size(), cm_free_func, NULL);
 }
 
 // RequestType is implicit in the call
@@ -99,7 +101,7 @@ void ClusterSet::BuildMarshalledResponse(int id, int start_index, int end_index,
   hp->num_clusters = clusters_.size();
   // hand the buf pointer to the message
   response->msg =
-      zmq::message_t(buf.release_raw(), buf.size(), free_func, NULL);
+      zmq::message_t(buf.release_raw(), buf.size(), cm_free_func, NULL);
 }
 
 ClusterSet::ClusterSet(MarshalledClusterSet& marshalled_set,
@@ -366,7 +368,8 @@ void ClusterSet::DebugDump(const std::vector<Sequence>& sequences) const {
     std::cout << "\tCluster seqs:\n";
     for (const auto& seq : cluster.Sequences()) {
       std::cout << "\t\tGenome: " << sequences[seq].Genome() << ", sequence: "
-                << PrintNormalizedProtein(sequences[seq].Seq().data(), sequences[seq].Seq().length())
+                << PrintNormalizedProtein(sequences[seq].Seq().data(),
+                                          sequences[seq].Seq().length())
                 << "\n\n";
     }
   }
@@ -388,7 +391,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
       std::cout << "Breaking partial merge.\n";
       break;
     }
-    Cluster c_standin(c_other.AllSequences());  // stand in cluster which holds diffs
+    Cluster c_standin(
+        c_other.AllSequences());  // stand in cluster which holds diffs
     if (!fully_merged && c.PassesThreshold(c_other, aligner)) {
       // std::cout << "passed threshold, aligning ...\n";
       s = c.AlignReps(c_other, &alignment, aligner);
@@ -464,7 +468,8 @@ ClusterSet ClusterSet::MergeCluster(Cluster& c_other, ProteinAligner* aligner,
   return new_cluster_set;
 }
 
-void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>& sequences) {
+void ClusterSet::ScheduleAlignments(AllAllBase* executor,
+                                    std::vector<Sequence>& sequences) {
   // removing duplicate clusters (clusters with same sequences)
   // for some reason, absl::InlinedVector doesnt work here
   absl::flat_hash_set<std::vector<size_t>> set_map;
@@ -484,7 +489,8 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>&
     }
   }
 
-  std::cout << "Found " << num_dups_found << " duplicate clusters." << std::endl;
+  std::cout << "Found " << num_dups_found << " duplicate clusters."
+            << std::endl;
   // sort by residue total first
   // to schedule the heaviest computations first
   std::cout << "sorting clusters ...\n";
@@ -527,9 +533,10 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>&
 
         auto abs_seq_pair = std::make_pair(seq1, seq2);
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
-          AllAllExecutor::WorkItem item =
-              std::make_tuple(&sequences[seq1], &sequences[seq2], cluster.Sequences().size());
-          //std::cout << "enqueueing alignment between " << seq2->ID() << " and " << seq2->ID() << "\n";
+          AllAllExecutor::WorkItem item = std::make_tuple(
+              &sequences[seq1], &sequences[seq2], cluster.Sequences().size());
+          // std::cout << "enqueueing alignment between " << seq2->ID() << " and
+          // " << seq2->ID() << "\n";
           executor->EnqueueAlignment(item);
         } else {
           num_avoided++;
@@ -540,36 +547,66 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor, std::vector<Sequence>&
   std::cout << "Avoided " << num_avoided << " alignments." << std::endl;
 }
 
-void ClusterSet::DumpJson(const std::string& filename,
-                          std::vector<std::string>& dataset_file_names) const {
-  nlohmann::json j;
-  size_t counter = 0;
+#define RETURN_ON_ERROR(...) \
+  int e = (__VA_ARGS__);     \
+  if (e) return e;
 
-  j["datasets"] = json::array();
-  for (const auto& name : dataset_file_names) {
-    j["datasets"].push_back(name);
+int ClusterSet::DumpJson(const std::string& filename,
+                         std::vector<std::string>& dataset_file_names) const {
+  std::cout << "dumping clusters ...\n";
+
+  // total amount of clusters can be large. So we buffer and compress data to
+  // file as we go, with default 2 MB buffers
+  BufferedCompressor compressor(2 * 1024 * 1024);
+  compressor.Init(filename);
+
+  std::stringstream ss;
+
+  std::string dsets("{\n\"datasets\": [\n");
+  RETURN_ON_ERROR(compressor.Write(dsets.data(), dsets.size()));
+
+  for (auto n_it = dataset_file_names.begin(); n_it != dataset_file_names.end();
+       n_it++) {
+    RETURN_ON_ERROR(compressor.Write("\t\"", 2));
+    RETURN_ON_ERROR(compressor.Write(n_it->data(), n_it->size()));
+    if (std::next(n_it) == dataset_file_names.end()) {
+      RETURN_ON_ERROR(compressor.Write("\"\n],\n", 5));
+    } else {
+      RETURN_ON_ERROR(compressor.Write("\",\n", 3));
+    }
   }
 
-  j["clusters"] = json::array();
+  std::string clstrs("\"clusters\": [\n");
+  RETURN_ON_ERROR(compressor.Write(clstrs.data(), clstrs.size()));
 
-  for (const auto& c : clusters_) {
-    j["clusters"].push_back(json::array());
+  // im using tabs/space here so it's at least somewhat human readable when
+  // decompressed
+  for (auto c_it = clusters_.begin(); c_it != clusters_.end(); c_it++) {
+    RETURN_ON_ERROR(compressor.Write("[\n", 2));
 
-    for (const auto& s : c.Sequences()) {
-      nlohmann::json j_temp = json::object();
-      j_temp["Genome"] = c.SeqAt(s).Genome();
-      j_temp["Index"] = c.SeqAt(s).GenomeIndex();
-      j_temp["AbsoluteIndex"] = s;
-      j["clusters"][counter].push_back(j_temp);
+    for (auto s_it = c_it->Sequences().begin(); s_it != c_it->Sequences().end();
+         s_it++) {
+      const auto& s = *s_it;
+
+      ss << "{\n\t\"Genome\": \"" << c_it->SeqAt(s).Genome()
+         << "\",\n\t\"Index\": " << c_it->SeqAt(s).GenomeIndex()
+         << ",\n\t\"AbsoluteIndex\": " << s << "\n}";
+      if (std::next(s_it) != c_it->Sequences().end()) {
+        ss << ",";
+      }
+      ss << "\n";
+      std::string out = ss.str();
+      RETURN_ON_ERROR(compressor.Write(out.data(), out.size()));
+      ss.str(std::string());  // clear the stream buffer
     }
 
-    counter++;
+    if (std::next(c_it) == clusters_.end()) {
+      RETURN_ON_ERROR(compressor.Write("]\n", 2));
+    } else {
+      RETURN_ON_ERROR(compressor.Write("],\n", 3));
+    }
   }
-
-  std::cout << "dumping clusters ...\n";
-  std::ofstream o(filename);
-
-  o << std::setw(2) << j << std::endl;
+  RETURN_ON_ERROR(compressor.Write("]}\n", 3));
 }
 
 void ClusterSet::RemoveDuplicates() {

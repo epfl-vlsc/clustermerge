@@ -447,7 +447,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         }
         mu_.Unlock();
 
-        cout << "got needed set\n";
+        //cout << "got needed set\n";
         auto start = std::chrono::high_resolution_clock::now();
         MarshalledClusterSetView set(it->second.first.data());
         ClusterSet cs(set, it->second.second, start_index, end_index,
@@ -455,11 +455,11 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
 
         Cluster c(cluster, sequences_);
         auto end = std::chrono::high_resolution_clock::now();
-        cout << "built set and cluster, took "
+        /*cout << "built set and cluster, took "
              << std::chrono::duration_cast<std::chrono::milliseconds>(end -
                                                                       start)
                     .count()
-             << " ms\n";
+             << " ms\n";*/
 
         auto new_cs = cs.MergeCluster(c, &aligner, worker_signal_);
         if (worker_signal_) {
@@ -492,7 +492,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         auto start = std::chrono::high_resolution_clock::now();
         int res = ProcessAlignments(request.data, &aligner, &results);
         MarshalledResponse resp;
-        resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), free_func, NULL);
+        resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), cm_free_func, NULL);
 
         result_queue_->push(std::move(resp));
         auto end = std::chrono::high_resolution_clock::now();
@@ -538,7 +538,7 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
       }
 
       auto size = request.buf.size();
-      zmq::message_t msg(request.buf.release_raw(), size, free_func, NULL);
+      zmq::message_t msg(request.buf.release_raw(), size, cm_free_func, NULL);
       bool success = zmq_incomplete_request_socket_->send(std::move(msg));
       if (!success) {
         cout << "INCOMP REQ Thread failed to send response over zmq!\n";

@@ -218,7 +218,7 @@ agd::Status Controller::Run(const Params& params,
       zmq_send_socket_->recv(&message);
 
       auto size = merge_request.buf.size();
-      zmq::message_t msg(merge_request.buf.release_raw(), size, free_func,
+      zmq::message_t msg(merge_request.buf.release_raw(), size, cm_free_func,
                          NULL);
       /*cout << "pushing request of size " << size << " of type "
            << (merge_request.has_batch() ? "batch " : "partial ") << std::endl;*/
@@ -282,7 +282,7 @@ agd::Status Controller::Run(const Params& params,
         agd::Buffer buf;
         buf.AppendBuffer(partial_item->marshalled_set_buf.data(),
                          partial_item->marshalled_set_buf.size());
-        zmq::message_t msg(buf.release_raw(), buf.size(), free_func, NULL);
+        zmq::message_t msg(buf.release_raw(), buf.size(), cm_free_func, NULL);
         // cout << "Size of message = " << msg.size() << std::endl;
         bool success = zmq_set_request_socket_->send(std::move(msg));
         if (!success) {
@@ -688,8 +688,11 @@ agd::Status Controller::Run(const Params& params,
 
   ClusterSet set(final_set, sequences_);
   std::vector<string> placeholder = {"dist_placeholder"};
-  string json_output_file = absl::StrCat(params.output_dir, "dist_clusters.json");
-  set.DumpJson(json_output_file, placeholder);
+  string json_output_file = absl::StrCat(params.output_dir, "/dist_clusters.json");
+  int dump_res = set.DumpJson(json_output_file, placeholder);
+  if (dump_res) {
+    cout << "Failed to dump clusters to compressed JSON, returned: " << dump_res << ", continuing ..." << std::endl;
+  }
 
   if (!params.exclude_allall) {
     cout << "scheduling all-all alignments on workers..." << std::endl;

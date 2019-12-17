@@ -6,7 +6,7 @@
 #include "cluster.h"
 #include "src/comms/requests.h"
 
-void free_func(void* data, void* hint); 
+void cm_free_func(void* data, void* hint); 
 
 class MergeExecutor;
 
@@ -74,7 +74,7 @@ class ClusterSet {
   void RemoveDuplicates();
 
   void DebugDump(const std::vector<Sequence>& sequences) const;
-  void DumpJson(const std::string& filename,
+  int DumpJson(const std::string& filename,
                 std::vector<std::string>& dataset_file_names) const;
 
   size_t Size() { return clusters_.size(); }

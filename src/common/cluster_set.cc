@@ -548,8 +548,8 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
 }
 
 #define RETURN_ON_ERROR(...) \
-  int e = (__VA_ARGS__);     \
-  if (e) return e;
+  {int e = (__VA_ARGS__);     \
+  if (e) return e;}
 
 int ClusterSet::DumpJson(const std::string& filename,
                          std::vector<std::string>& dataset_file_names) const {
@@ -607,6 +607,7 @@ int ClusterSet::DumpJson(const std::string& filename,
     }
   }
   RETURN_ON_ERROR(compressor.Write("]}\n", 3));
+  return 0;
 }
 
 void ClusterSet::RemoveDuplicates() {

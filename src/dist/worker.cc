@@ -102,7 +102,7 @@ int Worker::ProcessAlignments(const char* seq_buf, ProteinAligner* aligner, Alig
   const SeqPair* abs_seq_pair;
   result->Init(500);
   size_t num = 0;
-  while (reqs.GetNextPair(&abs_seq_pair)) {
+  while (reqs.GetNextPair(&abs_seq_pair) && !worker_signal_) {
     //cout << "got seq pair\n";
     ProteinAligner::Alignment alignment;
 
@@ -491,6 +491,16 @@ agd::Status Worker::Run(const Params& params, const Parameters& aligner_params,
         //cout << "processing alignments!!\n";
         auto start = std::chrono::high_resolution_clock::now();
         int res = ProcessAlignments(request.data, &aligner, &results);
+
+        if (worker_signal_) {
+          MarshalledRequest rq;
+          rq.buf.AppendBuffer(reinterpret_cast<const char*>(msg.data()),
+                              msg.size());
+          incomplete_request_queue_->push(std::move(rq));
+          std ::cout << "Pushing alignment into incomplete queue\n";
+          continue;
+        }
+
         MarshalledResponse resp;
         resp.msg = zmq::message_t(results.buf_.release_raw(), results.buf_.size(), cm_free_func, NULL);
 

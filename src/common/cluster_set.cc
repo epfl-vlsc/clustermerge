@@ -501,6 +501,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
 
   CandidateMap candidate_map(40000000);  // only a few MB
   int num_avoided = 0;
+  auto time_last_candmap_status = std::chrono::high_resolution_clock::now();
 
   for (const auto& cluster : clusters_) {
     // std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
@@ -540,6 +541,13 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
           executor->EnqueueAlignment(item);
         } else {
           num_avoided++;
+        }
+        auto cur_time = std::chrono::high_resolution_clock::now();
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - time_last_candmap_status).count() > 60000){
+          time_t now_time = std::time(0);
+          std::cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "]" 
+                    << "current candidate map size: " << candidate_map.size() << std::endl;
+          time_last_candmap_status = cur_time;
         }
       }
     }

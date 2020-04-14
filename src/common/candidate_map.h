@@ -56,6 +56,10 @@ class CandidateMap {
     }
   }
 
+  size_t size(){
+    return map_.size();
+  }
+
  private:
   int times_rehashed = 0;
   int longest_ = 0;

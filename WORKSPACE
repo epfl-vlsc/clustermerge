@@ -33,3 +33,10 @@ git_repository(
   remote="https://github.com/abseil/abseil-cpp",
   branch="lts_2018_12_18"
 )
+
+http_archive(
+    name = "bloomfilter",
+    url = "http://www.partow.net/downloads/bloom_filter.zip",
+    sha256 = "97de747ce5db8b5cb82613a419812980d140e40b0c6e58285b9c2ceb0b8e8d81",
+    build_file = "bloomfilter.BUILD",
+)

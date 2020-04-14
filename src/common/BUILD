@@ -48,6 +48,7 @@ cc_library(
             "@com_google_absl//absl/container:flat_hash_set",
             "@json//:json-cpp",
             "@args//:args",
+            "@bloomfilter//:bloomfilter",
             #"//src/proto:clustermerge_cc_proto",
             "//src/agd:agd",
             "//src/dataset:dataset",

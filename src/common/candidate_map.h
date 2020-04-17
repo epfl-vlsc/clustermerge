@@ -88,6 +88,10 @@ class CandidateMap {
     return ret_filter;
   }
 
+  size_t size(){
+    return map_.size();
+  }
+
  private:
   uint64_t disagreements_ = 0;
   uint64_t lookups_ = 0;

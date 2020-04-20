@@ -90,6 +90,10 @@ agd::Status LoadCheckpointFile(
     MarshalledClusterSet new_set;
     new_set.buf.resize(sz);
     checkp_stream.read(new_set.buf.mutable_data(), sz);
+    if (!checkp_stream.good() && !checkp_stream.eof()) {
+      return agd::errors::Internal("Unable to read correct number of bytes from stream ",
+                                  checkpoint_file, " reason: ", strerror(errno));
+    }
     queue->push(std::move(new_set));
   }
 

@@ -530,7 +530,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
   std::cout << "done sorting clusters." << std::endl;
 
   CandidateMap candidate_map(40000000);  // only a few MB
-  int num_avoided = 0, num_scheduled = 0;
+  uint64_t num_avoided = 0, num_scheduled = 0;
   auto time_last_candmap_status = std::chrono::high_resolution_clock::now();
 
   for (const auto& cluster : clusters_) {

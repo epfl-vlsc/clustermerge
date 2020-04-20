@@ -719,10 +719,13 @@ agd::Status Controller::Run(const Params& params,
   timing_file << sec.count() << std::endl;
   timing_file.close();
 
+  std::cout << "beginning to build the ClusterSet from the final set." << std::endl;
   ClusterSet set(final_set, sequences_);
+  std::cout << "finished building the ClusterSet from the final set. Start dumping to json." << std::endl;
   std::vector<string> placeholder = {"dist_placeholder"};
   string json_output_file =
       absl::StrCat(params.output_dir, "/dist_clusters.json");
+  std::cout << "json output file is " << json_output_file << std::endl;
   int dump_res = set.DumpJson(json_output_file, placeholder);
   if (dump_res) {
     cout << "Failed to dump clusters to compressed JSON, returned: " << dump_res

@@ -20,6 +20,36 @@ void cm_free_func(void* data, void* hint) {
   delete[] reinterpret_cast<char*>(data);
 }
 
+
+void process_mem_usage(double& vm_usage, double& resident_set){
+   using std::ios_base;
+   using std::ifstream;
+   using std::string;
+
+   vm_usage     = 0.0;
+   resident_set = 0.0;
+
+   // 'file' stat seems to give the most reliable results
+   ifstream stat_stream("/proc/self/stat",ios_base::in);
+   // dummy vars for leading entries in stat that we don't care about
+   string pid, comm, state, ppid, pgrp, session, tty_nr;
+   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+   string utime, stime, cutime, cstime, priority, nice;
+   string O, itrealvalue, starttime;
+   // the two fields we want
+   unsigned long vsize;
+   long rss;
+   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+               >> utime >> stime >> cutime >> cstime >> priority >> nice
+               >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
+   stat_stream.close();
+   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
+   vm_usage     = vsize / 1024.0;
+   resident_set = rss * page_size_kb;
+}
+
+
 // type is implicit in the call, retained for future improvments
 void ClusterSet::BuildMarshalledResponse(int id, RequestType type,
                                          MarshalledResponse* response) {
@@ -500,7 +530,8 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
   std::cout << "done sorting clusters." << std::endl;
 
   CandidateMap candidate_map(40000000);  // only a few MB
-  int num_avoided = 0;
+  int num_avoided = 0, num_scheduled = 0;
+  auto time_last_candmap_status = std::chrono::high_resolution_clock::now();
 
   for (const auto& cluster : clusters_) {
     // std::cout << "Cluster has " << cluster.Sequences().size() << " seqs\n";
@@ -535,16 +566,29 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
           AllAllExecutor::WorkItem item = std::make_tuple(
               &sequences[seq1], &sequences[seq2], cluster.Sequences().size());
-          // std::cout << "enqueueing alignment between " << seq2->ID() << " and
-          // " << seq2->ID() << "\n";
+          //std::cout << "enqueueing alignment between " << sequences[seq1].ID() << 
+          // " and " << sequences[seq2].ID() << std::endl;
           executor->EnqueueAlignment(item);
+          num_scheduled++;
         } else {
           num_avoided++;
+        }
+        auto cur_time = std::chrono::high_resolution_clock::now();
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - time_last_candmap_status).count() > 60000){
+          time_t now_time = std::time(0);
+          double vm, rss;
+          process_mem_usage(vm, rss); 
+          std::cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "]" 
+                    << " current candidate map size: " << candidate_map.size() 
+                    << " vsize: " << vm << "KB, RSS: " << rss << "KB, " 
+                    << " scheduled/avoided pairs: " << num_scheduled << "/" 
+                    << num_avoided << std::endl;
+          time_last_candmap_status = cur_time;
         }
       }
     }
   }
-  std::cout << "Avoided " << num_avoided << " alignments." << std::endl;
+  std::cout << "Avoided " << num_avoided << " / Scheduled " << num_scheduled << " alignments." << std::endl;
 }
 
 #define RETURN_ON_ERROR(...) \

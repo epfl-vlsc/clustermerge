@@ -24,7 +24,7 @@ class CandidateMap {
   CandidateMap(size_t size) {
     //map_.reserve(size);
     // BLOOM FILTER PARAMS
-    bl_params_.projected_element_count = 10000000;
+    bl_params_.projected_element_count = 500000000;
     bl_params_.false_positive_probability = 0.0001f;
     if (!bl_params_) {
       std::cout << "invalid BLFilter params!\n";
@@ -89,7 +89,7 @@ class CandidateMap {
   }
 
   size_t size(){
-    return map_.size();
+    return bl_filter_->element_count();
   }
 
  private:

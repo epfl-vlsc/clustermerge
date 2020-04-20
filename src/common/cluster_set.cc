@@ -500,7 +500,7 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
   std::cout << "done sorting clusters." << std::endl;
 
   CandidateMap candidate_map(40000000);  // only a few MB
-  int num_avoided = 0;
+  int num_avoided = 0, num_scheduled = 0;
   auto time_last_candmap_status = std::chrono::high_resolution_clock::now();
 
   for (const auto& cluster : clusters_) {
@@ -536,9 +536,10 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
         if (!candidate_map.ExistsOrInsert(abs_seq_pair)) {
           AllAllExecutor::WorkItem item = std::make_tuple(
               &sequences[seq1], &sequences[seq2], cluster.Sequences().size());
-          // std::cout << "enqueueing alignment between " << seq2->ID() << " and
-          // " << seq2->ID() << "\n";
+          //std::cout << "enqueueing alignment between " << sequences[seq1].ID() << 
+          // " and " << sequences[seq2].ID() << std::endl;
           executor->EnqueueAlignment(item);
+          num_scheduled++;
         } else {
           num_avoided++;
         }
@@ -546,13 +547,15 @@ void ClusterSet::ScheduleAlignments(AllAllBase* executor,
         if (std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - time_last_candmap_status).count() > 60000){
           time_t now_time = std::time(0);
           std::cout << "[" << std::put_time(std::localtime(&now_time), "%F %T") << "]" 
-                    << "current candidate map size: " << candidate_map.size() << std::endl;
+                    << " current candidate map size: " << candidate_map.size() 
+                    << " scheduled/avoided pairs: " << num_scheduled << "/" 
+                    << num_avoided << std::endl;
           time_last_candmap_status = cur_time;
         }
       }
     }
   }
-  std::cout << "Avoided " << num_avoided << " alignments." << std::endl;
+  std::cout << "Avoided " << num_avoided << " / Scheduled " << num_scheduled << " alignments." << std::endl;
 }
 
 #define RETURN_ON_ERROR(...) \
